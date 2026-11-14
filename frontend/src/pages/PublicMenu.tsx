@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -20,13 +20,7 @@ import {
   Toolbar,
   Paper,
   Divider,
-  Stack,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Snackbar,
-  Alert
+  Stack
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -35,29 +29,21 @@ import {
   Star as StarIcon,
   LocationOn as LocationIcon,
   AccessTime as TimeIcon,
-  RoomService as WaiterIcon,
-  Receipt as BillIcon,
   Spa as VeganIcon,
-  TableRestaurant as TableIcon,
-  Dining as DiningIcon,
   Restaurant as RestaurantIcon,
   Login as LoginIcon,
   WineBar as WineIcon,
-  Info as InfoIcon,
-  LocalDining as ForkIcon
+  Info as InfoIcon
 } from '@mui/icons-material';
 import { mockApi } from '../services/mockApi';
-import { Product, Category, StoreSettings, Table } from '../types';
-import { notifyRealtimeEvent } from '../services/eventBus';
+import { Product, Category, StoreSettings } from '../types';
 
 export default function PublicMenu() {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   // Data State
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [tables, setTables] = useState<Table[]>([]);
   const [settings, setSettings] = useState<StoreSettings | null>(null);
 
   // Filters State
@@ -65,41 +51,29 @@ export default function PublicMenu() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedTag, setSelectedTag] = useState<string>('ALL');
 
-  // Table Detection from QR (?mesa=4 or ?table=4)
-  const initialTableParam = searchParams.get('mesa') || searchParams.get('table') || '';
-  const [selectedTableNumber, setSelectedTableNumber] = useState<string>(initialTableParam);
-  const [isTableModalOpen, setIsTableModalOpen] = useState<boolean>(false);
-
-  // Dish Detail & Experience Modal
+  // Dish Interactive Detail Modal
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
 
-  // Waiter & Bill Alerts
-  const [serviceNotice, setServiceNotice] = useState<{ message: string; severity: 'success' | 'info' } | null>(null);
-
-  // Load Data
+  // Load Catalog Data
   useEffect(() => {
     loadData();
     const handleUpdate = () => { loadData(); };
     window.addEventListener('sesamo_catalog_updated', handleUpdate);
-    window.addEventListener('sesamo_tables_updated', handleUpdate);
     return () => {
       window.removeEventListener('sesamo_catalog_updated', handleUpdate);
-      window.removeEventListener('sesamo_tables_updated', handleUpdate);
     };
   }, []);
 
   const loadData = async () => {
     try {
-      const [prods, cats, tbls, sets] = await Promise.all([
+      const [prods, cats, sets] = await Promise.all([
         mockApi.products.getAll(),
         mockApi.categories.getAll(),
-        mockApi.tables.getAll(),
         mockApi.settings.get()
       ]);
       setProducts(prods.filter(p => p.isActive));
       setCategories(cats.filter(c => c.isActive));
-      setTables(tbls || []);
       setSettings(sets);
     } catch (err) {
       console.error('Error al cargar menú digital:', err);
@@ -140,37 +114,18 @@ export default function PublicMenu() {
     setSelectedProduct(null);
   };
 
-  // Waiter Actions
-  const handleCallWaiter = () => {
-    const tableStr = selectedTableNumber || 'Barra';
-    notifyRealtimeEvent('sesamo_waiter_called', { table: tableStr, timestamp: Date.now(), reason: 'ATENCION' });
-    setServiceNotice({
-      message: `🛎️ ¡Mesero notificado para la Mesa #${tableStr}! Un colaborador se acerca en un momento.`,
-      severity: 'success'
-    });
-  };
-
-  const handleRequestBill = () => {
-    const tableStr = selectedTableNumber || 'Barra';
-    notifyRealtimeEvent('sesamo_waiter_called', { table: tableStr, timestamp: Date.now(), reason: 'CUENTA' });
-    setServiceNotice({
-      message: `💵 ¡Cuenta solicitada para la Mesa #${tableStr}! Tu mesero te llevará el comprobante y datáfono.`,
-      severity: 'info'
-    });
-  };
-
   return (
-    <Box sx={{ bgcolor: '#0b1307', minHeight: '100vh', color: '#f8fafc', pb: 10 }}>
+    <Box sx={{ bgcolor: '#0b1307', minHeight: '100vh', color: '#f8fafc', pb: 8 }}>
       {/* ============================================================ */}
-      {/* TOP NAVIGATION BAR                                           */}
+      {/* TOP APP BAR (HEADER LIMPIO)                                  */}
       {/* ============================================================ */}
       <AppBar
         position="sticky"
         elevation={0}
         sx={{
-          bgcolor: 'rgba(11, 19, 7, 0.94)',
+          bgcolor: 'rgba(11, 19, 7, 0.95)',
           backdropFilter: 'blur(16px)',
-          borderBottom: '1px solid rgba(132, 204, 22, 0.2)'
+          borderBottom: '1px solid rgba(132, 204, 22, 0.18)'
         }}
       >
         <Container maxWidth="xl">
@@ -185,7 +140,7 @@ export default function PublicMenu() {
                 src="/logo.png"
                 alt="Sésamo Alimentos"
                 sx={{
-                  height: { xs: 44, sm: 50 },
+                  height: { xs: 44, sm: 52 },
                   width: 'auto',
                   filter: 'drop-shadow(0 4px 12px rgba(132, 204, 22, 0.35))'
                 }}
@@ -204,99 +159,33 @@ export default function PublicMenu() {
                 >
                   Sésamo
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#84cc16', fontWeight: 700, display: 'block', fontSize: '0.72rem' }}>
-                  Carta Digital & Experiencia Gastronómica
+                <Typography variant="caption" sx={{ color: '#84cc16', fontWeight: 700, display: 'block', fontSize: '0.74rem' }}>
+                  Menú & Carta Digital
                 </Typography>
               </Box>
             </Box>
 
-            {/* Right Quick Actions (Waiter & Bill Service) */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-              {/* Table Selector Pill */}
-              <Chip
-                icon={<TableIcon sx={{ color: '#84cc16 !important', fontSize: '18px !important' }} />}
-                label={selectedTableNumber ? `Mesa #${selectedTableNumber}` : 'Indicar Mesa'}
-                clickable
-                onClick={() => setIsTableModalOpen(true)}
-                sx={{
-                  bgcolor: selectedTableNumber ? 'rgba(132, 204, 22, 0.16)' : 'rgba(255, 255, 255, 0.08)',
-                  color: selectedTableNumber ? '#bef264' : '#cbd5e1',
-                  fontWeight: 800,
-                  fontSize: '0.82rem',
-                  border: '1px solid rgba(132, 204, 22, 0.35)',
-                  height: 38
-                }}
-              />
-
-              {/* Call Waiter Button */}
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<WaiterIcon />}
-                onClick={handleCallWaiter}
-                sx={{
-                  borderRadius: '12px',
-                  fontWeight: 900,
-                  fontSize: '0.82rem',
-                  textTransform: 'none',
-                  px: 2,
-                  height: 38,
-                  bgcolor: '#16a34a',
-                  background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                  boxShadow: '0 4px 14px rgba(22, 163, 74, 0.35)',
-                  '&:hover': { bgcolor: '#15803d' }
-                }}
-              >
-                Llamar Mesero
-              </Button>
-
-              {/* Request Bill Button */}
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<BillIcon />}
-                onClick={handleRequestBill}
-                sx={{
-                  display: { xs: 'none', md: 'inline-flex' },
-                  borderRadius: '12px',
-                  borderColor: 'rgba(234, 179, 8, 0.45)',
-                  color: '#facc15',
-                  fontWeight: 800,
-                  fontSize: '0.82rem',
-                  textTransform: 'none',
-                  px: 1.8,
-                  height: 38,
-                  bgcolor: 'rgba(234, 179, 8, 0.08)',
-                  '&:hover': {
-                    borderColor: '#facc15',
-                    bgcolor: 'rgba(234, 179, 8, 0.18)'
-                  }
-                }}
-              >
-                Pedir Cuenta
-              </Button>
-
-              {/* Staff Portal Link */}
-              <IconButton
-                onClick={() => navigate('/login')}
-                title="Acceso Personal / Meseros"
-                sx={{
-                  bgcolor: 'rgba(255,255,255,0.05)',
-                  color: '#94a3b8',
-                  p: 1.1,
-                  borderRadius: '14px',
-                  '&:hover': { color: '#ffffff', bgcolor: 'rgba(255,255,255,0.12)' }
-                }}
-              >
-                <LoginIcon sx={{ fontSize: 20 }} />
-              </IconButton>
-            </Box>
+            {/* Right: Staff Portal Button */}
+            <IconButton
+              onClick={() => navigate('/login')}
+              title="Acceso Personal / Staff"
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.06)',
+                color: '#94a3b8',
+                p: 1.1,
+                borderRadius: '14px',
+                border: '1px solid rgba(255,255,255,0.1)',
+                '&:hover': { color: '#ffffff', bgcolor: 'rgba(132, 204, 22, 0.2)', borderColor: '#84cc16' }
+              }}
+            >
+              <LoginIcon sx={{ fontSize: 20 }} />
+            </IconButton>
           </Toolbar>
         </Container>
       </AppBar>
 
       {/* ============================================================ */}
-      {/* HERO BANNER SECTION (EXPERIENCIAL & SERVICIO)                */}
+      {/* HERO BANNER SECTION                                          */}
       {/* ============================================================ */}
       <Box
         sx={{
@@ -304,156 +193,72 @@ export default function PublicMenu() {
           overflow: 'hidden',
           background: 'linear-gradient(180deg, #131e0c 0%, #0b1307 100%)',
           pt: { xs: 4, md: 5 },
-          pb: { xs: 4, md: 5 },
+          pb: { xs: 3.5, md: 4.5 },
           borderBottom: '1px solid rgba(132, 204, 22, 0.12)'
         }}
       >
         <Container maxWidth="xl">
-          <Grid container spacing={3} sx={{ alignItems: 'center' }}>
-            <Grid size={{ xs: 12, md: 8 }}>
-              {/* Badges */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 1.8, flexWrap: 'wrap' }}>
-                <Chip
-                  icon={<ForkIcon sx={{ color: '#84cc16 !important', fontSize: '15px !important' }} />}
-                  label="Servicio Exclusivo a la Mesa"
-                  size="small"
-                  sx={{
-                    bgcolor: 'rgba(132, 204, 22, 0.14)',
-                    color: '#bef264',
-                    fontWeight: 800,
-                    fontSize: '0.75rem',
-                    border: '1px solid rgba(132, 204, 22, 0.3)'
-                  }}
-                />
-                <Chip
-                  icon={<StarIcon sx={{ color: '#facc15 !important', fontSize: '15px !important' }} />}
-                  label="Cocina de Autor & Sabores Conscientes"
-                  size="small"
-                  sx={{
-                    bgcolor: 'rgba(250, 204, 21, 0.1)',
-                    color: '#fef08a',
-                    fontWeight: 700,
-                    fontSize: '0.75rem',
-                    border: '1px solid rgba(250, 204, 21, 0.25)'
-                  }}
-                />
-              </Box>
+          <Box sx={{ maxWidth: 780 }}>
+            {/* Tag Chip */}
+            <Chip
+              icon={<StarIcon sx={{ color: '#facc15 !important', fontSize: '15px !important' }} />}
+              label="Cocina de Autor & Sabores Conscientes"
+              size="small"
+              sx={{
+                bgcolor: 'rgba(250, 204, 21, 0.1)',
+                color: '#fef08a',
+                fontWeight: 700,
+                fontSize: '0.75rem',
+                border: '1px solid rgba(250, 204, 21, 0.25)',
+                mb: 1.5
+              }}
+            />
 
-              <Typography
-                variant="h2"
-                component="h1"
-                sx={{
-                  fontWeight: 900,
-                  fontSize: { xs: '2.1rem', sm: '2.8rem', md: '3.4rem' },
-                  lineHeight: 1.15,
-                  letterSpacing: '-0.03em',
-                  mb: 1.5,
-                  background: 'linear-gradient(135deg, #ffffff 0%, #e2e8f0 60%, #bef264 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent'
-                }}
-              >
-                Nuestra Carta Digital en tu Mesa
-              </Typography>
+            <Typography
+              variant="h2"
+              component="h1"
+              sx={{
+                fontWeight: 900,
+                fontSize: { xs: '2.2rem', sm: '2.9rem', md: '3.4rem' },
+                lineHeight: 1.12,
+                letterSpacing: '-0.03em',
+                mb: 1.5,
+                background: 'linear-gradient(135deg, #ffffff 0%, #e2e8f0 60%, #bef264 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent'
+              }}
+            >
+              Nuestra Carta
+            </Typography>
 
-              <Typography
-                variant="body1"
-                sx={{
-                  color: '#94a3b8',
-                  fontSize: { xs: '0.98rem', md: '1.1rem' },
-                  lineHeight: 1.6,
-                  maxWidth: 700,
-                  mb: 2.8
-                }}
-              >
-                Explora cada platillo con fotos en alta resolución, ingredientes, maridajes sugeridos e información nutricional. Tu mesero asignado tomará tu orden directamente en tu mesa.
-              </Typography>
+            <Typography
+              variant="body1"
+              sx={{
+                color: '#94a3b8',
+                fontSize: { xs: '0.98rem', md: '1.08rem' },
+                lineHeight: 1.6,
+                mb: 2.5
+              }}
+            >
+              Explora nuestras creaciones con fotos, videos de preparación, maridajes sugeridos e información nutricional. Toca cualquier platillo para conocer su ficha completa.
+            </Typography>
 
-              {/* Location & Time Info */}
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2.5} sx={{ color: '#cbd5e1' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                  <LocationIcon sx={{ color: '#84cc16', fontSize: 18 }} />
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {settings?.address || 'El Poblado & Laureles, Medellín'}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                  <TimeIcon sx={{ color: '#84cc16', fontSize: 18 }} />
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    Servicio de Sala: 12:00 PM - 10:30 PM
-                  </Typography>
-                </Box>
-              </Stack>
-            </Grid>
-
-            {/* Service Hospitality Info Card */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2.8,
-                  borderRadius: '24px',
-                  bgcolor: 'rgba(23, 35, 17, 0.8)',
-                  border: '1px solid rgba(132, 204, 22, 0.25)',
-                  backdropFilter: 'blur(12px)',
-                  boxShadow: '0 12px 30px rgba(0, 0, 0, 0.35)'
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.8 }}>
-                  <DiningIcon sx={{ color: '#84cc16', fontSize: 32 }} />
-                  <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#ffffff', lineHeight: 1.2 }}>
-                      Atención Personalizada
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#a3e635', fontWeight: 600 }}>
-                      {selectedTableNumber ? `Mesa #${selectedTableNumber} Seleccionada` : 'Selecciona tu mesa para atención'}
-                    </Typography>
-                  </Box>
-                </Box>
-                <Typography variant="body2" sx={{ color: '#cbd5e1', fontSize: '0.86rem', lineHeight: 1.55, mb: 2.2 }}>
-                  Toca cualquier plato para ver su preparación y maridaje recomendado. Cuando decidas qué ordenar, presiona el botón para llamar a tu mesero.
+            {/* Location & Time Info */}
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2.5} sx={{ color: '#cbd5e1' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                <LocationIcon sx={{ color: '#84cc16', fontSize: 18 }} />
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {settings?.address || 'El Poblado & Laureles, Medellín'}
                 </Typography>
-
-                <Stack direction="row" spacing={1.2}>
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    startIcon={<WaiterIcon />}
-                    onClick={handleCallWaiter}
-                    sx={{
-                      bgcolor: '#16a34a',
-                      color: '#ffffff',
-                      fontWeight: 800,
-                      textTransform: 'none',
-                      borderRadius: '14px',
-                      py: 1.1,
-                      '&:hover': { bgcolor: '#15803d' }
-                    }}
-                  >
-                    Llamar Mesero
-                  </Button>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    startIcon={<BillIcon />}
-                    onClick={handleRequestBill}
-                    sx={{
-                      borderColor: 'rgba(234, 179, 8, 0.4)',
-                      color: '#facc15',
-                      fontWeight: 800,
-                      textTransform: 'none',
-                      borderRadius: '14px',
-                      py: 1.1,
-                      bgcolor: 'rgba(234, 179, 8, 0.08)',
-                      '&:hover': { bgcolor: 'rgba(234, 179, 8, 0.16)', borderColor: '#facc15' }
-                    }}
-                  >
-                    Pedir Cuenta
-                  </Button>
-                </Stack>
-              </Paper>
-            </Grid>
-          </Grid>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                <TimeIcon sx={{ color: '#84cc16', fontSize: 18 }} />
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Horario: 12:00 PM - 10:30 PM
+                </Typography>
+              </Box>
+            </Stack>
+          </Box>
         </Container>
       </Box>
 
@@ -461,11 +266,11 @@ export default function PublicMenu() {
       {/* SEARCH, CATEGORIES & DIETARY FILTER CONTROLS                 */}
       {/* ============================================================ */}
       <Container maxWidth="xl" sx={{ mt: 3.5 }}>
-        {/* Search Input */}
+        {/* Search Bar */}
         <Box sx={{ mb: 2.5 }}>
           <TextField
             fullWidth
-            placeholder="Buscar por platillo, ingrediente, vino o término (ej. Solomito, Salmón, Risotto, Mojito...)"
+            placeholder="Buscar por platillo, ingrediente, vino o término (ej. Solomito, Risotto, Bowl, Mojito...)"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             slotProps={{
@@ -483,11 +288,11 @@ export default function PublicMenu() {
                   </InputAdornment>
                 ) : null,
                 sx: {
-                  bgcolor: 'rgba(20, 32, 15, 0.8)',
+                  bgcolor: 'rgba(20, 32, 15, 0.85)',
                   borderRadius: '16px',
                   color: '#ffffff',
                   fontSize: '0.98rem',
-                  border: '1px solid rgba(132, 204, 22, 0.2)',
+                  border: '1px solid rgba(132, 204, 22, 0.22)',
                   '& fieldset': { border: 'none' },
                   '&:hover': { borderColor: '#84cc16' }
                 }
@@ -496,7 +301,7 @@ export default function PublicMenu() {
           />
         </Box>
 
-        {/* Category Pills (Horizontal Scrollable) */}
+        {/* Category Navigation Pills */}
         <Box sx={{ mb: 2 }}>
           <Stack
             direction="row"
@@ -605,7 +410,7 @@ export default function PublicMenu() {
         </Box>
 
         {/* ============================================================ */}
-        {/* DISHES CARDS GRID                                            */}
+        {/* DISH CARDS GRID                                              */}
         {/* ============================================================ */}
         {filteredProducts.length === 0 ? (
           <Paper
@@ -659,7 +464,7 @@ export default function PublicMenu() {
                       }
                     }}
                   >
-                    {/* Image & Visual Badges */}
+                    {/* Image & Video Indicator */}
                     <Box sx={{ position: 'relative', pt: '62%', overflow: 'hidden' }}>
                       <CardMedia
                         component="img"
@@ -714,7 +519,7 @@ export default function PublicMenu() {
                       />
                     </Box>
 
-                    {/* Card Body */}
+                    {/* Card Content */}
                     <CardContent sx={{ flexGrow: 1, p: 2.2 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.8 }}>
                         <Typography
@@ -840,7 +645,7 @@ export default function PublicMenu() {
       </Container>
 
       {/* ============================================================ */}
-      {/* DISH DETAIL & SENSORY TASTING MODAL                          */}
+      {/* DISH INTERACTIVE DETAIL MODAL                                */}
       {/* ============================================================ */}
       <Dialog
         open={isDetailModalOpen}
@@ -930,11 +735,11 @@ export default function PublicMenu() {
                 {selectedProduct.description}
               </Typography>
 
-              {/* Modifiers & Customization Options (Read-only culinary preview) */}
+              {/* Options & Variations Preview */}
               {selectedProduct.modifiers && selectedProduct.modifiers.length > 0 && (
                 <Box sx={{ mb: 2.5, p: 2, bgcolor: 'rgba(255,255,255,0.04)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)' }}>
                   <Typography variant="caption" sx={{ fontWeight: 800, color: '#84cc16', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 1 }}>
-                    Opciones y Acompañamientos Disponibles:
+                    Opciones y Acompañamientos:
                   </Typography>
                   {selectedProduct.modifiers.map(group => (
                     <Box key={group.id} sx={{ mb: 1 }}>
@@ -966,7 +771,7 @@ export default function PublicMenu() {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                   <WineIcon sx={{ color: '#facc15', fontSize: 20 }} />
                   <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#fef08a' }}>
-                    Maridaje & Sugerencia del Sommelier
+                    Maridaje & Sugerencia de la Casa
                   </Typography>
                 </Box>
                 <Typography variant="caption" sx={{ color: '#cbd5e1', lineHeight: 1.5, display: 'block' }}>
@@ -974,139 +779,26 @@ export default function PublicMenu() {
                 </Typography>
               </Box>
 
-              {/* Call Waiter CTA */}
               <Button
                 fullWidth
-                variant="contained"
-                size="large"
-                startIcon={<WaiterIcon />}
-                onClick={() => {
-                  handleCallWaiter();
-                  handleCloseDetailModal();
-                }}
+                variant="outlined"
+                onClick={handleCloseDetailModal}
                 sx={{
-                  py: 1.3,
+                  py: 1.1,
                   borderRadius: '14px',
-                  fontWeight: 900,
-                  fontSize: '0.95rem',
-                  bgcolor: '#16a34a',
-                  background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                  boxShadow: '0 6px 20px rgba(22, 163, 74, 0.4)',
+                  fontWeight: 800,
+                  borderColor: 'rgba(132, 204, 22, 0.4)',
+                  color: '#bef264',
                   textTransform: 'none',
-                  '&:hover': { bgcolor: '#15803d' }
+                  '&:hover': { borderColor: '#84cc16', bgcolor: 'rgba(132, 204, 22, 0.12)' }
                 }}
               >
-                Pedir este platillo a mi mesero 🛎️
+                Cerrar Ficha
               </Button>
             </DialogContent>
           </>
         )}
       </Dialog>
-
-      {/* ============================================================ */}
-      {/* TABLE SELECTION DIALOG                                       */}
-      {/* ============================================================ */}
-      <Dialog
-        open={isTableModalOpen}
-        onClose={() => setIsTableModalOpen(false)}
-        maxWidth="xs"
-        fullWidth
-        slotProps={{
-          paper: {
-            sx: {
-              bgcolor: '#14200f',
-              color: '#ffffff',
-              borderRadius: '24px',
-              border: '1px solid rgba(132, 204, 22, 0.3)',
-              p: 2.5
-            }
-          }
-        }}
-      >
-        <DialogContent sx={{ p: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 1.5 }}>
-            <TableIcon sx={{ color: '#84cc16', fontSize: 28 }} />
-            <Typography variant="h6" sx={{ fontWeight: 900 }}>
-              ¿En qué mesa te encuentras?
-            </Typography>
-          </Box>
-          <Typography variant="body2" sx={{ color: '#94a3b8', mb: 2.5, fontSize: '0.88rem' }}>
-            Indica el número de tu mesa para que el personal de servicio acuda rápidamente cuando los llames.
-          </Typography>
-
-          <FormControl fullWidth size="small" sx={{ mb: 2.5 }}>
-            <InputLabel sx={{ color: '#84cc16', fontWeight: 700 }}>Número de Mesa</InputLabel>
-            <Select
-              value={selectedTableNumber}
-              label="Número de Mesa"
-              onChange={e => setSelectedTableNumber(e.target.value)}
-              sx={{
-                color: '#ffffff',
-                bgcolor: 'rgba(255,255,255,0.06)',
-                borderRadius: '12px',
-                fontWeight: 800,
-                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(132, 204, 22, 0.4)' }
-              }}
-            >
-              {tables.length > 0 ? (
-                tables.map(t => (
-                  <MenuItem key={t.id} value={String(t.number)}>
-                    Mesa #{t.number} — {t.location} ({t.capacity} puestos)
-                  </MenuItem>
-                ))
-              ) : (
-                [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
-                  <MenuItem key={n} value={String(n)}>
-                    Mesa #{n}
-                  </MenuItem>
-                ))
-              )}
-            </Select>
-          </FormControl>
-
-          <Button
-            fullWidth
-            variant="contained"
-            onClick={() => setIsTableModalOpen(false)}
-            sx={{
-              py: 1.2,
-              borderRadius: '14px',
-              fontWeight: 800,
-              bgcolor: '#16a34a',
-              textTransform: 'none',
-              '&:hover': { bgcolor: '#15803d' }
-            }}
-          >
-            Confirmar Mesa
-          </Button>
-        </DialogContent>
-      </Dialog>
-
-      {/* ============================================================ */}
-      {/* SERVICE NOTIFICATION SNACKBAR                                */}
-      {/* ============================================================ */}
-      <Snackbar
-        open={Boolean(serviceNotice)}
-        autoHideDuration={6000}
-        onClose={() => setServiceNotice(null)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={() => setServiceNotice(null)}
-          severity={serviceNotice?.severity || 'success'}
-          sx={{
-            width: '100%',
-            fontWeight: 800,
-            bgcolor: serviceNotice?.severity === 'info' ? '#0284c7' : '#16a34a',
-            color: '#ffffff',
-            borderRadius: '16px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-            '& .MuiAlert-icon': { color: '#ffffff' }
-          }}
-        >
-          {serviceNotice?.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }
