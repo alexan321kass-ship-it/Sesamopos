@@ -52,7 +52,9 @@ import {
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
   GridView as GridViewIcon,
-  ViewList as TableViewIcon
+  ViewList as TableViewIcon,
+  DoneAll as DoneAllIcon,
+  SkipNext as SkipNextIcon
 } from '@mui/icons-material';
 import { mockApi } from '../services/mockApi';
 import { Customer, Order } from '../types';
@@ -67,6 +69,29 @@ const ALLERGEN_OPTIONS = [
   'Soja',
   'Sésamo',
   'Mostaza'
+];
+
+const BROADCAST_PRESETS = [
+  {
+    id: 'promo',
+    label: '🎁 Promo Especial',
+    text: '¡Hola {nombre}! 🌿 En Restaurante Sésamo tenemos una promoción especial para ti: 2x1 en postres artesanales o bebidas de la casa con tu plato fuerte. ¡Te esperamos hoy!',
+  },
+  {
+    id: 'menu',
+    label: '✨ Novedades de Carta',
+    text: '¡Hola {nombre}! ✨ Ven a descubrir los nuevos platillos de nuestra carta en Restaurante Sésamo. Ingredientes frescos, recetas únicas y el mejor ambiente. ¡Haz tu reserva respondiendo a este mensaje!',
+  },
+  {
+    id: 'miss_you',
+    label: '💚 Te Extrañamos',
+    text: '¡Hola {nombre}! En Restaurante Sésamo te extrañamos mucho. Queremos verte de nuevo, así que en tu próxima visita la bebida de la casa corre por nuestra cuenta. ¡Te esperamos!',
+  },
+  {
+    id: 'daily',
+    label: '🍽️ Almuerzo / Menú del Día',
+    text: '¡Hola {nombre}! 🍽️ Ya está listo el menú de hoy en Sésamo: fresco, saludable y preparado al momento. ¿Te apartamos mesa o prefieres que te lo llevemos a domicilio?',
+  },
 ];
 
 export default function CustomersScreen() {
@@ -91,6 +116,15 @@ export default function CustomersScreen() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   const [deleteConfirmCustomer, setDeleteConfirmCustomer] = useState<Customer | null>(null);
+
+  // WhatsApp Broadcast Campaign State
+  const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
+  const [broadcastAudience, setBroadcastAudience] = useState<'ALL' | 'FREQUENT' | 'AT_RISK'>('ALL');
+  const [broadcastMessage, setBroadcastMessage] = useState<string>(
+    '¡Hola {nombre}! 🌿 En Restaurante Sésamo tenemos una promoción especial para ti: 2x1 en postres artesanales o bebidas de la casa con tu plato fuerte. ¡Te esperamos hoy!'
+  );
+  const [sentCustomerIds, setSentCustomerIds] = useState<Record<string, boolean>>({});
+  const [activeDispatchIndex, setActiveDispatchIndex] = useState<number>(0);
 
   // Feedback Snackbar
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'info' | 'warning' | 'error' }>({
@@ -323,6 +357,68 @@ export default function CustomersScreen() {
     window.open(`https://wa.me/${fullPhone}?text=${text}`, '_blank');
   };
 
+  // Clientes con teléfono válido para la campaña de difusión
+  const broadcastRecipients = useMemo(() => {
+    let list = customers.filter(c => c.phone && c.phone.replace(/[^0-9]/g, '').length >= 7);
+    if (broadcastAudience === 'FREQUENT') {
+      list = list.filter(c => (c.totalOrders || 0) >= 2);
+    } else if (broadcastAudience === 'AT_RISK') {
+      list = rfmSegments.atRisk.filter(c => c.phone && c.phone.replace(/[^0-9]/g, '').length >= 7);
+    }
+    return list;
+  }, [customers, broadcastAudience, rfmSegments]);
+
+  const sentCount = useMemo(() => {
+    return broadcastRecipients.filter(c => sentCustomerIds[c.id]).length;
+  }, [broadcastRecipients, sentCustomerIds]);
+
+  const formatBroadcastText = (template: string, customer: Customer) => {
+    const firstName = customer.name?.trim().split(' ')[0] || customer.name || 'comensal';
+    return template
+      .replace(/{nombre}/gi, firstName)
+      .replace(/{nombre_completo}/gi, customer.name || '')
+      .replace(/{restaurante}/gi, 'Restaurante Sésamo');
+  };
+
+  const handleSendToCustomer = (customer: Customer) => {
+    const text = formatBroadcastText(broadcastMessage, customer);
+    openWhatsApp(customer.phone, customer.name, text);
+    setSentCustomerIds(prev => ({ ...prev, [customer.id]: true }));
+  };
+
+  const handleSendCurrentAndNext = () => {
+    if (broadcastRecipients.length === 0) return;
+    const current = broadcastRecipients[activeDispatchIndex];
+    if (current) {
+      handleSendToCustomer(current);
+      if (activeDispatchIndex + 1 < broadcastRecipients.length) {
+        setActiveDispatchIndex(prev => prev + 1);
+      }
+    }
+  };
+
+  const handleSkipNext = () => {
+    if (activeDispatchIndex + 1 < broadcastRecipients.length) {
+      setActiveDispatchIndex(prev => prev + 1);
+    }
+  };
+
+  const handleSendAllBatch = () => {
+    if (broadcastRecipients.length === 0) return;
+    broadcastRecipients.forEach((c, idx) => {
+      setTimeout(() => {
+        const text = formatBroadcastText(broadcastMessage, c);
+        openWhatsApp(c.phone, c.name, text);
+        setSentCustomerIds(prev => ({ ...prev, [c.id]: true }));
+      }, idx * 600);
+    });
+    setSnackbar({
+      open: true,
+      message: `Abriendo WhatsApp para ${broadcastRecipients.length} comensales. Si alguna pestaña no abre, habilita las ventanas emergentes en tu navegador.`,
+      severity: 'info',
+    });
+  };
+
   // Órdenes asociadas a un cliente en el modal 360
   const customerRecentOrders = useMemo(() => {
     if (!profileCustomer) return [];
@@ -439,6 +535,28 @@ export default function CustomersScreen() {
             }}
           >
             Sincronizar
+          </Button>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<WhatsAppIcon sx={{ fontSize: 18 }} />}
+            onClick={() => {
+              setActiveDispatchIndex(0);
+              setIsBroadcastModalOpen(true);
+            }}
+            sx={{
+              borderRadius: 2,
+              fontWeight: 900,
+              textTransform: 'none',
+              bgcolor: '#16a34a',
+              color: '#ffffff',
+              px: 2,
+              py: 0.9,
+              boxShadow: '0 4px 14px rgba(22, 163, 74, 0.3)',
+              '&:hover': { bgcolor: '#15803d', boxShadow: '0 6px 18px rgba(22, 163, 74, 0.45)' },
+            }}
+          >
+            Enviar WhatsApp Masivo
           </Button>
           <Button
             variant="contained"
@@ -1512,6 +1630,320 @@ export default function CustomersScreen() {
               Contactar por WhatsApp
             </Button>
           )}
+        </DialogActions>
+      </Dialog>
+
+      {/* DIÁLOGO: CAMPAÑA DE MENSAJES MASIVOS WHATSAPP */}
+      <Dialog
+        open={isBroadcastModalOpen}
+        onClose={() => setIsBroadcastModalOpen(false)}
+        maxWidth="md"
+        fullWidth
+        slotProps={{ paper: { sx: { borderRadius: '24px', overflow: 'hidden' } } }}
+      >
+        <DialogTitle sx={{ bgcolor: '#f0fdf4', borderBottom: '1px solid #bbf7d0', p: 2.5 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ width: 44, height: 44, borderRadius: '14px', bgcolor: '#16a34a', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)' }}>
+                <WhatsAppIcon sx={{ fontSize: 26 }} />
+              </Box>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 900, color: '#14532d', lineHeight: 1.2 }}>
+                  Enviar Mensaje Masivo por WhatsApp
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#15803d', fontWeight: 600 }}>
+                  Personaliza tu mensaje y contacta a tus clientes en un clic con plantillas dinámicas
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton onClick={() => setIsBroadcastModalOpen(false)} size="small" sx={{ color: '#166534' }}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 3, bgcolor: '#ffffff' }}>
+          <Stack spacing={2.5}>
+            {/* 1. SELECCIÓN DE AUDIENCIA */}
+            <Box>
+              <Typography variant="caption" sx={{ fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 1 }}>
+                1. Selecciona a quién enviar el mensaje:
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Chip
+                  clickable
+                  onClick={() => { setBroadcastAudience('ALL'); setActiveDispatchIndex(0); }}
+                  label={`👥 Todos los Clientes (${customers.filter(c => c.phone).length})`}
+                  color={broadcastAudience === 'ALL' ? 'success' : 'default'}
+                  variant={broadcastAudience === 'ALL' ? 'filled' : 'outlined'}
+                  sx={{ fontWeight: 800, borderRadius: '10px' }}
+                />
+                <Chip
+                  clickable
+                  onClick={() => { setBroadcastAudience('FREQUENT'); setActiveDispatchIndex(0); }}
+                  label={`⭐ Clientes Frecuentes (${customers.filter(c => c.phone && (c.totalOrders || 0) >= 2).length})`}
+                  color={broadcastAudience === 'FREQUENT' ? 'success' : 'default'}
+                  variant={broadcastAudience === 'FREQUENT' ? 'filled' : 'outlined'}
+                  sx={{ fontWeight: 800, borderRadius: '10px' }}
+                />
+                <Chip
+                  clickable
+                  onClick={() => { setBroadcastAudience('AT_RISK'); setActiveDispatchIndex(0); }}
+                  label={`⚠️ Clientes en Riesgo / Inactivos (${rfmSegments.atRisk.filter(c => c.phone).length})`}
+                  color={broadcastAudience === 'AT_RISK' ? 'success' : 'default'}
+                  variant={broadcastAudience === 'AT_RISK' ? 'filled' : 'outlined'}
+                  sx={{ fontWeight: 800, borderRadius: '10px' }}
+                />
+              </Box>
+            </Box>
+
+            {/* 2. PLANTILLAS RÁPIDAS */}
+            <Box>
+              <Typography variant="caption" sx={{ fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 1 }}>
+                2. Plantillas rápidas (haz clic para cargar):
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {BROADCAST_PRESETS.map(preset => (
+                  <Button
+                    key={preset.id}
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setBroadcastMessage(preset.text)}
+                    sx={{
+                      borderRadius: '10px',
+                      textTransform: 'none',
+                      fontWeight: 800,
+                      fontSize: '0.78rem',
+                      borderColor: '#cbd5e1',
+                      color: '#334155',
+                      bgcolor: '#f8fafc',
+                      '&:hover': { bgcolor: '#f1f5f9', borderColor: '#94a3b8' },
+                    }}
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+              </Box>
+            </Box>
+
+            {/* 3. EDITOR DEL MENSAJE */}
+            <Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.8 }}>
+                <Typography variant="caption" sx={{ fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  3. Redacta o modifica el mensaje:
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.72rem' }}>
+                    Variables dinámicas:
+                  </Typography>
+                  <Chip
+                    size="small"
+                    label="{nombre}"
+                    onClick={() => setBroadcastMessage(prev => prev + ' {nombre}')}
+                    sx={{ height: 20, fontSize: '0.65rem', fontWeight: 800, bgcolor: '#e0f2fe', color: '#0369a1', cursor: 'pointer' }}
+                  />
+                  <Chip
+                    size="small"
+                    label="{restaurante}"
+                    onClick={() => setBroadcastMessage(prev => prev + ' {restaurante}')}
+                    sx={{ height: 20, fontSize: '0.65rem', fontWeight: 800, bgcolor: '#fef3c7', color: '#92400e', cursor: 'pointer' }}
+                  />
+                </Box>
+              </Box>
+              <TextField
+                fullWidth
+                multiline
+                rows={4}
+                value={broadcastMessage}
+                onChange={(e) => setBroadcastMessage(e.target.value)}
+                placeholder="Escribe el mensaje que recibirán tus clientes..."
+                sx={{
+                  bgcolor: '#ffffff',
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '14px',
+                    fontSize: '0.9rem',
+                    fontFamily: 'inherit',
+                  },
+                }}
+              />
+            </Box>
+
+            {/* 4. VISTA PREVIA ESTILO WHATSAPP */}
+            <Box sx={{ p: 2, bgcolor: '#efeae2', borderRadius: '16px', border: '1px solid #e2dcd2' }}>
+              <Typography variant="caption" sx={{ fontWeight: 900, color: '#54656f', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 1 }}>
+                Vista previa del cliente (WhatsApp en vivo):
+              </Typography>
+              <Box sx={{ maxWidth: '85%', bgcolor: '#dcf8c6', p: 1.5, borderRadius: '12px 12px 2px 12px', boxShadow: '0 1px 2px rgba(0,0,0,0.15)', ml: 'auto', position: 'relative' }}>
+                <Typography variant="body2" sx={{ color: '#111b21', whiteSpace: 'pre-wrap', fontSize: '0.88rem' }}>
+                  {formatBroadcastText(broadcastMessage, broadcastRecipients[activeDispatchIndex] || { id: '0', name: 'Carlos Gómez', phone: '3001234567' } as any)}
+                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                  <Typography variant="caption" sx={{ fontSize: '0.65rem', color: '#667781' }}>
+                    {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Typography>
+                  <DoneAllIcon sx={{ fontSize: 14, color: '#53bdeb' }} />
+                </Box>
+              </Box>
+            </Box>
+
+            {/* 5. PANEL DE CONTROL DE ENVÍO */}
+            <Paper elevation={0} sx={{ p: 2.5, borderRadius: '18px', border: '1px solid #e2e8f0', bgcolor: '#f8fafc' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#1e290b' }}>
+                    Progreso de Envío: {sentCount} de {broadcastRecipients.length} enviados
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {broadcastRecipients.length === 0
+                      ? 'No hay clientes con teléfono en este grupo.'
+                      : `Comensal actual: ${broadcastRecipients[activeDispatchIndex]?.name || 'Finalizado'}`}
+                  </Typography>
+                </Box>
+                <Chip
+                  label={`${Math.round((sentCount / (broadcastRecipients.length || 1)) * 100)}% Completado`}
+                  size="small"
+                  sx={{ fontWeight: 900, bgcolor: sentCount === broadcastRecipients.length && broadcastRecipients.length > 0 ? '#dcfce7' : '#e0f2fe', color: sentCount === broadcastRecipients.length && broadcastRecipients.length > 0 ? '#15803d' : '#0369a1' }}
+                />
+              </Box>
+
+              <LinearProgress
+                variant="determinate"
+                value={Math.round((sentCount / (broadcastRecipients.length || 1)) * 100)}
+                sx={{ height: 8, borderRadius: 4, mb: 2, bgcolor: '#e2e8f0', '& .MuiLinearProgress-bar': { bgcolor: '#16a34a' } }}
+              />
+
+              {broadcastRecipients.length > 0 && activeDispatchIndex < broadcastRecipients.length ? (
+                <Box sx={{ p: 2, bgcolor: '#ffffff', borderRadius: '14px', border: '1px solid #cbd5e1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Avatar sx={{ bgcolor: '#1e290b', color: '#84cc16', fontWeight: 900 }}>
+                      {broadcastRecipients[activeDispatchIndex].name.charAt(0).toUpperCase()}
+                    </Avatar>
+                    <Box>
+                      <Typography variant="body1" sx={{ fontWeight: 900, color: '#1e290b' }}>
+                        {broadcastRecipients[activeDispatchIndex].name}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700 }}>
+                        📱 {broadcastRecipients[activeDispatchIndex].phone} • {broadcastRecipients[activeDispatchIndex].totalOrders || 0} visitas
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      endIcon={<SkipNextIcon />}
+                      onClick={handleSkipNext}
+                      sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 700 }}
+                    >
+                      Saltar
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      startIcon={<WhatsAppIcon />}
+                      onClick={handleSendCurrentAndNext}
+                      sx={{
+                        borderRadius: '10px',
+                        textTransform: 'none',
+                        fontWeight: 900,
+                        bgcolor: '#16a34a',
+                        px: 2.5,
+                        '&:hover': { bgcolor: '#15803d' },
+                      }}
+                    >
+                      Enviar a {broadcastRecipients[activeDispatchIndex].name.split(' ')[0]} 🚀
+                    </Button>
+                  </Stack>
+                </Box>
+              ) : (
+                <Alert severity="success" sx={{ borderRadius: '12px', fontWeight: 700 }}>
+                  ¡Has completado la lista de destinatarios o no hay más clientes pendientes!
+                </Alert>
+              )}
+            </Paper>
+
+            {/* 6. LISTA DETALLADA DE DESTINATARIOS */}
+            <Box>
+              <Typography variant="caption" sx={{ fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 1 }}>
+                Destinatarios individuales ({broadcastRecipients.length}):
+              </Typography>
+              <Paper elevation={0} sx={{ maxHeight: 200, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '14px', p: 1, bgcolor: '#f8fafc' }}>
+                <Stack spacing={0.8}>
+                  {broadcastRecipients.map((c, idx) => {
+                    const isSent = Boolean(sentCustomerIds[c.id]);
+                    return (
+                      <Box
+                        key={c.id}
+                        sx={{
+                          p: 1.2,
+                          bgcolor: idx === activeDispatchIndex ? '#f0fdf4' : '#ffffff',
+                          border: '1px solid',
+                          borderColor: idx === activeDispatchIndex ? '#86efac' : '#e2e8f0',
+                          borderRadius: '10px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 800, color: '#1e290b' }}>
+                            {c.name}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#64748b' }}>
+                            ({c.phone})
+                          </Typography>
+                          {isSent && (
+                            <Chip label="Enviado ✅" size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 800, bgcolor: '#dcfce7', color: '#15803d' }} />
+                          )}
+                        </Box>
+                        <Button
+                          size="small"
+                          variant={isSent ? 'outlined' : 'contained'}
+                          color={isSent ? 'inherit' : 'success'}
+                          startIcon={<WhatsAppIcon sx={{ fontSize: 14 }} />}
+                          onClick={() => {
+                            setActiveDispatchIndex(idx);
+                            handleSendToCustomer(c);
+                          }}
+                          sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 800, fontSize: '0.72rem', py: 0.4 }}
+                        >
+                          {isSent ? 'Reenviar' : 'Enviar'}
+                        </Button>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              </Paper>
+            </Box>
+          </Stack>
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2.5, bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}>
+          <Button onClick={() => setIsBroadcastModalOpen(false)} sx={{ fontWeight: 700, color: '#64748b' }}>
+            Cerrar
+          </Button>
+          <Stack direction="row" spacing={1.5}>
+            <Button
+              variant="outlined"
+              color="success"
+              startIcon={<WhatsAppIcon />}
+              onClick={handleSendAllBatch}
+              disabled={broadcastRecipients.length === 0}
+              sx={{ borderRadius: '12px', fontWeight: 800, textTransform: 'none' }}
+            >
+              Abrir Todos en Pestañas
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<WhatsAppIcon />}
+              onClick={handleSendCurrentAndNext}
+              disabled={broadcastRecipients.length === 0 || activeDispatchIndex >= broadcastRecipients.length}
+              sx={{ borderRadius: '12px', fontWeight: 900, textTransform: 'none', bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' } }}
+            >
+              Enviar Siguiente 🚀
+            </Button>
+          </Stack>
         </DialogActions>
       </Dialog>
 
