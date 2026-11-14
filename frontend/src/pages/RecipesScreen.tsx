@@ -596,39 +596,85 @@ export default function RecipesScreen() {
   return (
     <Box sx={{ pb: 6 }}>
       {/* 1. HEADER SECTION */}
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2, mb: 3 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', lg: 'row' },
+          justifyContent: 'space-between',
+          alignItems: { xs: 'flex-start', lg: 'center' },
+          gap: 2,
+          mb: 3,
+        }}
+      >
         <Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-            <Box sx={{ width: 44, height: 44, borderRadius: '14px', bgcolor: '#1e290b', color: '#84cc16', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 3,
+                bgcolor: '#1e290b',
+                color: '#84cc16',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 14px rgba(30, 41, 11, 0.2)',
+                flexShrink: 0,
+              }}
+            >
               <MenuBookIcon sx={{ fontSize: 26 }} />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 900, color: '#1e290b', letterSpacing: '-0.5px' }}>
-              Ingeniería de Recetas & Escandallos
-            </Typography>
-            <Chip
-              label="Miller & Kasavana Matrix • Costeo Dinámico"
-              size="small"
-              sx={{ fontWeight: 800, bgcolor: 'rgba(132, 204, 22, 0.15)', color: '#4d7c0f', borderRadius: '8px' }}
-            />
-            {isKitchen && (
-              <Chip
-                label="👨‍🍳 Vista Culinaria"
-                size="small"
-                sx={{ fontWeight: 800, bgcolor: '#ffedd5', color: '#c2410c', borderRadius: '8px' }}
-              />
-            )}
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, flexWrap: 'wrap' }}>
+                <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b', letterSpacing: -0.5 }}>
+                  Ingeniería de Recetas & Escandallos
+                </Typography>
+                <Chip
+                  label="Miller & Kasavana Matrix • Costeo Dinámico"
+                  size="small"
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: '0.72rem',
+                    bgcolor: 'rgba(132, 204, 22, 0.15)',
+                    color: '#4d7c0f',
+                    borderRadius: 2,
+                    border: '1px solid #bef264',
+                    height: 24,
+                  }}
+                />
+                {isKitchen && (
+                  <Chip
+                    label="👨‍🍳 Vista Culinaria"
+                    size="small"
+                    sx={{ fontWeight: 800, fontSize: '0.72rem', bgcolor: '#ffedd5', color: '#c2410c', borderRadius: 2, height: 24 }}
+                  />
+                )}
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.4 }}>
+                Fichas técnicas culinarias, costeo de materias primas por gramo/mililitro, Food Cost %, mermas y matriz de rentabilidad estratégica.
+              </Typography>
+            </Box>
           </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 500 }}>
-            Fichas técnicas culinarias, costeo de materias primas por gramo/mililitro, Food Cost %, mermas y matriz de rentabilidad estratégica.
-          </Typography>
         </Box>
 
-        <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
+        {/* Action Buttons Toolbar */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, flexWrap: 'wrap', flexShrink: 0 }}>
           <Button
             variant="outlined"
-            startIcon={<RefreshIcon />}
+            size="small"
+            startIcon={<RefreshIcon sx={{ fontSize: 18 }} />}
             onClick={loadData}
-            sx={{ borderRadius: '12px', fontWeight: 800, textTransform: 'none', color: '#475569', borderColor: '#cbd5e1', bgcolor: '#ffffff' }}
+            sx={{
+              borderRadius: 2,
+              fontWeight: 800,
+              textTransform: 'none',
+              color: '#475569',
+              borderColor: '#e2e8f0',
+              bgcolor: '#ffffff',
+              px: 1.8,
+              py: 0.9,
+              '&:hover': { bgcolor: '#f8fafc', borderColor: '#cbd5e1' },
+            }}
           >
             Sincronizar Almacén
           </Button>
@@ -636,119 +682,313 @@ export default function RecipesScreen() {
           {canManageRecipes && (
             <Button
               variant="contained"
-              startIcon={<AddIcon />}
+              size="small"
+              startIcon={<AddIcon sx={{ fontSize: 18 }} />}
               onClick={handleOpenCreateModal}
               sx={{
-                borderRadius: '12px',
+                borderRadius: 2,
                 fontWeight: 900,
                 textTransform: 'none',
-                bgcolor: '#1e290b',
+                bgcolor: '#65a30d',
                 color: '#ffffff',
-                px: 2.5,
-                boxShadow: '0 4px 14px rgba(30, 41, 11, 0.25)',
-                '&:hover': { bgcolor: '#2d3e11' }
+                px: 2.2,
+                py: 0.9,
+                boxShadow: '0 4px 14px rgba(101, 163, 13, 0.35)',
+                '&:hover': { bgcolor: '#4d7c0f', boxShadow: '0 6px 18px rgba(101, 163, 13, 0.45)' },
               }}
             >
               Nuevo Escandallo
             </Button>
           )}
-        </Stack>
+        </Box>
       </Box>
 
       {/* 2. KPI RIBBON */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: '18px', bgcolor: '#ffffff', display: 'flex', alignItems: 'center', gap: 1.8 }}>
-            <Box sx={{ width: 46, height: 46, borderRadius: '14px', bgcolor: 'rgba(30, 41, 11, 0.08)', color: '#1e290b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <KitchenIcon />
-            </Box>
+        {/* KPI 1: Recetas Costeadas */}
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              bgcolor: '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': { borderColor: '#cbd5e1', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(0,0,0,0.06)' },
+            }}
+          >
             <Box>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
-                Recetas Costeadas
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b', lineHeight: 1.1 }}>
-                {summaryKPIs.totalRecipes} / {products.length}
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600 }}>
-                {Math.round((summaryKPIs.totalRecipes / (products.length || 1)) * 100)}% de la carta fichada
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 30, height: 30, borderRadius: '50%', bgcolor: '#f1f5f9', color: '#1e290b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <KitchenIcon sx={{ fontSize: 17 }} />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
+                    Recetas Costeadas
+                  </Typography>
+                </Box>
+                <Chip
+                  label={`${Math.round((summaryKPIs.totalRecipes / (products.length || 1)) * 100)}%`}
+                  size="small"
+                  sx={{ height: 20, fontSize: '0.65rem', fontWeight: 900, bgcolor: '#f1f5f9', color: '#475569' }}
+                />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#1e290b', mb: 0.5, letterSpacing: -0.5 }}>
+                {summaryKPIs.totalRecipes} <Typography component="span" variant="h6" sx={{ color: '#94a3b8', fontWeight: 700 }}>/ {products.length}</Typography>
               </Typography>
             </Box>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+              Fichas técnicas culinarias activas
+            </Typography>
           </Paper>
         </Grid>
 
-        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: '18px', bgcolor: '#ffffff', display: 'flex', alignItems: 'center', gap: 1.8 }}>
-            <Box sx={{ width: 46, height: 46, borderRadius: '14px', bgcolor: 'rgba(2, 132, 199, 0.12)', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <MoneyIcon />
-            </Box>
+        {/* KPI 2: Costo Promedio */}
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              bgcolor: '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': { borderColor: '#7dd3fc', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(2, 132, 199, 0.08)' },
+            }}
+          >
             <Box>
-              <Typography variant="caption" sx={{ color: '#0284c7', fontWeight: 700, textTransform: 'uppercase' }}>
-                Costo Promedio
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#0284c7', lineHeight: 1.1 }}>
-                ${summaryKPIs.avgCost.toLocaleString()}
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
-                Insumos + empaque + merma
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 30, height: 30, borderRadius: '50%', bgcolor: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <MoneyIcon sx={{ fontSize: 17 }} />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: '#0369a1', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
+                    Costo Promedio
+                  </Typography>
+                </Box>
+                <Chip label="POR PLATO" size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 800, bgcolor: '#e0f2fe', color: '#0284c7' }} />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#0284c7', mb: 0.5, letterSpacing: -0.5 }}>
+                ${Math.round(summaryKPIs.avgCost).toLocaleString()}
               </Typography>
             </Box>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+              Insumos + empaque + merma
+            </Typography>
           </Paper>
         </Grid>
 
-        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: '18px', bgcolor: '#ffffff', display: 'flex', alignItems: 'center', gap: 1.8 }}>
-            <Box sx={{ width: 46, height: 46, borderRadius: '14px', bgcolor: 'rgba(22, 163, 74, 0.12)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <TrendingUpIcon />
-            </Box>
+        {/* KPI 3: Margen Promedio */}
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              bgcolor: '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': { borderColor: '#86efac', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(22, 163, 74, 0.08)' },
+            }}
+          >
             <Box>
-              <Typography variant="caption" sx={{ color: '#16a34a', fontWeight: 700, textTransform: 'uppercase' }}>
-                Margen Promedio
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#16a34a', lineHeight: 1.1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 30, height: 30, borderRadius: '50%', bgcolor: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <TrendingUpIcon sx={{ fontSize: 17 }} />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: '#166534', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
+                    Margen Promedio
+                  </Typography>
+                </Box>
+                <Chip label="RENTABILIDAD" size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 800, bgcolor: '#dcfce7', color: '#15803d' }} />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#15803d', mb: 0.5, letterSpacing: -0.5 }}>
                 {summaryKPIs.avgMargin}%
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
-                Utilidad bruta sobre venta
-              </Typography>
             </Box>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+              Utilidad bruta promedio sobre venta
+            </Typography>
           </Paper>
         </Grid>
 
-        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: '18px', bgcolor: '#ffffff', display: 'flex', alignItems: 'center', gap: 1.8 }}>
-            <Box sx={{ width: 46, height: 46, borderRadius: '14px', bgcolor: summaryKPIs.avgFoodCost <= 35 ? 'rgba(22, 163, 74, 0.12)' : 'rgba(245, 158, 11, 0.15)', color: summaryKPIs.avgFoodCost <= 35 ? '#16a34a' : '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <SpeedIcon />
-            </Box>
+        {/* KPI 4: Food Cost % */}
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              bgcolor: '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': { borderColor: '#bef264', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(101, 163, 13, 0.08)' },
+            }}
+          >
             <Box>
-              <Typography variant="caption" sx={{ color: summaryKPIs.avgFoodCost <= 35 ? '#16a34a' : '#d97706', fontWeight: 700, textTransform: 'uppercase' }}>
-                Food Cost %
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: summaryKPIs.avgFoodCost <= 35 ? '#16a34a' : '#d97706', lineHeight: 1.1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box
+                    sx={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: '50%',
+                      bgcolor: summaryKPIs.avgFoodCost <= 35 ? '#ecfccb' : '#fef3c7',
+                      color: summaryKPIs.avgFoodCost <= 35 ? '#4d7c0f' : '#d97706',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <SpeedIcon sx={{ fontSize: 17 }} />
+                  </Box>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: summaryKPIs.avgFoodCost <= 35 ? '#4d7c0f' : '#d97706',
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.5,
+                      fontSize: '0.72rem',
+                    }}
+                  >
+                    Food Cost %
+                  </Typography>
+                </Box>
+                <Chip
+                  label={summaryKPIs.avgFoodCost <= 35 ? 'ÓPTIMO' : 'ALTO'}
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: '0.62rem',
+                    fontWeight: 900,
+                    bgcolor: summaryKPIs.avgFoodCost <= 35 ? '#ecfccb' : '#fef3c7',
+                    color: summaryKPIs.avgFoodCost <= 35 ? '#3f6212' : '#92400e',
+                  }}
+                />
+              </Box>
+              <Typography
+                variant="h4"
+                sx={{
+                  fontWeight: 900,
+                  color: summaryKPIs.avgFoodCost <= 35 ? '#3f6212' : '#d97706',
+                  mb: 0.5,
+                  letterSpacing: -0.5,
+                }}
+              >
                 {summaryKPIs.avgFoodCost}%
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
-                Target óptimo: 28% - 35%
-              </Typography>
             </Box>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+              Target óptimo: 28% – 35%
+            </Typography>
           </Paper>
         </Grid>
 
-        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <Paper elevation={0} sx={{ p: 2, border: summaryKPIs.criticalCount > 0 ? '1px solid #fecaca' : '1px solid #e2e8f0', borderRadius: '18px', bgcolor: summaryKPIs.criticalCount > 0 ? '#fff5f5' : '#ffffff', display: 'flex', alignItems: 'center', gap: 1.8 }}>
-            <Box sx={{ width: 46, height: 46, borderRadius: '14px', bgcolor: summaryKPIs.criticalCount > 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(100, 116, 139, 0.1)', color: summaryKPIs.criticalCount > 0 ? '#ef4444' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <WarningIcon />
-            </Box>
+        {/* KPI 5: Food Cost Crítico */}
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: summaryKPIs.criticalCount > 0 ? '1px solid #fca5a5' : '1px solid #e2e8f0',
+              borderRadius: 3,
+              bgcolor: summaryKPIs.criticalCount > 0 ? '#fff5f5' : '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': {
+                borderColor: summaryKPIs.criticalCount > 0 ? '#ef4444' : '#cbd5e1',
+                transform: 'translateY(-2px)',
+                boxShadow: summaryKPIs.criticalCount > 0 ? '0 6px 18px rgba(239, 68, 68, 0.12)' : '0 6px 18px rgba(0,0,0,0.06)',
+              },
+            }}
+          >
             <Box>
-              <Typography variant="caption" sx={{ color: summaryKPIs.criticalCount > 0 ? '#dc2626' : '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
-                Food Cost Crítico
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: summaryKPIs.criticalCount > 0 ? '#dc2626' : '#1e290b', lineHeight: 1.1 }}>
-                {summaryKPIs.criticalCount} platos
-              </Typography>
-              <Typography variant="caption" sx={{ color: summaryKPIs.criticalCount > 0 ? '#ef4444' : '#94a3b8', fontWeight: 600 }}>
-                {summaryKPIs.criticalCount > 0 ? 'Costo > 38% del precio' : 'Todos en margen saludable'}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box
+                    sx={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: '50%',
+                      bgcolor: summaryKPIs.criticalCount > 0 ? '#fee2e2' : '#f1f5f9',
+                      color: summaryKPIs.criticalCount > 0 ? '#dc2626' : '#64748b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <WarningIcon sx={{ fontSize: 17 }} />
+                  </Box>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: summaryKPIs.criticalCount > 0 ? '#dc2626' : '#64748b',
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.5,
+                      fontSize: '0.72rem',
+                    }}
+                  >
+                    Food Cost Crítico
+                  </Typography>
+                </Box>
+                <Chip
+                  label={summaryKPIs.criticalCount > 0 ? `⚠️ ${summaryKPIs.criticalCount} ALERTA` : '🟢 TODO OK'}
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: '0.62rem',
+                    fontWeight: 900,
+                    bgcolor: summaryKPIs.criticalCount > 0 ? '#fee2e2' : '#f0fdf4',
+                    color: summaryKPIs.criticalCount > 0 ? '#b91c1c' : '#15803d',
+                  }}
+                />
+              </Box>
+              <Typography
+                variant="h4"
+                sx={{
+                  fontWeight: 900,
+                  color: summaryKPIs.criticalCount > 0 ? '#dc2626' : '#1e290b',
+                  mb: 0.5,
+                  letterSpacing: -0.5,
+                }}
+              >
+                {summaryKPIs.criticalCount} <Typography component="span" variant="h6" sx={{ color: summaryKPIs.criticalCount > 0 ? '#dc2626' : '#94a3b8', fontWeight: 700 }}>platos</Typography>
               </Typography>
             </Box>
+            <Typography
+              variant="caption"
+              sx={{ color: summaryKPIs.criticalCount > 0 ? '#dc2626' : 'text.secondary', fontWeight: 600 }}
+            >
+              {summaryKPIs.criticalCount > 0 ? 'Costo > 38% del precio de venta' : 'Todos en margen saludable'}
+            </Typography>
           </Paper>
         </Grid>
       </Grid>
