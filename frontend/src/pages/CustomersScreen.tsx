@@ -60,37 +60,6 @@ import {
 import { mockApi } from '../services/mockApi';
 import { Customer, Order } from '../types';
 
-// Loyalty tier colors and labels
-const TIER_CONFIG: Record<string, { label: string; color: string; bg: string; iconColor: string; perk: string }> = {
-  DIAMANTE: {
-    label: 'Cliente Diamante',
-    color: '#6366f1',
-    bg: '#eef2ff',
-    iconColor: '#4f46e5',
-    perk: '15% de descuento permanente • Postre cortesía del Chef • Mesa preferencial'
-  },
-  ORO: {
-    label: 'Cliente Oro',
-    color: '#d97706',
-    bg: '#fef3c7',
-    iconColor: '#b45309',
-    perk: '10% de descuento en carta • Bebida de bienvenida gratis'
-  },
-  PLATA: {
-    label: 'Cliente Plata',
-    color: '#475569',
-    bg: '#f1f5f9',
-    iconColor: '#64748b',
-    perk: '5% de descuento en consumo • 1.5x acumulación de puntos'
-  },
-  BRONCE: {
-    label: 'Cliente Bronce',
-    color: '#92400e',
-    bg: '#ffedd5',
-    iconColor: '#b45309',
-    perk: 'Acumulación estándar de 1 punto por cada $1.000 COP'
-  },
-};
 
 const ALLERGEN_OPTIONS = [
   'Gluten',
@@ -108,12 +77,12 @@ export default function CustomersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Tabs (0: Directorio General, 1: Club de Lealtad, 2: Segmentación RFM, 3: Facturación DIAN)
+  // Tabs (0: Directorio General, 1: Segmentación RFM, 2: Facturación DIAN)
   const [mainTab, setMainTab] = useState(0);
 
   // Filters & Views
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedTier, setSelectedTier] = useState<string>('TODOS');
+  const [customerFilter, setCustomerFilter] = useState<'ALL' | 'FREQUENT' | 'DIAN'>('ALL');
   const [selectedSort, setSelectedSort] = useState<string>('TOTAL_SPENT');
   const [viewMode, setViewMode] = useState<'CARDS' | 'TABLE'>('CARDS');
 
@@ -167,15 +136,15 @@ export default function CustomersScreen() {
     const totalCount = customers.length;
     let totalSpentAccum = 0;
     let totalPointsAccum = 0;
-    let highValueCount = 0; // Diamante & Oro
+    let frequentCount = 0;
     let totalOrdersAccum = 0;
 
     customers.forEach(c => {
       totalSpentAccum += c.totalSpent || 0;
       totalPointsAccum += c.loyaltyPoints || 0;
       totalOrdersAccum += c.totalOrders || 0;
-      if (c.tier === 'DIAMANTE' || c.tier === 'ORO') {
-        highValueCount++;
+      if ((c.totalOrders || 0) >= 2) {
+        frequentCount++;
       }
     });
 
@@ -185,7 +154,7 @@ export default function CustomersScreen() {
       totalCount,
       totalSpentAccum,
       totalPointsAccum,
-      highValueCount,
+      frequentCount,
       avgTicket,
     };
   }, [customers]);
@@ -195,8 +164,8 @@ export default function CustomersScreen() {
     const now = Date.now();
     const thirtyDaysAgo = now - 86400000 * 30;
 
-    const vipCustomers = customers.filter(c => (c.tier === 'DIAMANTE' || c.tier === 'ORO') || (c.totalSpent || 0) >= 500000);
-    const frequentCustomers = customers.filter(c => (c.totalOrders || 0) >= 5);
+    const vipCustomers = customers.filter(c => (c.totalSpent || 0) >= 300000 || (c.totalOrders || 0) >= 6);
+    const frequentCustomers = customers.filter(c => (c.totalOrders || 0) >= 3);
     const newCustomers = customers.filter(c => !c.createdAt || c.createdAt >= (now - 86400000 * 45));
     const inactiveAtRisk = customers.filter(c => c.lastVisit && c.lastVisit < thirtyDaysAgo);
 
@@ -224,7 +193,10 @@ export default function CustomersScreen() {
 
         if (!matchesQuery) return false;
 
-        if (selectedTier !== 'TODOS' && c.tier !== selectedTier) {
+        if (customerFilter === 'FREQUENT' && (c.totalOrders || 0) < 2) {
+          return false;
+        }
+        if (customerFilter === 'DIAN' && !c.documentId) {
           return false;
         }
 
@@ -245,7 +217,7 @@ export default function CustomersScreen() {
         }
         return 0;
       });
-  }, [customers, searchTerm, selectedTier, selectedSort]);
+  }, [customers, searchTerm, customerFilter, selectedSort]);
 
   // Open Create Modal
   const handleOpenCreateModal = () => {
@@ -574,7 +546,7 @@ export default function CustomersScreen() {
           </Paper>
         </Grid>
 
-        {/* KPI 2: Clientes VIP */}
+        {/* KPI 2: Clientes Frecuentes */}
         <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
           <Paper
             elevation={0}
@@ -599,17 +571,17 @@ export default function CustomersScreen() {
                     <PremiumIcon sx={{ fontSize: 17 }} />
                   </Box>
                   <Typography variant="caption" sx={{ color: '#d97706', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
-                    Clientes VIP
+                    Clientes Frecuentes
                   </Typography>
                 </Box>
-                <Chip label="ORO & DIAMANTE" size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 900, bgcolor: '#fef3c7', color: '#92400e' }} />
+                <Chip label="RECURRENTES" size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 900, bgcolor: '#fef3c7', color: '#92400e' }} />
               </Box>
               <Typography variant="h4" sx={{ fontWeight: 900, color: '#d97706', mb: 0.5, letterSpacing: -0.5 }}>
-                {kpis.highValueCount}
+                {kpis.frequentCount}
               </Typography>
             </Box>
             <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-              Comensales de alta recurrencia y consumo
+              Comensales con 2 o más pedidos
             </Typography>
           </Paper>
         </Grid>
@@ -753,7 +725,6 @@ export default function CustomersScreen() {
           }}
         >
           <Tab label={`👥 Directorio General (${customers.length})`} />
-          <Tab label="💎 Club de Fidelización & Niveles VIP" />
           <Tab label="📊 Segmentación RFM & Retención" />
           <Tab label="🧾 Facturación Electrónica DIAN" />
         </Tabs>
@@ -765,7 +736,7 @@ export default function CustomersScreen() {
           {/* BARRA DE HERRAMIENTAS Y FILTROS */}
           <Paper elevation={0} sx={{ p: 2, mb: 3, border: '1px solid #e2e8f0', borderRadius: '18px', bgcolor: '#ffffff' }}>
             <Grid container spacing={1.5} sx={{ alignItems: 'center' }}>
-              <Grid size={{ xs: 12, md: 4 }}>
+              <Grid size={{ xs: 12, md: 4.5 }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -790,16 +761,14 @@ export default function CustomersScreen() {
                   select
                   fullWidth
                   size="small"
-                  label="Nivel de Fidelidad"
-                  value={selectedTier}
-                  onChange={(e) => setSelectedTier(e.target.value)}
+                  label="Filtrar por"
+                  value={customerFilter}
+                  onChange={(e) => setCustomerFilter(e.target.value as any)}
                   slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                 >
-                  <MenuItem value="TODOS">Todos los Niveles</MenuItem>
-                  <MenuItem value="DIAMANTE">💎 Diamante</MenuItem>
-                  <MenuItem value="ORO">🥇 Oro</MenuItem>
-                  <MenuItem value="PLATA">🥈 Plata</MenuItem>
-                  <MenuItem value="BRONCE">🥉 Bronce</MenuItem>
+                  <MenuItem value="ALL">Todos los Clientes</MenuItem>
+                  <MenuItem value="FREQUENT">👥 Clientes Frecuentes (2+)</MenuItem>
+                  <MenuItem value="DIAN">🧾 Con Facturación DIAN</MenuItem>
                 </TextField>
               </Grid>
 
@@ -872,8 +841,6 @@ export default function CustomersScreen() {
                 </Grid>
               ) : (
                 filteredCustomers.map(customer => {
-                  const tierConfig = TIER_CONFIG[customer.tier || 'BRONCE'] || TIER_CONFIG.BRONCE;
-
                   return (
                     <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={customer.id}>
                       <Card
@@ -900,13 +867,13 @@ export default function CustomersScreen() {
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                               <Avatar
                                 sx={{
-                                  bgcolor: tierConfig.color,
-                                  color: '#ffffff',
+                                  bgcolor: '#1e290b',
+                                  color: '#84cc16',
                                   fontWeight: 900,
                                   width: 46,
                                   height: 46,
                                   fontSize: '1.1rem',
-                                  boxShadow: `0 4px 10px ${tierConfig.color}40`
+                                  boxShadow: '0 4px 10px rgba(30, 41, 11, 0.25)',
                                 }}
                               >
                                 {customer.name.charAt(0).toUpperCase()}
@@ -922,14 +889,14 @@ export default function CustomersScreen() {
                             </Box>
 
                             <Chip
-                              label={tierConfig.label.replace('Cliente ', '')}
+                              label={`${customer.totalOrders || 0} pedidos`}
                               size="small"
                               sx={{
-                                fontWeight: 900,
+                                fontWeight: 800,
                                 fontSize: '0.7rem',
-                                bgcolor: tierConfig.bg,
-                                color: tierConfig.color,
-                                border: `1px solid ${tierConfig.color}30`
+                                bgcolor: '#f1f5f9',
+                                color: '#475569',
+                                border: '1px solid #e2e8f0',
                               }}
                             />
                           </Box>
@@ -1060,7 +1027,7 @@ export default function CustomersScreen() {
                     <TableCell sx={{ fontWeight: 800, color: '#475569' }}>Documento Fiscal</TableCell>
                     <TableCell sx={{ fontWeight: 800, color: '#475569' }}>Contacto</TableCell>
                     <TableCell sx={{ fontWeight: 800, color: '#475569' }}>Ubicación</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 800, color: '#475569' }}>Nivel Lealtad</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 800, color: '#475569' }}>Pedidos</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 800, color: '#475569' }}>Puntos</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800, color: '#475569' }}>Consumo LTV</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800, color: '#475569' }}>Acciones</TableCell>
@@ -1068,12 +1035,11 @@ export default function CustomersScreen() {
                 </TableHead>
                 <TableBody>
                   {filteredCustomers.map(customer => {
-                    const tierConfig = TIER_CONFIG[customer.tier || 'BRONCE'] || TIER_CONFIG.BRONCE;
                     return (
                       <TableRow key={customer.id} hover sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <Avatar sx={{ bgcolor: tierConfig.color, color: '#ffffff', fontWeight: 900, width: 38, height: 38, fontSize: '0.9rem' }}>
+                            <Avatar sx={{ bgcolor: '#1e290b', color: '#84cc16', fontWeight: 900, width: 38, height: 38, fontSize: '0.9rem' }}>
                               {customer.name.charAt(0).toUpperCase()}
                             </Avatar>
                             <Box>
@@ -1109,9 +1075,9 @@ export default function CustomersScreen() {
                         </TableCell>
                         <TableCell align="center">
                           <Chip
-                            label={tierConfig.label.replace('Cliente ', '')}
+                            label={`${customer.totalOrders || 0} pedidos`}
                             size="small"
-                            sx={{ fontWeight: 900, bgcolor: tierConfig.bg, color: tierConfig.color, borderRadius: '8px' }}
+                            sx={{ fontWeight: 800, bgcolor: '#f1f5f9', color: '#475569', borderRadius: '8px' }}
                           />
                         </TableCell>
                         <TableCell align="center">
@@ -1166,90 +1132,8 @@ export default function CustomersScreen() {
         </>
       )}
 
-      {/* TAB 1: CLUB DE LEALTAD & NIVELES VIP */}
+      {/* TAB 1: SEGMENTACIÓN RFM & RETENCIÓN */}
       {mainTab === 1 && (
-        <Box>
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b' }}>
-              Club de Fidelización & Beneficios VIP Sésamo
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Automatiza la lealtad de tus comensales mediante categorías escalonadas, beneficios exclusivos y canje directo de puntos.
-            </Typography>
-          </Box>
-
-          <Grid container spacing={2.5}>
-            {Object.entries(TIER_CONFIG).map(([tierKey, config]) => {
-              const countInTier = customers.filter(c => (c.tier || 'BRONCE') === tierKey).length;
-              const totalSpentInTier = customers.filter(c => (c.tier || 'BRONCE') === tierKey).reduce((acc, c) => acc + (c.totalSpent || 0), 0);
-
-              return (
-                <Grid size={{ xs: 12, sm: 6, md: 3 }} key={tierKey}>
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      p: 2.5,
-                      borderRadius: '20px',
-                      border: `1px solid ${config.color}35`,
-                      bgcolor: config.bg,
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      transition: 'all 0.2s ease',
-                      '&:hover': { transform: 'translateY(-3px)', boxShadow: `0 8px 24px ${config.color}25` }
-                    }}
-                  >
-                    <Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 900, color: config.iconColor }}>
-                          {config.label}
-                        </Typography>
-                        <Chip
-                          label={`${countInTier} clientes`}
-                          size="small"
-                          sx={{ fontWeight: 900, bgcolor: '#ffffff', color: config.iconColor, borderRadius: '8px' }}
-                        />
-                      </Box>
-
-                      <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', display: 'block', mb: 0.8 }}>
-                        Beneficio Exclusivo del Nivel:
-                      </Typography>
-                      <Paper elevation={0} sx={{ p: 1.5, bgcolor: '#ffffff', borderRadius: '12px', mb: 2, border: `1px solid ${config.color}20` }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.78rem', color: '#334155', fontWeight: 600 }}>
-                          {config.perk}
-                        </Typography>
-                      </Paper>
-
-                      <Box sx={{ p: 1, bgcolor: 'rgba(255,255,255,0.7)', borderRadius: '10px' }}>
-                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, display: 'block' }}>
-                          Facturación Acumulada del Segmento:
-                        </Typography>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 900, color: config.iconColor }}>
-                          ${totalSpentInTier.toLocaleString()} COP
-                        </Typography>
-                      </Box>
-                    </Box>
-
-                    <Button
-                      fullWidth
-                      size="small"
-                      variant="outlined"
-                      onClick={() => { setSelectedTier(tierKey); setMainTab(0); }}
-                      sx={{ mt: 2, borderRadius: '10px', fontWeight: 800, textTransform: 'none', bgcolor: '#ffffff', borderColor: config.color, color: config.iconColor }}
-                    >
-                      Ver Clientes {config.label.replace('Cliente ', '')}
-                    </Button>
-                  </Paper>
-                </Grid>
-              );
-            })}
-          </Grid>
-        </Box>
-      )}
-
-      {/* TAB 2: SEGMENTACIÓN RFM & RETENCIÓN */}
-      {mainTab === 2 && (
         <Box>
           <Box sx={{ mb: 3 }}>
             <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b' }}>
@@ -1335,8 +1219,8 @@ export default function CustomersScreen() {
         </Box>
       )}
 
-      {/* TAB 3: FACTURACIÓN ELECTRÓNICA DIAN */}
-      {mainTab === 3 && (
+      {/* TAB 2: FACTURACIÓN ELECTRÓNICA DIAN */}
+      {mainTab === 2 && (
         <Box>
           <Box sx={{ mb: 3 }}>
             <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b' }}>
@@ -1539,32 +1423,16 @@ export default function CustomersScreen() {
               </Grid>
 
               <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#1e290b', pt: 1 }}>
-                2. Fidelización & Nivel VIP:
+                2. Puntos de Fidelidad:
               </Typography>
 
               <Grid container spacing={2}>
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    label="Categoría de Fidelidad"
-                    value={editingCustomer.tier || 'BRONCE'}
-                    onChange={(e) => setEditingCustomer({ ...editingCustomer, tier: e.target.value as any })}
-                  >
-                    <MenuItem value="DIAMANTE">💎 Diamante (VIP Exclusivo)</MenuItem>
-                    <MenuItem value="ORO">🥇 Oro (Cliente Frecuente)</MenuItem>
-                    <MenuItem value="PLATA">🥈 Plata (Cliente Regular)</MenuItem>
-                    <MenuItem value="BRONCE">🥉 Bronce (Nuevo / Estándar)</MenuItem>
-                  </TextField>
-                </Grid>
-
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
                     fullWidth
                     size="small"
                     type="number"
-                    label="Puntos de Lealtad Iniciales"
+                    label="Puntos de Fidelidad Iniciales"
                     value={editingCustomer.loyaltyPoints ?? 100}
                     onChange={(e) => setEditingCustomer({ ...editingCustomer, loyaltyPoints: Number(e.target.value) || 0 })}
                   />
@@ -1655,35 +1523,32 @@ export default function CustomersScreen() {
         </DialogTitle>
 
         <DialogContent dividers sx={{ p: 3 }}>
-          {profileCustomer && (() => {
-            const tierConfig = TIER_CONFIG[profileCustomer.tier || 'BRONCE'] || TIER_CONFIG.BRONCE;
-
-            return (
-              <Stack spacing={2.5}>
-                {/* Header Perfil */}
-                <Paper elevation={0} sx={{ p: 2.5, borderRadius: '18px', border: `1px solid ${tierConfig.color}40`, bgcolor: tierConfig.bg }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Avatar sx={{ width: 56, height: 56, bgcolor: tierConfig.color, color: '#ffffff', fontWeight: 900, fontSize: '1.4rem' }}>
-                        {profileCustomer.name.charAt(0).toUpperCase()}
-                      </Avatar>
-                      <Box>
-                        <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b' }}>
-                          {profileCustomer.name}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#475569', fontWeight: 600 }}>
-                          {profileCustomer.documentType || 'CC'} {profileCustomer.documentId || 'Sin identificación fiscal'}
-                        </Typography>
-                      </Box>
+          {profileCustomer && (
+            <Stack spacing={2.5}>
+              {/* Header Perfil */}
+              <Paper elevation={0} sx={{ p: 2.5, borderRadius: '18px', border: '1px solid #e2e8f0', bgcolor: '#f8fafc' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Avatar sx={{ width: 56, height: 56, bgcolor: '#1e290b', color: '#84cc16', fontWeight: 900, fontSize: '1.4rem' }}>
+                      {profileCustomer.name.charAt(0).toUpperCase()}
+                    </Avatar>
+                    <Box>
+                      <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b' }}>
+                        {profileCustomer.name}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: '#475569', fontWeight: 600 }}>
+                        {profileCustomer.documentType || 'CC'} {profileCustomer.documentId || 'Sin identificación fiscal'}
+                      </Typography>
                     </Box>
-
-                    <Chip
-                      icon={<StarIcon sx={{ fontSize: 16 }} />}
-                      label={tierConfig.label}
-                      sx={{ fontWeight: 900, bgcolor: '#ffffff', color: tierConfig.iconColor, py: 2, px: 1, borderRadius: '12px' }}
-                    />
                   </Box>
-                </Paper>
+
+                  <Chip
+                    icon={<StarIcon sx={{ fontSize: 16 }} />}
+                    label={`${profileCustomer.loyaltyPoints || 0} Puntos`}
+                    sx={{ fontWeight: 900, bgcolor: '#fefce8', color: '#854d0e', border: '1px solid #fde047', py: 2, px: 1, borderRadius: '12px' }}
+                  />
+                </Box>
+              </Paper>
 
                 {/* Métricas del Comensal */}
                 <Grid container spacing={2}>
@@ -1771,8 +1636,7 @@ export default function CustomersScreen() {
                   )}
                 </Box>
               </Stack>
-            );
-          })()}
+          )}
         </DialogContent>
 
         <DialogActions sx={{ p: 2.5, justifyContent: 'space-between' }}>
