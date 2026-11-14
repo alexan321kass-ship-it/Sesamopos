@@ -70,7 +70,8 @@ export type RealtimeEventType =
   | 'sesamo_deliveries_updated'
   | 'sesamo_staff_updated'
   | 'sesamo_shifts_updated'
-  | 'sesamo_settings_updated';
+  | 'sesamo_settings_updated'
+  | 'sesamo_waiter_called';
 
 export const notifyRealtimeEvent = (type: RealtimeEventType, payload?: any) => {
   // 1. Dispatch local window event
