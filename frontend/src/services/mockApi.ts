@@ -4,23 +4,11 @@ import { playKitchenBellSound } from '../utils/audioAlerts';
 import { notifyRealtimeEvent } from './eventBus';
 
 export const getApiUrl = (): string => {
-  if (typeof window !== 'undefined') {
-    const custom = localStorage.getItem('sesamo_api_url');
-    if (custom) return custom.trim().replace(/\/$/, '');
-  }
   const envUrl = import.meta.env.VITE_API_URL;
-  if (envUrl) return envUrl.trim().replace(/\/$/, '');
-  return 'https://sesamo-api.onrender.com/api';
-};
-
-export const setApiUrl = (url: string) => {
-  if (typeof window !== 'undefined') {
-    if (url && url.trim()) {
-      localStorage.setItem('sesamo_api_url', url.trim().replace(/\/$/, ''));
-    } else {
-      localStorage.removeItem('sesamo_api_url');
-    }
+  if (envUrl && envUrl.trim() && !envUrl.includes('tu-url-de-render')) {
+    return envUrl.trim().replace(/\/$/, '');
   }
+  return 'https://sesamo-api.onrender.com/api';
 };
 
 const getStoredUserRole = (): string | undefined => {

@@ -30,7 +30,7 @@ import {
   LockClock as LockClockIcon,
   Shield as SecurityIcon
 } from '@mui/icons-material';
-import { mockApi, getApiUrl, setApiUrl } from '../services/mockApi';
+import { mockApi, getApiUrl } from '../services/mockApi';
 import { StoreSettings } from '../types';
 import { useAuthStore } from '../store/authStore';
 import { Navigate } from 'react-router-dom';
@@ -72,19 +72,12 @@ export default function SettingsScreen() {
     latencyMs: 35,
     lastCheck: null,
   });
-  const [apiUrlInput, setApiUrlInput] = useState<string>(() => {
-    const active = getApiUrl();
-    return active.includes('tu-url-de-render') || active.includes('tu-servicio') ? 'https://sesamo-api.onrender.com/api' : active;
-  });
-  const [apiUrlSaved, setApiUrlSaved] = useState(false);
   const [isPinging, setIsPinging] = useState(false);
 
   useEffect(() => {
-    // Limpieza de URLs de plantilla si quedaron guardadas en localStorage
-    const saved = localStorage.getItem('sesamo_api_url');
-    if (saved && (saved.includes('tu-url-de-render') || saved.includes('tu-servicio') || saved === 'http://localhost:3001/api')) {
+    // Limpieza de cualquier residuo anterior en localStorage
+    if (typeof window !== 'undefined') {
       localStorage.removeItem('sesamo_api_url');
-      setApiUrlInput('https://sesamo-api.onrender.com/api');
     }
     loadSettings();
     checkDatabaseHealth();
@@ -121,15 +114,6 @@ export default function SettingsScreen() {
     } finally {
       setIsPinging(false);
     }
-  };
-
-  const handleSaveApiUrl = () => {
-    const urlToSave = (apiUrlInput.trim() && !apiUrlInput.includes('tu-url-de-render')) ? apiUrlInput.trim() : 'https://sesamo-api.onrender.com/api';
-    setApiUrl(urlToSave);
-    setApiUrlInput(urlToSave);
-    setApiUrlSaved(true);
-    setTimeout(() => setApiUrlSaved(false), 3000);
-    checkDatabaseHealth();
   };
 
   const loadSettings = async () => {
@@ -530,44 +514,26 @@ export default function SettingsScreen() {
             </Grid>
           </Grid>
 
-          {/* Configuración de Endpoint Backend Cloud */}
-          <Box sx={{ mt: 3, p: 2.5, bgcolor: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1e290b' }}>
-                🌐 URL del Backend en la Nube (Render / Vercel)
-              </Typography>
-              {apiUrlSaved && (
-                <Chip label="¡URL guardada con éxito!" size="small" color="success" sx={{ fontWeight: 700 }} />
-              )}
+          {/* Telemetría del Endpoint de Producción (Solo Lectura y Protegido) */}
+          <Box sx={{ mt: 3, p: 2, bgcolor: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ p: 0.8, bgcolor: '#ecfdf5', borderRadius: '10px', color: '#059669', display: 'flex' }}>
+                <SecurityIcon sx={{ fontSize: 18 }} />
+              </Box>
+              <Box>
+                <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Servidor API Central (Protegido por Variables de Entorno)
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: '#1e290b', fontFamily: 'monospace' }}>
+                  {getApiUrl()}
+                </Typography>
+              </Box>
             </Box>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-              Ingresa aquí la URL de tu backend desplegado en Render (por ejemplo: <code>https://tu-servicio.onrender.com/api</code>). Si cambias la URL o estás en un dispositivo nuevo, puedes guardarla aquí directamente para sincronizar con la base de datos en Neon.
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-              <TextField
-                fullWidth
-                size="small"
-                value={apiUrlInput}
-                onChange={(e) => setApiUrlInput(e.target.value)}
-                placeholder="https://sesamo-api.onrender.com/api"
-                sx={{ flex: 1, minWidth: 260, bgcolor: '#ffffff' }}
-                slotProps={{ input: { sx: { borderRadius: '10px' } } }}
-              />
-              <Button
-                variant="contained"
-                onClick={handleSaveApiUrl}
-                disabled={isPinging}
-                sx={{
-                  borderRadius: '10px',
-                  textTransform: 'none',
-                  fontWeight: 800,
-                  bgcolor: 'primary.main',
-                  px: 3,
-                }}
-              >
-                {isPinging ? 'Comprobando...' : 'Guardar & Conectar'}
-              </Button>
-            </Box>
+            <Chip
+              label="Configuración Segura (DevOps)"
+              size="small"
+              sx={{ bgcolor: '#f1f5f9', color: '#475569', fontWeight: 700, fontSize: '0.72rem' }}
+            />
           </Box>
         </Paper>
 
