@@ -48,20 +48,33 @@ import {
   History as HistoryIcon,
   Search as SearchIcon,
   Visibility as VisibilityIcon,
+  CheckCircle as CheckCircleIcon,
+  Restaurant as RestaurantIcon,
+  AccessTime as TimeIcon,
+  Person as PersonIcon,
+  NotificationsActive as AlertBellIcon,
 } from '@mui/icons-material';
 import { mockApi } from '../services/mockApi';
 import { useAuthStore } from '../store/authStore';
-import { CashRegister, Order, DeliveryOrder } from '../types';
+import { CashRegister, Order, DeliveryOrder, Table as RestaurantTable } from '../types';
+import BillingModal from '../components/BillingModal';
 
 export default function CashRegisterScreen() {
   const { user } = useAuthStore();
 
   const [currentRegister, setCurrentRegister] = useState<CashRegister | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [tables, setTables] = useState<RestaurantTable[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryOrder[]>([]);
   const [manualMovements, setManualMovements] = useState<any[]>([]);
   const [closuresHistory, setClosuresHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Billing modal in cash register
+  const [billingModalOpen, setBillingModalOpen] = useState(false);
+  const [selectedBillingOrder, setSelectedBillingOrder] = useState<Order | null>(null);
+  const [selectedBillingTable, setSelectedBillingTable] = useState<RestaurantTable | null>(null);
+  const [pendingSearch, setPendingSearch] = useState('');
 
   // Active Tab: 0 = Turno Activo & Arqueo, 1 = Métodos de Pago, 2 = Historial de Reportes Z
   const [currentTab, setCurrentTab] = useState(0);
@@ -120,18 +133,20 @@ export default function CashRegisterScreen() {
   const loadData = async (showSpinner = false) => {
     if (showSpinner) setLoading(true);
     try {
-      const [reg, allOrders, movs, allDeliveries, history] = await Promise.all([
+      const [reg, allOrders, movs, allDeliveries, history, allTables] = await Promise.all([
         mockApi.cash.getCurrentRegister(),
         mockApi.orders.getAll(),
         mockApi.cash.getMovements(),
         mockApi.deliveries.getAll(),
         mockApi.cash.getHistory(),
+        mockApi.tables.getAll(),
       ]);
       setCurrentRegister(reg || null);
       setOrders(allOrders || []);
       setManualMovements(movs || []);
       setDeliveries(allDeliveries || []);
       setClosuresHistory(history || []);
+      setTables(allTables || []);
     } catch (e) {
       console.error('Error cargando caja:', e);
     } finally {
@@ -144,10 +159,14 @@ export default function CashRegisterScreen() {
     window.addEventListener('sesamo_order_updated', () => loadData());
     window.addEventListener('sesamo_cash_updated', () => loadData());
     window.addEventListener('sesamo_deliveries_updated', () => loadData());
+    window.addEventListener('sesamo_tables_updated', () => loadData());
+    window.addEventListener('sesamo_bill_requested', () => loadData());
     return () => {
       window.removeEventListener('sesamo_order_updated', () => loadData());
       window.removeEventListener('sesamo_cash_updated', () => loadData());
       window.removeEventListener('sesamo_deliveries_updated', () => loadData());
+      window.removeEventListener('sesamo_tables_updated', () => loadData());
+      window.removeEventListener('sesamo_bill_requested', () => loadData());
     };
   }, []);
 
@@ -223,6 +242,48 @@ export default function CashRegisterScreen() {
 
   // Active shift calculations
   const shiftStart = currentRegister?.openedAt || 0;
+
+  // Pending accounts awaiting cashier checkout
+  const pendingAccounts = useMemo(() => {
+    return orders
+      .filter((o) => o.status !== 'PAGADO' && o.status !== 'CANCELADO' && Array.isArray(o.items) && o.items.length > 0)
+      .map((o) => {
+        const associatedTable = tables.find(
+          (t) => String(t.id) === String(o.tableId) || (o.tableName && t.number === Number(o.tableName.replace(/\D/g, '')))
+        );
+        const isBillRequested = associatedTable?.status === 'CUENTA_PEDIDA';
+        return {
+          order: o,
+          table: associatedTable,
+          isBillRequested,
+        };
+      })
+      .filter((item) => {
+        if (!pendingSearch.trim()) return true;
+        const q = pendingSearch.toLowerCase().trim();
+        const tableName = item.table ? `mesa ${item.table.number}` : (item.order.tableName || '');
+        const waiterName = item.order.waiterName || item.table?.currentWaiterName || '';
+        const orderNum = item.order.orderNumber || '';
+        return (
+          tableName.toLowerCase().includes(q) ||
+          waiterName.toLowerCase().includes(q) ||
+          orderNum.toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => {
+        if (a.isBillRequested && !b.isBillRequested) return -1;
+        if (!a.isBillRequested && b.isBillRequested) return 1;
+        return (b.order.createdAt || 0) - (a.order.createdAt || 0);
+      });
+  }, [orders, tables, pendingSearch]);
+
+  const pendingTotalVolume = useMemo(() => {
+    return pendingAccounts.reduce((acc, curr) => acc + (Number(curr.order.total) || 0), 0);
+  }, [pendingAccounts]);
+
+  const requestedBillsCount = useMemo(() => {
+    return pendingAccounts.filter((a) => a.isBillRequested).length;
+  }, [pendingAccounts]);
   const paidOrders = useMemo(() => {
     return orders.filter(o =>
       o.status === 'PAGADO' && (
@@ -603,6 +664,51 @@ export default function CashRegisterScreen() {
               </Paper>
             </Grid>
 
+            {/* KPI 3: Cuentas Pendientes por Cobrar */}
+            <Grid size={{ xs: 12, sm: 4, md: 2.3 }}>
+              <Paper
+                elevation={0}
+                onClick={() => setCurrentTab(0)}
+                sx={{
+                  p: 2,
+                  border: requestedBillsCount > 0 ? '2px solid #ea580c' : '1px solid #e2e8f0',
+                  borderRadius: 2.5,
+                  bgcolor: requestedBillsCount > 0 ? '#fff7ed' : '#ffffff',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 6px 16px rgba(234, 88, 12, 0.15)',
+                  },
+                }}
+              >
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontWeight: 900,
+                      color: requestedBillsCount > 0 ? '#c2410c' : '#475569',
+                      textTransform: 'uppercase',
+                      fontSize: '0.65rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                    }}
+                  >
+                    {requestedBillsCount > 0 && <AlertBellIcon sx={{ fontSize: 14, color: '#ea580c' }} />}
+                    Por Cobrar (Salón)
+                  </Typography>
+                  <ReceiptIcon sx={{ fontSize: 18, color: requestedBillsCount > 0 ? '#ea580c' : '#94a3b8' }} />
+                </Box>
+                <Typography variant="h5" sx={{ fontWeight: 900, color: requestedBillsCount > 0 ? '#c2410c' : '#1e293b' }}>
+                  ${pendingTotalVolume.toLocaleString()}
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: requestedBillsCount > 0 ? '#c2410c' : 'text.secondary' }}>
+                  {pendingAccounts.length} cuentas ({requestedBillsCount} en caja)
+                </Typography>
+              </Paper>
+            </Grid>
+
             {/* KPI 3: Efectivo Físico Esperado */}
             <Grid size={{ xs: 12, sm: 4, md: 2.5 }}>
               <Paper
@@ -731,6 +837,32 @@ export default function CashRegisterScreen() {
             '& .MuiTabs-indicator': { backgroundColor: '#65a30d', height: 3 },
           }}
         >
+          <Tab
+            icon={<PosIcon />}
+            iconPosition="start"
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <span>Cuentas por Cobrar</span>
+                <Chip
+                  label={pendingAccounts.length}
+                  size="small"
+                  sx={{
+                    fontWeight: 900,
+                    height: 22,
+                    fontSize: '0.75rem',
+                    bgcolor: requestedBillsCount > 0 ? '#ea580c' : '#65a30d',
+                    color: '#ffffff',
+                    animation: requestedBillsCount > 0 ? 'pulse 1.5s infinite' : 'none',
+                    '@keyframes pulse': {
+                      '0%': { transform: 'scale(1)' },
+                      '50%': { transform: 'scale(1.15)' },
+                      '100%': { transform: 'scale(1)' },
+                    }
+                  }}
+                />
+              </Box>
+            }
+          />
           <Tab icon={<ReceiptIcon />} iconPosition="start" label={`Movimientos del Turno (${allHistoryMovements.length})`} />
           <Tab icon={<CardIcon />} iconPosition="start" label="Auditoría por Métodos de Pago" />
           <Tab icon={<HistoryIcon />} iconPosition="start" label={`Historial de Reportes Z (${closuresHistory.length})`} />
@@ -738,9 +870,251 @@ export default function CashRegisterScreen() {
       </Paper>
 
       {/* ═══════════════════════════════════════════════════════════ */}
-      {/* TAB 0: MOVIMIENTOS DEL TURNO EN VIVO                       */}
+      {/* TAB 0: CUENTAS Y MESAS PENDIENTES DE COBRO                 */}
       {/* ═══════════════════════════════════════════════════════════ */}
       {currentTab === 0 && (
+        <Box>
+          {/* Header Banner & Quick Filter */}
+          <Paper elevation={0} sx={{ p: 2.5, mb: 3, border: '1px solid #e2e8f0', borderRadius: 3, bgcolor: '#ffffff' }}>
+            <Grid container spacing={2} sx={{ alignItems: 'center' }}>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Box sx={{ p: 1, bgcolor: '#f0fdf4', borderRadius: '12px', color: '#16a34a', display: 'flex' }}>
+                    <PosIcon sx={{ fontSize: 24 }} />
+                  </Box>
+                  <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 900, color: '#1e290b', lineHeight: 1.2 }}>
+                      Cuentas Pendientes por Cobrar
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      El mesero solicita la cuenta y la Caja es la única encargada de liquidar efectivo, tarjeta o transferencia.
+                    </Typography>
+                  </Box>
+                </Box>
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Buscar por mesa, mesero o comanda..."
+                  value={pendingSearch}
+                  onChange={(e) => setPendingSearch(e.target.value)}
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon color="action" fontSize="small" />
+                        </InputAdornment>
+                      ),
+                      sx: { borderRadius: '12px', bgcolor: '#f8fafc' }
+                    }
+                  }}
+                />
+              </Grid>
+            </Grid>
+          </Paper>
+
+          {/* Cards Grid */}
+          {pendingAccounts.length === 0 ? (
+            <Paper
+              elevation={0}
+              sx={{
+                p: 6,
+                textAlign: 'center',
+                borderRadius: 4,
+                border: '2px dashed #cbd5e1',
+                bgcolor: '#ffffff',
+                mb: 4,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: '50%',
+                  bgcolor: '#f0fdf4',
+                  color: '#16a34a',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mx: 'auto',
+                  mb: 2,
+                }}
+              >
+                <CheckCircleIcon sx={{ fontSize: 40 }} />
+              </Box>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b', mb: 1 }}>
+                ✨ No hay cuentas pendientes de cobro
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 520, mx: 'auto' }}>
+                Todas las mesas y pedidos están al día. Cuando los meseros envíen comandas o soliciten la cuenta ("Pedir Cuenta a Caja"), aparecerán listadas aquí con su botón directo para cobrar.
+              </Typography>
+            </Paper>
+          ) : (
+            <Grid container spacing={2.5}>
+              {pendingAccounts.map(({ order, table, isBillRequested }) => {
+                const tableName = table ? `Mesa ${table.number}` : (order.tableName || `Orden #${order.orderNumber || order.id.slice(-4)}`);
+                const waiterName = order.waiterName || table?.currentWaiterName || 'Mesero Asignado';
+                const timeMinutes = order.createdAt ? Math.round((Date.now() - order.createdAt) / 60000) : 0;
+                const itemsCount = (order.items || []).reduce((acc: number, it: any) => acc + (it.quantity || 1), 0);
+
+                return (
+                  <Grid key={order.id} size={{ xs: 12, sm: 6, lg: 4 }}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2.5,
+                        borderRadius: 3.5,
+                        border: isBillRequested ? '2px solid #ea580c' : '1px solid #e2e8f0',
+                        bgcolor: isBillRequested ? '#fffaf5' : '#ffffff',
+                        boxShadow: isBillRequested
+                          ? '0 6px 20px rgba(234, 88, 12, 0.15)'
+                          : '0 4px 14px rgba(0,0,0,0.03)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        height: '100%',
+                        transition: 'transform 0.2s',
+                        '&:hover': { transform: 'translateY(-2px)' }
+                      }}
+                    >
+                      <Box>
+                        {/* Header: Table & Status Tag */}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                            <Avatar
+                              sx={{
+                                bgcolor: isBillRequested ? '#ea580c' : '#0284c7',
+                                color: '#ffffff',
+                                width: 44,
+                                height: 44,
+                                fontWeight: 900,
+                                fontSize: '1.1rem'
+                              }}
+                            >
+                              {table ? table.number : 'P'}
+                            </Avatar>
+                            <Box>
+                              <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#0f172a', lineHeight: 1.2 }}>
+                                {tableName}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {table?.location || order.type || 'Consumo en Salón'}
+                              </Typography>
+                            </Box>
+                          </Box>
+
+                          {isBillRequested ? (
+                            <Chip
+                              icon={<AlertBellIcon sx={{ fontSize: '15px !important', color: '#ffffff !important' }} />}
+                              label="CUENTA PEDIDA"
+                              size="small"
+                              sx={{
+                                bgcolor: '#ea580c',
+                                color: '#ffffff',
+                                fontWeight: 900,
+                                fontSize: '0.72rem',
+                                boxShadow: '0 2px 8px rgba(234, 88, 12, 0.35)',
+                              }}
+                            />
+                          ) : (
+                            <Chip
+                              label={order.status === 'LISTO' ? 'Listo' : 'En Consumo'}
+                              size="small"
+                              sx={{
+                                bgcolor: '#f1f5f9',
+                                color: '#475569',
+                                fontWeight: 800,
+                                fontSize: '0.72rem'
+                              }}
+                            />
+                          )}
+                        </Box>
+
+                        {/* Meta info: Waiter, Time, Items */}
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 2, fontSize: '0.78rem', color: '#64748b' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <PersonIcon sx={{ fontSize: 15 }} />
+                            <span>{waiterName}</span>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <TimeIcon sx={{ fontSize: 15 }} />
+                            <span>{timeMinutes > 0 ? `Hace ${timeMinutes} min` : 'Recién abierta'}</span>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <RestaurantIcon sx={{ fontSize: 15 }} />
+                            <span>{itemsCount} {itemsCount === 1 ? 'producto' : 'productos'}</span>
+                          </Box>
+                        </Box>
+
+                        {/* Items list preview */}
+                        <Box sx={{ p: 1.5, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0', maxHeight: 120, overflowY: 'auto', mb: 2 }}>
+                          {(order.items || []).map((it: any, idx: number) => (
+                            <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', py: 0.25 }}>
+                              <Typography variant="caption" sx={{ fontWeight: 700, color: '#334155' }}>
+                                {it.quantity}x {it.productName}
+                              </Typography>
+                              <Typography variant="caption" sx={{ fontWeight: 800, color: '#0f172a' }}>
+                                ${(it.totalPrice || it.price * it.quantity).toLocaleString()}
+                              </Typography>
+                            </Box>
+                          ))}
+                        </Box>
+                      </Box>
+
+                      {/* Bottom Pricing & Action Button */}
+                      <Box sx={{ pt: 1.5, borderTop: '1px dashed #cbd5e1' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                          <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                            Total a Cobrar
+                          </Typography>
+                          <Typography variant="h5" sx={{ fontWeight: 900, color: '#15803d' }}>
+                            ${Number(order.total).toLocaleString()} COP
+                          </Typography>
+                        </Box>
+
+                        <Button
+                          fullWidth
+                          variant="contained"
+                          size="large"
+                          startIcon={<PosIcon />}
+                          onClick={() => {
+                            setSelectedBillingOrder(order);
+                            setSelectedBillingTable(table || null);
+                            setBillingModalOpen(true);
+                          }}
+                          sx={{
+                            bgcolor: isBillRequested ? '#ea580c' : '#65a30d',
+                            color: '#ffffff',
+                            fontWeight: 900,
+                            py: 1.3,
+                            fontSize: '0.95rem',
+                            borderRadius: '12px',
+                            boxShadow: isBillRequested
+                              ? '0 4px 14px rgba(234, 88, 12, 0.35)'
+                              : '0 4px 14px rgba(101, 163, 13, 0.35)',
+                            '&:hover': {
+                              bgcolor: isBillRequested ? '#c2410c' : '#4d7c0f'
+                            }
+                          }}
+                        >
+                          Cobrar en Caja
+                        </Button>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                );
+              })}
+            </Grid>
+          )}
+        </Box>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {/* TAB 1: MOVIMIENTOS DEL TURNO EN VIVO                       */}
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {currentTab === 1 && (
         <Box>
           {/* Filter Toolbar */}
           <Paper elevation={0} sx={{ p: 2, mb: 3, border: '1px solid #e2e8f0', borderRadius: 2.5 }}>
@@ -882,9 +1256,9 @@ export default function CashRegisterScreen() {
       )}
 
       {/* ═══════════════════════════════════════════════════════════ */}
-      {/* TAB 1: AUDITORÍA POR MÉTODOS DE PAGO                       */}
+      {/* TAB 2: AUDITORÍA POR MÉTODOS DE PAGO                       */}
       {/* ═══════════════════════════════════════════════════════════ */}
-      {currentTab === 1 && (
+      {currentTab === 2 && (
         <Box>
           <Box sx={{ mb: 3 }}>
             <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e290b' }}>
@@ -988,9 +1362,9 @@ export default function CashRegisterScreen() {
       )}
 
       {/* ═══════════════════════════════════════════════════════════ */}
-      {/* TAB 2: HISTORIAL DE REPORTES Z (CIERRES ANTERIORES)        */}
+      {/* TAB 3: HISTORIAL DE REPORTES Z (CIERRES ANTERIORES)        */}
       {/* ═══════════════════════════════════════════════════════════ */}
-      {currentTab === 2 && (
+      {currentTab === 3 && (
         <Box>
           <Box sx={{ mb: 3 }}>
             <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e290b' }}>
@@ -1540,6 +1914,31 @@ export default function CashRegisterScreen() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* MODAL COBRAR EN CAJA */}
+      {billingModalOpen && (
+        <BillingModal
+          open={billingModalOpen}
+          onClose={() => {
+            setBillingModalOpen(false);
+            setSelectedBillingOrder(null);
+            setSelectedBillingTable(null);
+          }}
+          order={selectedBillingOrder}
+          table={selectedBillingTable}
+          onPaymentSuccess={() => {
+            setBillingModalOpen(false);
+            setSelectedBillingOrder(null);
+            setSelectedBillingTable(null);
+            setSnackbar({
+              open: true,
+              message: '¡Cuenta liquidada con éxito en Caja! Factura generada y mesa liberada.',
+              severity: 'success',
+            });
+            loadData();
+          }}
+        />
+      )}
 
       {/* SNACKBAR NOTIFICATIONS */}
       <Snackbar

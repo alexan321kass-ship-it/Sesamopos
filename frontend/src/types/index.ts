@@ -101,7 +101,7 @@ export interface Product {
 }
 
 // Tables
-export type TableStatus = 'DISPONIBLE' | 'OCUPADA' | 'RESERVADA' | 'PEDIDO_LISTO' | 'FUERA_DE_SERVICIO';
+export type TableStatus = 'DISPONIBLE' | 'OCUPADA' | 'RESERVADA' | 'PEDIDO_LISTO' | 'FUERA_DE_SERVICIO' | 'CUENTA_PEDIDA';
 
 export interface Table {
   id: string;
@@ -149,6 +149,7 @@ export interface Order {
   customerName?: string;
   customerDocument?: string;
   tableId?: string;
+  tableName?: string;
   waiterId?: string;
   waiterName?: string;
   items: OrderItem[];

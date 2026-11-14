@@ -179,6 +179,21 @@ export default function TablesScreen() {
   };
 
   const getStatusConfig = (table: Table, activeOrder?: Order) => {
+    if (table.status === 'CUENTA_PEDIDA') {
+      return {
+        label: '🧾 Cuenta en Caja',
+        color: '#b45309',
+        bgColor: '#fffbeb',
+        borderColor: '#fde68a',
+        headerBg: 'linear-gradient(180deg, #fef3c7 0%, #ffffff 100%)',
+        badgeBg: '#fde68a',
+        badgeColor: '#92400e',
+        dotColor: '#d97706',
+        isReady: false,
+        icon: <ReceiptIcon sx={{ fontSize: 16 }} />
+      };
+    }
+
     if (table.status === 'DISPONIBLE' && !activeOrder) {
       return {
         label: 'Libre',
@@ -365,6 +380,23 @@ export default function TablesScreen() {
       setSelectedTable(null);
     } else {
       alert('Esta mesa no tiene un pedido activo para cobrar.');
+    }
+  };
+
+  const handleRequestBillToCashier = async (table: Table) => {
+    try {
+      await mockApi.tables.updateStatus(table.id, 'CUENTA_PEDIDA');
+      setActionNotice({
+        type: 'success',
+        message: `¡Cuenta de Mesa ${table.number} enviada a Caja! El cajero ya la tiene en su lista para cobrar.`
+      });
+      setSelectedTable(null);
+      loadData();
+    } catch (err: any) {
+      setActionNotice({
+        type: 'error',
+        message: err?.message || 'Error solicitando cuenta a caja'
+      });
     }
   };
 
@@ -1504,6 +1536,49 @@ export default function TablesScreen() {
                     >
                       💵 Cobrar Cuenta (${drawerActiveOrder.total.toLocaleString()})
                     </Button>
+                  )}
+
+                  {/* REQUEST BILL BUTTON FOR WAITERS: Delegate payment to Caja */}
+                  {!canProcessPayment && (
+                    selectedTable.status === 'CUENTA_PEDIDA' ? (
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          p: 2,
+                          bgcolor: '#fffbeb',
+                          border: '2px solid #fde68a',
+                          borderRadius: '14px',
+                          textAlign: 'center'
+                        }}
+                      >
+                        <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                          🧾 Cuenta enviada a Caja
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#78350f', fontWeight: 600 }}>
+                          El cliente puede pasar a cancelar a la caja principal o esperar su factura.
+                        </Typography>
+                      </Paper>
+                    ) : (
+                      <Button
+                        fullWidth
+                        variant="contained"
+                        size="large"
+                        startIcon={<ReceiptIcon />}
+                        onClick={() => handleRequestBillToCashier(selectedTable)}
+                        sx={{
+                          bgcolor: '#ea580c',
+                          color: '#ffffff',
+                          borderRadius: '14px',
+                          fontWeight: 900,
+                          py: 1.5,
+                          fontSize: '1rem',
+                          boxShadow: '0 4px 14px rgba(234, 88, 12, 0.35)',
+                          '&:hover': { bgcolor: '#c2410c' }
+                        }}
+                      >
+                        🧾 Pedir Cuenta / Enviar a Caja (${drawerActiveOrder.total.toLocaleString()})
+                      </Button>
+                    )
                   )}
 
                   {/* EDIT ORDER BUTTON */}
