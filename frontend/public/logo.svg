@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 240" width="100%" height="100%">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="leafGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#84cc16" />
+      <stop offset="50%" stop-color="#65a30d" />
+      <stop offset="100%" stop-color="#4d7c0f" />
+    </linearGradient>
+
+    <linearGradient id="bubbleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="30%" stop-color="#facc15" />
+      <stop offset="100%" stop-color="#eab308" />
+    </linearGradient>
+
+    <linearGradient id="orangeOutline" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f97316" />
+      <stop offset="100%" stop-color="#ea580c" />
+    </linearGradient>
+
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="3" dy="5" stdDeviation="4" flood-color="#1e290b" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <!-- Golden Flame Speech Bubble Background -->
+    <!-- Outer Orange Flame Stroke -->
+    <path d="M 210,130 C 200,90 230,55 260,50 C 290,45 310,25 350,15 C 340,40 370,45 420,40 C 470,35 550,45 560,90 C 570,140 520,190 440,190 C 370,190 320,180 280,180 C 240,180 215,160 210,130 Z" 
+          fill="none" stroke="url(#orangeOutline)" stroke-width="12" stroke-linejoin="round" />
+    
+    <!-- Yellow Inner Bubble -->
+    <path d="M 210,130 C 200,90 230,55 260,50 C 290,45 310,25 350,15 C 340,40 370,45 420,40 C 470,35 550,45 560,90 C 570,140 520,190 440,190 C 370,190 320,180 280,180 C 240,180 215,160 210,130 Z" 
+          fill="url(#bubbleGrad)" stroke="#f59e0b" stroke-width="4" stroke-linejoin="round" />
+
+    <!-- Leaf Mascot (Hoja animada con ojos y pulgar arriba) -->
+    <!-- Leaf Body -->
+    <path d="M 120,20 C 130,50 170,80 180,120 C 190,160 160,200 130,220 C 100,200 60,170 50,120 C 40,70 90,30 120,20 Z" 
+          fill="url(#leafGrad)" stroke="#3f6212" stroke-width="4" />
+    
+    <!-- Leaf Serrated Edges -->
+    <path d="M 120,20 L 128,35 L 140,45 L 155,60 L 168,80 L 178,105 L 180,120 M 120,20 L 105,35 L 90,48 L 72,65 L 58,88 L 50,120" 
+          fill="none" stroke="#4d7c0f" stroke-width="3" />
+    
+    <!-- Leaf Center Vein -->
+    <path d="M 120,35 Q 125,120 130,210" fill="none" stroke="#84cc16" stroke-width="3" stroke-linecap="round" />
+
+    <!-- Ojos de la Hoja -->
+    <!-- Left Eye -->
+    <ellipse cx="108" cy="100" rx="14" ry="20" fill="#ffffff" stroke="#1e290b" stroke-width="3" />
+    <ellipse cx="108" cy="104" rx="8" ry="12" fill="#232d0c" />
+    <circle cx="106" cy="98" r="4" fill="#ffffff" />
+    <circle cx="110" cy="108" r="2" fill="#ffffff" />
+
+    <!-- Right Eye -->
+    <ellipse cx="144" cy="100" rx="14" ry="20" fill="#ffffff" stroke="#1e290b" stroke-width="3" />
+    <ellipse cx="144" cy="104" rx="8" ry="12" fill="#232d0c" />
+    <circle cx="142" cy="98" r="4" fill="#ffffff" />
+    <circle cx="146" cy="108" r="2" fill="#ffffff" />
+
+    <!-- Cejas sonrientes -->
+    <path d="M 98,75 Q 108,70 118,75" fill="none" stroke="#232d0c" stroke-width="3" stroke-linecap="round" />
+    <path d="M 134,75 Q 144,70 154,75" fill="none" stroke="#232d0c" stroke-width="3" stroke-linecap="round" />
+
+    <!-- Boca Feliz -->
+    <path d="M 112,130 Q 126,145 140,130" fill="none" stroke="#1e290b" stroke-width="4" stroke-linecap="round" />
+
+    <!-- Mano con pulgar arriba 👍 (Izquierda) -->
+    <path d="M 45,135 C 30,130 20,120 30,105 C 35,98 48,108 55,120 L 52,135 Z" fill="#ffffff" stroke="#3f6212" stroke-width="3" />
+    <circle cx="30" cy="108" r="7" fill="#ffffff" stroke="#3f6212" stroke-width="3" />
+
+    <!-- Mano sosteniendo la burbuja (Derecha) -->
+    <g transform="translate(205, 75)">
+      <path d="M 0,10 C -10,5 -15,15 -5,25 C 0,30 10,25 15,15 Z" fill="#ffffff" stroke="#3f6212" stroke-width="3" />
+      <ellipse cx="5" cy="5" rx="6" ry="8" fill="#ffffff" stroke="#3f6212" stroke-width="3" />
+      <ellipse cx="12" cy="12" rx="6" ry="8" fill="#ffffff" stroke="#3f6212" stroke-width="3" />
+    </g>
+
+    <!-- Typography: sésamo alimentos -->
+    <text x="245" y="122" 
+          font-family="'Fredoka', 'Quicksand', 'Arial Black', sans-serif" 
+          font-size="64" 
+          font-weight="900" 
+          fill="#232d0c" 
+          letter-spacing="-1">sésamo</text>
+
+    <text x="275" y="158" 
+          font-family="'Quicksand', 'Montserrat', 'Arial', sans-serif" 
+          font-size="30" 
+          font-weight="700" 
+          font-style="italic"
+          fill="#3a4715" 
+          letter-spacing="2">alimentos</text>
+  </g>
+</svg>

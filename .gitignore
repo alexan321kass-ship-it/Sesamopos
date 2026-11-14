@@ -1,0 +1,26 @@
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+backend/.env
+frontend/.env.local
+
+# Build output
+backend/dist/
+*.tsbuildinfo
+sesamo_hostgator.zip
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# OS and Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

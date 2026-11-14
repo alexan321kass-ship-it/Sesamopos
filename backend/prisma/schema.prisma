@@ -1,0 +1,200 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String       @id @default(uuid())
+  name           String
+  email          String       @unique
+  password       String
+  role           String
+  isActive       Boolean      @default(true)
+  phone          String?
+  documentId     String?
+  pin            String?
+  avatarUrl      String?
+  hireDate       String?
+  hourlyRate     Float?
+  shiftStatus    String?      @default("FUERA_DE_TURNO")
+  shiftStartTime String?
+  assignedArea   String?
+  permissions    Json?
+  stats          Json?
+  orders         Order[]
+  shifts         StaffShift[]
+}
+
+model StaffShift {
+  id          String   @id @default(uuid())
+  staffId     String
+  staffName   String
+  role        String
+  date        String
+  checkIn     String
+  checkOut    String?
+  status      String   @default("ACTIVO")
+  hoursWorked Float    @default(0)
+  notes       String?
+  user        User?    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean   @default(true)
+  products    Product[]
+}
+
+model Product {
+  id          String      @id @default(uuid())
+  sku         String?
+  name        String
+  description String?
+  price       Float
+  cost        Float?
+  imageUrl    String?
+  tags        Json?
+  rating      Float?
+  calories    String?
+  isAvailable Boolean     @default(true)
+  isActive    Boolean     @default(true)
+  category    Category?   @relation(fields: [categoryId], references: [id])
+  categoryId  String?
+  orderItems  OrderItem[]
+}
+
+model Table {
+  id                String  @id @default(uuid())
+  number            Int     @unique
+  capacity          Int     @default(4)
+  location          String? @default("Salón Principal")
+  status            String  @default("DISPONIBLE")
+  currentOrderId    String?
+  currentWaiterId   String?
+  currentWaiterName String?
+  timeOccupied      Float?
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  orderNumber   String?
+  createdAt     Float?
+  updatedAt     Float?
+  tableId       String?
+  tableName     String?
+  waiterId      String?
+  waiterName    String?
+  customerName  String?
+  status        String      @default("CREADO")
+  type          String?     @default("MESA")
+  items         Json?
+  subtotal      Float?      @default(0)
+  discount      Float?      @default(0)
+  tax           Float?      @default(0)
+  total         Float       @default(0)
+  paymentMethod String?
+  user          User?       @relation(fields: [userId], references: [id])
+  userId        String?
+  orderItems    OrderItem[]
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   String
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+  quantity  Int     @default(1)
+  price     Float
+}
+
+model CashRegister {
+  id            String   @id @default(uuid())
+  name          String   @default("Caja Principal (POS)")
+  openedBy      String
+  openedAt      Float
+  initialAmount Float    @default(0)
+  currentAmount Float    @default(0)
+  isOpen        Boolean  @default(true)
+  closedAt      Float?
+  closedBy      String?
+  countedCash   Float?
+  notes         String?
+}
+
+model CashMovement {
+  id         String  @id @default(uuid())
+  registerId String?
+  type       String
+  amount     Float
+  reason     String
+  date       Float
+}
+
+model CashHistory {
+  id            String  @id @default(uuid())
+  registerId    String?
+  openedBy      String
+  openedAt      Float
+  closedBy      String?
+  closedAt      Float
+  initialAmount Float
+  countedCash   Float
+  notes         String?
+  movements     Json?
+}
+
+model Delivery {
+  id                    String  @id @default(uuid())
+  orderNumber           String?
+  customer              Json?
+  items                 Json?
+  subtotal              Float?  @default(0)
+  deliveryFee           Float?  @default(0)
+  total                 Float   @default(0)
+  paymentMethod         String?
+  cashGiven             Float?
+  changeDue             Float?
+  deliveryStatus        String  @default("PENDIENTE")
+  riderName             String?
+  riderPhone            String?
+  dispatchTime          String?
+  estimatedDeliveryTime String?
+  notes                 String?
+  createdAt             Float?
+}
+
+model InventoryItem {
+  id           String  @id @default(uuid())
+  sku          String?
+  code         String?
+  name         String
+  category     String?
+  currentStock Float   @default(0)
+  minStock     Float   @default(0)
+  maxStock     Float?
+  unit         String? @default("unid")
+  costPerUnit  Float?  @default(0)
+  unitCost     Float?  @default(0)
+  supplier     String?
+  isActive     Boolean @default(true)
+}
+
+model Reservation {
+  id           String  @id @default(uuid())
+  customerName String
+  phone        String?
+  pax          Int?    @default(2)
+  date         String?
+  time         String?
+  tableId      String?
+  status       String  @default("PENDIENTE")
+  notes        String?
+  createdAt    Float?
+}

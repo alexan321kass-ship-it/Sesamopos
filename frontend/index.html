@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/logo-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sésamo Alimentos - Menú Digital & Sistema POS</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      window.addEventListener('error', function(event) {
+        var root = document.getElementById('root');
+        if (!root || root.children.length === 0) {
+          var banner = document.getElementById('sesamo-fatal-error');
+          if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'sesamo-fatal-error';
+            banner.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:#0d160e;color:#f8fafc;padding:32px;font-family:sans-serif;z-index:999999;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;';
+            document.body.appendChild(banner);
+          }
+          banner.innerHTML = '<div style="background:#162215;padding:32px;border-radius:16px;border:1px solid #ef4444;max-width:540px;box-shadow:0 20px 40px rgba(0,0,0,0.6);"><h2 style="color:#ef4444;margin-top:0;font-size:1.3rem;">Error al iniciar el sistema</h2><p style="color:#cbd5e1;font-size:0.95rem;line-height:1.5;">' + (event.message || 'Se produjo un error al cargar los componentes') + '</p><div style="display:flex;gap:12px;justify-content:center;margin-top:20px;"><button onclick="location.reload()" style="background:#65a30d;color:#fff;border:none;padding:10px 18px;border-radius:8px;font-weight:bold;cursor:pointer;">Recargar</button><button onclick="localStorage.clear();sessionStorage.clear();location.href=\'/login\';" style="background:transparent;color:#facc15;border:1px solid #facc15;padding:10px 18px;border-radius:8px;font-weight:bold;cursor:pointer;">Limpiar Caché y Reiniciar</button></div></div>';
+        }
+      });
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
