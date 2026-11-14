@@ -36,7 +36,6 @@ import {
   People as PeopleIcon,
   PersonAdd as PersonAddIcon,
   Search as SearchIcon,
-  Star as StarIcon,
   Phone as PhoneIcon,
   Email as EmailIcon,
   Home as HomeIcon,
@@ -48,8 +47,6 @@ import {
   Refresh as RefreshIcon,
   WorkspacePremium as PremiumIcon,
   FileDownload as DownloadIcon,
-  Add as AddIcon,
-  Remove as RemoveIcon,
   Visibility as VisibilityIcon,
   WhatsApp as WhatsAppIcon,
   CheckCircle as CheckCircleIcon,
@@ -93,9 +90,6 @@ export default function CustomersScreen() {
   const [profileCustomer, setProfileCustomer] = useState<Customer | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
-  const [pointsModalCustomer, setPointsModalCustomer] = useState<Customer | null>(null);
-  const [pointsDelta, setPointsDelta] = useState<number>(50);
-
   const [deleteConfirmCustomer, setDeleteConfirmCustomer] = useState<Customer | null>(null);
 
   // Feedback Snackbar
@@ -135,13 +129,11 @@ export default function CustomersScreen() {
   const kpis = useMemo(() => {
     const totalCount = customers.length;
     let totalSpentAccum = 0;
-    let totalPointsAccum = 0;
     let frequentCount = 0;
     let totalOrdersAccum = 0;
 
     customers.forEach(c => {
       totalSpentAccum += c.totalSpent || 0;
-      totalPointsAccum += c.loyaltyPoints || 0;
       totalOrdersAccum += c.totalOrders || 0;
       if ((c.totalOrders || 0) >= 2) {
         frequentCount++;
@@ -153,7 +145,6 @@ export default function CustomersScreen() {
     return {
       totalCount,
       totalSpentAccum,
-      totalPointsAccum,
       frequentCount,
       avgTicket,
     };
@@ -209,9 +200,6 @@ export default function CustomersScreen() {
         if (selectedSort === 'ORDERS') {
           return (b.totalOrders || 0) - (a.totalOrders || 0);
         }
-        if (selectedSort === 'POINTS') {
-          return (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0);
-        }
         if (selectedSort === 'NAME') {
           return a.name.localeCompare(b.name);
         }
@@ -230,7 +218,6 @@ export default function CustomersScreen() {
       address: '',
       city: 'Medellín',
       zone: 'Laureles',
-      loyaltyPoints: 100, // Bono de bienvenida
       totalOrders: 0,
       totalSpent: 0,
       averageTicket: 0,
@@ -282,35 +269,6 @@ export default function CustomersScreen() {
     setIsProfileModalOpen(true);
   };
 
-  // Open Loyalty Points Modal
-  const handleOpenPointsModal = (customer: Customer) => {
-    setPointsModalCustomer(customer);
-    setPointsDelta(50);
-  };
-
-  // Apply Points Adjustment
-  const handleApplyPoints = async (isAddition: boolean) => {
-    if (!pointsModalCustomer) return;
-    const delta = isAddition ? Math.abs(pointsDelta) : -Math.abs(pointsDelta);
-
-    try {
-      const updated = await mockApi.customers.adjustPoints(pointsModalCustomer.id, delta);
-      setPointsModalCustomer(null);
-      if (profileCustomer && profileCustomer.id === updated.id) {
-        setProfileCustomer(updated);
-      }
-      setSnackbar({
-        open: true,
-        message: `${isAddition ? 'Añadidos' : 'Canjeados'} ${Math.abs(delta)} puntos a ${updated.name}. Saldo: ${updated.loyaltyPoints} pts.`,
-        severity: 'success',
-      });
-      loadData();
-    } catch (err) {
-      console.error(err);
-      setSnackbar({ open: true, message: 'Error al ajustar puntos de lealtad.', severity: 'error' });
-    }
-  };
-
   // Delete Customer
   const handleDeleteCustomer = async (customer: Customer) => {
     try {
@@ -340,9 +298,9 @@ export default function CustomersScreen() {
 
   // Export to CSV
   const handleExportCSV = () => {
-    const headers = 'ID,Nombre,TipoDoc,Documento,Telefono,Email,Ciudad,Direccion,Zona,Puntos,TotalPedidos,TotalGastado,Tier\n';
+    const headers = 'ID,Nombre,TipoDoc,Documento,Telefono,Email,Ciudad,Direccion,Zona,TotalPedidos,TotalGastado\n';
     const rows = filteredCustomers
-      .map(c => `"${c.id}","${c.name}","${c.documentType || 'CC'}","${c.documentId || ''}","${c.phone}","${c.email || ''}","${c.city || ''}","${c.address || ''}","${c.zone || ''}",${c.loyaltyPoints || 0},${c.totalOrders || 0},${c.totalSpent || 0},"${c.tier || 'BRONCE'}"`)
+      .map(c => `"${c.id}","${c.name}","${c.documentType || 'CC'}","${c.documentId || ''}","${c.phone}","${c.email || ''}","${c.city || ''}","${c.address || ''}","${c.zone || ''}",${c.totalOrders || 0},${c.totalSpent || 0}`)
       .join('\n');
 
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
@@ -422,7 +380,7 @@ export default function CustomersScreen() {
                   Directorio de Clientes & CRM
                 </Typography>
                 <Chip
-                  label="Fidelización • Facturación DIAN • WhatsApp Directo"
+                  label="Directorio • Facturación DIAN • WhatsApp Directo"
                   size="small"
                   sx={{
                     fontWeight: 800,
@@ -436,7 +394,7 @@ export default function CustomersScreen() {
                 />
               </Box>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.4 }}>
-                Base de datos unificada de comensales, historial de consumo LTV, puntos de fidelidad, alérgenos y datos fiscales para facturación electrónica DIAN.
+                Base de datos unificada de comensales, historial de consumo LTV, alérgenos y datos fiscales para facturación electrónica DIAN.
               </Typography>
             </Box>
           </Box>
@@ -507,7 +465,7 @@ export default function CustomersScreen() {
       {/* 2. TOP KPI CARDS */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {/* KPI 1: Clientes Totales */}
-        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Paper
             elevation={0}
             sx={{
@@ -547,7 +505,7 @@ export default function CustomersScreen() {
         </Grid>
 
         {/* KPI 2: Clientes Frecuentes */}
-        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Paper
             elevation={0}
             sx={{
@@ -587,7 +545,7 @@ export default function CustomersScreen() {
         </Grid>
 
         {/* KPI 3: Venta Clientes (LTV) */}
-        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Paper
             elevation={0}
             sx={{
@@ -627,7 +585,7 @@ export default function CustomersScreen() {
         </Grid>
 
         {/* KPI 4: Ticket Promedio */}
-        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Paper
             elevation={0}
             sx={{
@@ -662,46 +620,6 @@ export default function CustomersScreen() {
             </Box>
             <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
               Gasto promedio en cada visita u orden
-            </Typography>
-          </Paper>
-        </Grid>
-
-        {/* KPI 5: Puntos Activos */}
-        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              p: 2.5,
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              border: '1px solid #e2e8f0',
-              borderRadius: 3,
-              bgcolor: '#ffffff',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-              transition: 'all 0.2s ease',
-              '&:hover': { borderColor: '#fef08a', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(202, 138, 4, 0.08)' },
-            }}
-          >
-            <Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Box sx={{ width: 30, height: 30, borderRadius: '50%', bgcolor: '#fef9c3', color: '#ca8a04', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <StarIcon sx={{ fontSize: 17 }} />
-                  </Box>
-                  <Typography variant="caption" sx={{ color: '#a16207', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
-                    Puntos Activos
-                  </Typography>
-                </Box>
-                <Chip label="CANJEABLES" size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 900, bgcolor: '#fef9c3', color: '#854d0e' }} />
-              </Box>
-              <Typography variant="h4" sx={{ fontWeight: 900, color: '#ca8a04', mb: 0.5, letterSpacing: -0.5 }}>
-                {kpis.totalPointsAccum.toLocaleString()}
-              </Typography>
-            </Box>
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-              Puntos del club disponibles para redimir
             </Typography>
           </Paper>
         </Grid>
@@ -784,7 +702,6 @@ export default function CustomersScreen() {
                 >
                   <MenuItem value="TOTAL_SPENT">Mayor Consumo Histórico (LTV)</MenuItem>
                   <MenuItem value="ORDERS">Más Pedidos Realizados</MenuItem>
-                  <MenuItem value="POINTS">Más Puntos Acumulados</MenuItem>
                   <MenuItem value="NAME">Nombre (A - Z)</MenuItem>
                 </TextField>
               </Grid>
@@ -925,8 +842,8 @@ export default function CustomersScreen() {
                             </Box>
                           </Stack>
 
-                          {/* Resumen Financiero y de Puntos */}
-                          <Box sx={{ p: 1.5, bgcolor: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, mb: 1.5 }}>
+                          {/* Resumen Financiero */}
+                          <Box sx={{ p: 1.5, bgcolor: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 1.5 }}>
                             <Box>
                               <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, display: 'block', fontSize: '0.65rem' }}>
                                 Consumo LTV:
@@ -936,21 +853,12 @@ export default function CustomersScreen() {
                               </Typography>
                             </Box>
 
-                            <Box>
+                            <Box sx={{ textAlign: 'right' }}>
                               <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, display: 'block', fontSize: '0.65rem' }}>
                                 Pedidos:
                               </Typography>
                               <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1e290b' }}>
                                 {customer.totalOrders || 0} visitas
-                              </Typography>
-                            </Box>
-
-                            <Box sx={{ textAlign: 'right' }}>
-                              <Typography variant="caption" sx={{ color: '#ca8a04', fontWeight: 800, display: 'block', fontSize: '0.65rem' }}>
-                                Puntos:
-                              </Typography>
-                              <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#ca8a04' }}>
-                                {customer.loyaltyPoints || 0} pts
                               </Typography>
                             </Box>
                           </Box>
@@ -972,26 +880,15 @@ export default function CustomersScreen() {
 
                         {/* Barra de Acciones Directas */}
                         <CardActions sx={{ p: 2, pt: 0, justifyContent: 'space-between', borderTop: '1px solid #f8fafc' }}>
-                          <Stack direction="row" spacing={0.8}>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              startIcon={<WhatsAppIcon sx={{ fontSize: 15, color: '#16a34a' }} />}
-                              onClick={() => openWhatsApp(customer.phone, customer.name)}
-                              sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 800, fontSize: '0.72rem', borderColor: '#bbf7d0', color: '#15803d', bgcolor: '#f0fdf4' }}
-                            >
-                              WhatsApp
-                            </Button>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              startIcon={<StarIcon sx={{ fontSize: 15, color: '#ca8a04' }} />}
-                              onClick={() => handleOpenPointsModal(customer)}
-                              sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 800, fontSize: '0.72rem', borderColor: '#fef08a', color: '#854d0e', bgcolor: '#fefce8' }}
-                            >
-                              Puntos
-                            </Button>
-                          </Stack>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<WhatsAppIcon sx={{ fontSize: 15, color: '#16a34a' }} />}
+                            onClick={() => openWhatsApp(customer.phone, customer.name)}
+                            sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 800, fontSize: '0.72rem', borderColor: '#bbf7d0', color: '#15803d', bgcolor: '#f0fdf4' }}
+                          >
+                            WhatsApp
+                          </Button>
 
                           <Stack direction="row" spacing={0.5}>
                             <Tooltip title="Ficha 360° del Cliente">
@@ -1028,7 +925,6 @@ export default function CustomersScreen() {
                     <TableCell sx={{ fontWeight: 800, color: '#475569' }}>Contacto</TableCell>
                     <TableCell sx={{ fontWeight: 800, color: '#475569' }}>Ubicación</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 800, color: '#475569' }}>Pedidos</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 800, color: '#475569' }}>Puntos</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800, color: '#475569' }}>Consumo LTV</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800, color: '#475569' }}>Acciones</TableCell>
                   </TableRow>
@@ -1078,16 +974,6 @@ export default function CustomersScreen() {
                             label={`${customer.totalOrders || 0} pedidos`}
                             size="small"
                             sx={{ fontWeight: 800, bgcolor: '#f1f5f9', color: '#475569', borderRadius: '8px' }}
-                          />
-                        </TableCell>
-                        <TableCell align="center">
-                          <Chip
-                            icon={<StarIcon sx={{ fontSize: 13 }} />}
-                            label={`${customer.loyaltyPoints || 0} pts`}
-                            size="small"
-                            onClick={() => handleOpenPointsModal(customer)}
-                            clickable
-                            sx={{ fontWeight: 900, bgcolor: '#fefce8', color: '#854d0e', border: '1px solid #fde047', borderRadius: '8px' }}
                           />
                         </TableCell>
                         <TableCell align="right">
@@ -1198,14 +1084,14 @@ export default function CustomersScreen() {
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 800, color: '#1e290b' }}>{c.name}</Typography>
                         <Typography variant="caption" sx={{ color: '#dc2626', fontWeight: 700 }}>
-                          Saldo lealtad: {c.loyaltyPoints || 0} pts sin redimir
+                          Consumo acumulado: ${(c.totalSpent || 0).toLocaleString()}
                         </Typography>
                       </Box>
                       <Button
                         size="small"
                         variant="contained"
                         startIcon={<WhatsAppIcon sx={{ fontSize: 14 }} />}
-                        onClick={() => openWhatsApp(c.phone, c.name, `¡Hola ${c.name}! Te extrañamos en el Restaurante Sésamo. Tienes ${c.loyaltyPoints || 0} puntos acumulados. ¡Ven esta semana y te regalamos la bebida de la casa!`)}
+                        onClick={() => openWhatsApp(c.phone, c.name, `¡Hola ${c.name}! Te extrañamos en el Restaurante Sésamo. ¡Queremos invitarte a probar nuestras novedades esta semana y te regalamos la bebida de la casa!`)}
                         sx={{ borderRadius: '8px', fontWeight: 800, fontSize: '0.72rem', textTransform: 'none', bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' } }}
                       >
                         Reactivar WhatsApp
@@ -1423,24 +1309,7 @@ export default function CustomersScreen() {
               </Grid>
 
               <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#1e290b', pt: 1 }}>
-                2. Puntos de Fidelidad:
-              </Typography>
-
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    type="number"
-                    label="Puntos de Fidelidad Iniciales"
-                    value={editingCustomer.loyaltyPoints ?? 100}
-                    onChange={(e) => setEditingCustomer({ ...editingCustomer, loyaltyPoints: Number(e.target.value) || 0 })}
-                  />
-                </Grid>
-              </Grid>
-
-              <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#1e290b', pt: 1 }}>
-                3. Experiencia de Servicio en Salón & Alérgenos:
+                2. Experiencia de Servicio en Salón & Alérgenos:
               </Typography>
 
               <Box>
@@ -1543,16 +1412,15 @@ export default function CustomersScreen() {
                   </Box>
 
                   <Chip
-                    icon={<StarIcon sx={{ fontSize: 16 }} />}
-                    label={`${profileCustomer.loyaltyPoints || 0} Puntos`}
-                    sx={{ fontWeight: 900, bgcolor: '#fefce8', color: '#854d0e', border: '1px solid #fde047', py: 2, px: 1, borderRadius: '12px' }}
+                    label={`${profileCustomer.totalOrders || 0} Visitas`}
+                    sx={{ fontWeight: 800, bgcolor: '#f1f5f9', color: '#475569', py: 1.5, px: 1, borderRadius: '12px' }}
                   />
                 </Box>
               </Paper>
 
                 {/* Métricas del Comensal */}
                 <Grid container spacing={2}>
-                  <Grid size={{ xs: 6, sm: 3 }}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
                     <Paper elevation={0} sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
                       <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700 }}>Consumo Total LTV:</Typography>
                       <Typography variant="h6" sx={{ fontWeight: 900, color: '#16a34a' }}>
@@ -1561,7 +1429,7 @@ export default function CustomersScreen() {
                     </Paper>
                   </Grid>
 
-                  <Grid size={{ xs: 6, sm: 3 }}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
                     <Paper elevation={0} sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
                       <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700 }}>Total Visitas/Pedidos:</Typography>
                       <Typography variant="h6" sx={{ fontWeight: 900, color: '#1e290b' }}>
@@ -1570,20 +1438,11 @@ export default function CustomersScreen() {
                     </Paper>
                   </Grid>
 
-                  <Grid size={{ xs: 6, sm: 3 }}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
                     <Paper elevation={0} sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
                       <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700 }}>Ticket Promedio:</Typography>
                       <Typography variant="h6" sx={{ fontWeight: 900, color: '#0284c7' }}>
                         ${(profileCustomer.averageTicket || 0).toLocaleString()}
-                      </Typography>
-                    </Paper>
-                  </Grid>
-
-                  <Grid size={{ xs: 6, sm: 3 }}>
-                    <Paper elevation={0} sx={{ p: 2, bgcolor: '#fefce8', borderRadius: '14px', border: '1px solid #fef08a' }}>
-                      <Typography variant="caption" sx={{ color: '#854d0e', fontWeight: 700 }}>Puntos de Lealtad:</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 900, color: '#ca8a04' }}>
-                        {profileCustomer.loyaltyPoints || 0} pts
                       </Typography>
                     </Paper>
                   </Grid>
@@ -1656,83 +1515,6 @@ export default function CustomersScreen() {
         </DialogActions>
       </Dialog>
 
-      {/* DIÁLOGO: AJUSTAR PUNTOS DE LEALTAD */}
-      <Dialog
-        open={Boolean(pointsModalCustomer)}
-        onClose={() => setPointsModalCustomer(null)}
-        maxWidth="xs"
-        fullWidth
-        slotProps={{ paper: { sx: { borderRadius: '24px', p: 1 } } }}
-      >
-        <DialogTitle sx={{ fontWeight: 900, color: '#1e290b' }}>
-          Ajustar Puntos de Lealtad
-        </DialogTitle>
-        <DialogContent dividers sx={{ p: 3 }}>
-          {pointsModalCustomer && (
-            <Stack spacing={2}>
-              <Box sx={{ p: 1.5, bgcolor: '#fefce8', borderRadius: '14px', border: '1px solid #fef08a' }}>
-                <Typography variant="caption" sx={{ color: '#854d0e', fontWeight: 700, display: 'block' }}>
-                  Cliente Seleccionado:
-                </Typography>
-                <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#713f12' }}>
-                  {pointsModalCustomer.name}
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#854d0e' }}>
-                  Saldo Actual: <strong>{pointsModalCustomer.loyaltyPoints || 0} puntos</strong>
-                </Typography>
-              </Box>
-
-              <TextField
-                fullWidth
-                type="number"
-                label="Cantidad de Puntos"
-                value={pointsDelta}
-                onChange={(e) => setPointsDelta(Math.max(1, Number(e.target.value) || 0))}
-              />
-
-              {/* Botones Presets Rápidos */}
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                {[50, 100, 200, 500].map(p => (
-                  <Button
-                    key={p}
-                    size="small"
-                    variant={pointsDelta === p ? 'contained' : 'outlined'}
-                    onClick={() => setPointsDelta(p)}
-                    sx={{ flex: 1, borderRadius: '8px', fontWeight: 800 }}
-                  >
-                    +{p}
-                  </Button>
-                ))}
-              </Box>
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 2, display: 'flex', justifyContent: 'space-between' }}>
-          <Button onClick={() => setPointsModalCustomer(null)} sx={{ fontWeight: 700 }}>
-            Cancelar
-          </Button>
-          <Stack direction="row" spacing={1}>
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<RemoveIcon />}
-              onClick={() => handleApplyPoints(false)}
-              sx={{ borderRadius: '10px', fontWeight: 800 }}
-            >
-              Canjear / Restar
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => handleApplyPoints(true)}
-              sx={{ borderRadius: '10px', fontWeight: 800, bgcolor: '#1e290b' }}
-            >
-              Abonar Puntos
-            </Button>
-          </Stack>
-        </DialogActions>
-      </Dialog>
-
       {/* DIÁLOGO: CONFIRMAR ELIMINACIÓN */}
       <Dialog
         open={Boolean(deleteConfirmCustomer)}
@@ -1746,7 +1528,7 @@ export default function CustomersScreen() {
         </DialogTitle>
         <DialogContent>
           <Typography variant="body2">
-            ¿Confirmas que deseas eliminar a <strong>{deleteConfirmCustomer?.name}</strong>? Se borrará su historial y puntos de fidelización del directorio.
+            ¿Confirmas que deseas eliminar a <strong>{deleteConfirmCustomer?.name}</strong>? Se borrará su información de contacto e historial del directorio.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
