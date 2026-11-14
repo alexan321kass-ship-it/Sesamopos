@@ -700,7 +700,7 @@ export default function PurchasesScreen() {
             </Grid>
           </Paper>
 
-          <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
+          <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff', overflowX: 'auto', maxWidth: '100%' }}>
             <Table>
               <TableHead sx={{ bgcolor: '#f8fafc' }}>
                 <TableRow>
@@ -805,7 +805,7 @@ export default function PurchasesScreen() {
       {/* TAB 1: SUPPLIERS DIRECTORY */}
       {tabIndex === 1 && (
         <Box>
-          <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
+          <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff', overflowX: 'auto', maxWidth: '100%' }}>
             <Table>
               <TableHead sx={{ bgcolor: '#f8fafc' }}>
                 <TableRow>

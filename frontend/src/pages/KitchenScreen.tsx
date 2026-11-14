@@ -57,6 +57,7 @@ export default function KitchenScreen() {
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [activeMobileColumn, setActiveMobileColumn] = useState<'ALL' | 'NEW' | 'PREP' | 'READY'>('ALL');
   const [now, setNow] = useState<number>(Date.now());
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
 
@@ -1016,9 +1017,61 @@ export default function KitchenScreen() {
         </Box>
       </Paper>
 
+      {/* Mobile Column Switcher (Optimizado para Celulares y Tablets en Cocina) */}
+      <Box sx={{ display: { xs: 'flex', md: 'none' }, gap: 1, mb: 2, overflowX: 'auto', pb: 0.5 }}>
+        <Chip
+          label={`Todos (${filteredOrders.length})`}
+          onClick={() => setActiveMobileColumn('ALL')}
+          sx={{
+            fontWeight: 800,
+            fontSize: '0.78rem',
+            borderRadius: '12px',
+            bgcolor: activeMobileColumn === 'ALL' ? '#1e290b' : '#f8fafc',
+            color: activeMobileColumn === 'ALL' ? '#ffffff' : '#475569',
+            border: `1px solid ${activeMobileColumn === 'ALL' ? '#1e290b' : '#e2e8f0'}`
+          }}
+        />
+        <Chip
+          label={`🛎️ Entrantes (${newOrdersCount})`}
+          onClick={() => setActiveMobileColumn('NEW')}
+          sx={{
+            fontWeight: 800,
+            fontSize: '0.78rem',
+            borderRadius: '12px',
+            bgcolor: activeMobileColumn === 'NEW' ? '#0284c7' : '#f8fafc',
+            color: activeMobileColumn === 'NEW' ? '#ffffff' : '#475569',
+            border: `1px solid ${activeMobileColumn === 'NEW' ? '#0284c7' : '#e2e8f0'}`
+          }}
+        />
+        <Chip
+          label={`🔥 En Fuego (${inPrepCount})`}
+          onClick={() => setActiveMobileColumn('PREP')}
+          sx={{
+            fontWeight: 800,
+            fontSize: '0.78rem',
+            borderRadius: '12px',
+            bgcolor: activeMobileColumn === 'PREP' ? '#ea580c' : '#f8fafc',
+            color: activeMobileColumn === 'PREP' ? '#ffffff' : '#475569',
+            border: `1px solid ${activeMobileColumn === 'PREP' ? '#ea580c' : '#e2e8f0'}`
+          }}
+        />
+        <Chip
+          label={`✅ Listos (${readyCount})`}
+          onClick={() => setActiveMobileColumn('READY')}
+          sx={{
+            fontWeight: 800,
+            fontSize: '0.78rem',
+            borderRadius: '12px',
+            bgcolor: activeMobileColumn === 'READY' ? '#16a34a' : '#f8fafc',
+            color: activeMobileColumn === 'READY' ? '#ffffff' : '#475569',
+            border: `1px solid ${activeMobileColumn === 'READY' ? '#16a34a' : '#e2e8f0'}`
+          }}
+        />
+      </Box>
+
       {/* 3-Column Kanban Board */}
       <Grid container spacing={2.5}>
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: activeMobileColumn === 'ALL' || activeMobileColumn === 'NEW' ? 'block' : 'none', md: 'block' } }}>
           {renderColumn(
             'NUEVOS ENTRANTES',
             ['CREADO', 'CONFIRMADO', 'EN_COCINA'],
@@ -1033,7 +1086,7 @@ export default function KitchenScreen() {
           )}
         </Grid>
 
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: activeMobileColumn === 'ALL' || activeMobileColumn === 'PREP' ? 'block' : 'none', md: 'block' } }}>
           {renderColumn(
             'EN FUEGO / PREPARACIÓN',
             ['EN_PREPARACION'],
@@ -1048,7 +1101,7 @@ export default function KitchenScreen() {
           )}
         </Grid>
 
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: activeMobileColumn === 'ALL' || activeMobileColumn === 'READY' ? 'block' : 'none', md: 'block' } }}>
           {renderColumn(
             'LISTOS EN PASAPLATOS',
             ['LISTO'],

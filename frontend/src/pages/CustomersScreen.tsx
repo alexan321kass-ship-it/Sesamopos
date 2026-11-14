@@ -888,7 +888,7 @@ export default function CustomersScreen() {
             </Grid>
           ) : (
             /* VISTA 2: TABLA DETALLADA */
-            <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: '18px', overflow: 'hidden' }}>
+            <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: '18px', overflowX: 'auto', maxWidth: '100%' }}>
               <Table>
                 <TableHead sx={{ bgcolor: '#f8fafc' }}>
                   <TableRow>
@@ -1183,7 +1183,7 @@ export default function CustomersScreen() {
             </Typography>
           </Box>
 
-          <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: '18px', overflow: 'hidden' }}>
+          <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: '18px', overflowX: 'auto', maxWidth: '100%' }}>
             <Table>
               <TableHead sx={{ bgcolor: '#f8fafc' }}>
                 <TableRow>

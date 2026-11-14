@@ -275,19 +275,20 @@ export default function MainLayout() {
           color: 'text.primary',
         }}
       >
-        <Toolbar>
+        <Toolbar sx={{ px: { xs: 1.5, sm: 3 } }}>
           <IconButton
             color="inherit"
             aria-label="open drawer"
             edge="start"
             onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { sm: 'none' } }}
+            sx={{ mr: 1, display: { sm: 'none' } }}
           >
             <MenuIcon />
           </IconButton>
           
-          <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Breadcrumbs aria-label="breadcrumb">
+          <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 1.5, overflow: 'hidden' }}>
+            {/* Desktop Breadcrumbs */}
+            <Breadcrumbs aria-label="breadcrumb" sx={{ display: { xs: 'none', sm: 'flex' } }}>
               <Link underline="hover" color="inherit" href="/">
                 Sesamo
               </Link>
@@ -296,53 +297,69 @@ export default function MainLayout() {
               </Typography>
             </Breadcrumbs>
 
+            {/* Mobile Page Title */}
+            <Typography
+              variant="subtitle1"
+              sx={{
+                fontWeight: 800,
+                color: 'text.primary',
+                display: { xs: 'block', sm: 'none' },
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: 180
+              }}
+            >
+              {location.pathname.replace(/^\//, '').split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Sésamo'}
+            </Typography>
+
             {user?.role === 'COCINA' && (
               <Chip
-                label="👨‍🍳 Perfil Cocina"
+                label="👨‍🍳 Cocina"
                 size="small"
-                sx={{ bgcolor: 'rgba(234, 88, 12, 0.12)', color: '#ea580c', fontWeight: 800, border: '1px solid #ea580c' }}
+                sx={{ display: { xs: 'none', md: 'inline-flex' }, bgcolor: 'rgba(234, 88, 12, 0.12)', color: '#ea580c', fontWeight: 800, border: '1px solid #ea580c' }}
               />
             )}
             {user?.role === 'MESERO' && (
               <Chip
-                label="🛎️ Perfil Mesero"
+                label="🛎️ Mesero"
                 size="small"
-                sx={{ bgcolor: 'rgba(101, 163, 13, 0.12)', color: '#65a30d', fontWeight: 800, border: '1px solid #65a30d' }}
+                sx={{ display: { xs: 'none', md: 'inline-flex' }, bgcolor: 'rgba(101, 163, 13, 0.12)', color: '#65a30d', fontWeight: 800, border: '1px solid #65a30d' }}
               />
             )}
             {user?.role === 'CAJERO' && (
               <Chip
-                label="💵 Perfil Caja & Facturación"
+                label="💵 Caja"
                 size="small"
-                sx={{ bgcolor: 'rgba(2, 132, 199, 0.12)', color: '#0284c7', fontWeight: 800, border: '1px solid #0284c7' }}
+                sx={{ display: { xs: 'none', md: 'inline-flex' }, bgcolor: 'rgba(2, 132, 199, 0.12)', color: '#0284c7', fontWeight: 800, border: '1px solid #0284c7' }}
               />
             )}
             {user?.role === 'REPARTIDOR' && (
               <Chip
-                label="🛵 Perfil Repartidor"
+                label="🛵 Repartidor"
                 size="small"
-                sx={{ bgcolor: 'rgba(217, 119, 6, 0.12)', color: '#d97706', fontWeight: 800, border: '1px solid #d97706' }}
+                sx={{ display: { xs: 'none', md: 'inline-flex' }, bgcolor: 'rgba(217, 119, 6, 0.12)', color: '#d97706', fontWeight: 800, border: '1px solid #d97706' }}
               />
             )}
             {user?.role === 'INVENTARIO' && (
               <Chip
-                label="📦 Perfil Almacén & Stock"
+                label="📦 Almacén"
                 size="small"
-                sx={{ bgcolor: 'rgba(124, 58, 237, 0.12)', color: '#7c3aed', fontWeight: 800, border: '1px solid #7c3aed' }}
+                sx={{ display: { xs: 'none', md: 'inline-flex' }, bgcolor: 'rgba(124, 58, 237, 0.12)', color: '#7c3aed', fontWeight: 800, border: '1px solid #7c3aed' }}
               />
             )}
             {user?.role === 'GERENTE' && (
               <Chip
-                label="💼 Gerencia de Turno"
+                label="💼 Gerencia"
                 size="small"
-                sx={{ bgcolor: 'rgba(79, 70, 229, 0.12)', color: '#4f46e5', fontWeight: 800, border: '1px solid #4f46e5' }}
+                sx={{ display: { xs: 'none', md: 'inline-flex' }, bgcolor: 'rgba(79, 70, 229, 0.12)', color: '#4f46e5', fontWeight: 800, border: '1px solid #4f46e5' }}
               />
             )}
             {user?.role === 'ADMINISTRADOR' && (
               <Chip
-                label="👑 Administrador 360°"
+                label="👑 Admin 360°"
                 size="small"
-                sx={{ bgcolor: 'rgba(30, 41, 11, 0.12)', color: '#1e290b', fontWeight: 800, border: '1px solid #1e290b' }}
+                sx={{ display: { xs: 'none', md: 'inline-flex' }, bgcolor: 'rgba(30, 41, 11, 0.12)', color: '#1e290b', fontWeight: 800, border: '1px solid #1e290b' }}
               />
             )}
           </Box>
@@ -421,7 +438,14 @@ export default function MainLayout() {
       </Box>
       <Box
         component="main"
-        sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${drawerWidth}px)` }, mt: 8 }}
+        sx={{
+          flexGrow: 1,
+          p: { xs: 1.5, sm: 2, md: 3 },
+          width: { xs: '100%', sm: `calc(100% - ${drawerWidth}px)` },
+          maxWidth: '100%',
+          overflowX: 'hidden',
+          mt: { xs: 7, sm: 8 }
+        }}
       >
         <Outlet />
       </Box>

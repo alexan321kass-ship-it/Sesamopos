@@ -1282,7 +1282,7 @@ export default function InventoryScreen() {
             </Grid>
           ) : (
             /* VIEW 2: TABLE MODE (Data Table Pro) */
-            <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+            <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0', overflowX: 'auto', maxWidth: '100%' }}>
               <Table>
                 <TableHead sx={{ bgcolor: '#f8fafc' }}>
                   <TableRow>
@@ -1515,7 +1515,7 @@ export default function InventoryScreen() {
           </Paper>
 
           {/* Table */}
-          <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
+          <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 3, overflowX: 'auto', maxWidth: '100%' }}>
             <Table>
               <TableHead sx={{ bgcolor: '#f8fafc' }}>
                 <TableRow>

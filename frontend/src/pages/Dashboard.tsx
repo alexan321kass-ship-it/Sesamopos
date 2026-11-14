@@ -719,9 +719,9 @@ export default function Dashboard() {
       </Paper>
 
       {/* 2. EXECUTIVE 6-KPI RIBBON */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
+      <Grid container spacing={1.5} sx={{ mb: 3 }}>
         {/* Total Sales with Goal Progress */}
-        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+        <Grid size={{ xs: 6, sm: 6, md: 4, lg: 2 }}>
           <Card
             elevation={0}
             sx={{
@@ -739,18 +739,18 @@ export default function Dashboard() {
           >
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.8 }}>
-                <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: { xs: '0.62rem', sm: '0.75rem' } }}>
                   Ventas de Hoy
                 </Typography>
                 <Avatar sx={{ width: 28, height: 28, bgcolor: '#ecfccb', color: '#65a30d' }}>
                   <MoneyIcon sx={{ fontSize: 18 }} />
                 </Avatar>
               </Box>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b', lineHeight: 1.1 }}>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b', lineHeight: 1.1, fontSize: { xs: '1.15rem', sm: '1.4rem' } }}>
                 ${kpis.totalSales.toLocaleString()}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.4 }}>
-                Meta diaria: ${(kpis.dailyGoal / 1000000).toFixed(1)}M COP
+              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.4, fontSize: '0.68rem' }}>
+                Meta: ${(kpis.dailyGoal / 1000000).toFixed(1)}M
               </Typography>
             </Box>
 
@@ -776,7 +776,7 @@ export default function Dashboard() {
         </Grid>
 
         {/* Theoretical Food Cost % */}
-        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+        <Grid size={{ xs: 6, sm: 6, md: 4, lg: 2 }}>
           <Card
             elevation={0}
             sx={{
@@ -794,24 +794,24 @@ export default function Dashboard() {
           >
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.8 }}>
-                <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: { xs: '0.62rem', sm: '0.75rem' } }}>
                   Food Cost %
                 </Typography>
                 <Avatar sx={{ width: 28, height: 28, bgcolor: '#fef3c7', color: '#b45309' }}>
                   <PieIcon sx={{ fontSize: 18 }} />
                 </Avatar>
               </Box>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: kpis.foodCostPercentage > 35 ? '#b91c1c' : '#15803d', lineHeight: 1.1 }}>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: kpis.foodCostPercentage > 35 ? '#b91c1c' : '#15803d', lineHeight: 1.1, fontSize: { xs: '1.15rem', sm: '1.4rem' } }}>
                 {kpis.foodCostPercentage}%
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.4 }}>
-                Costo insumos: ${Math.round(kpis.totalTheoreticalCost).toLocaleString()}
+              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.4, fontSize: '0.68rem' }}>
+                Insumos: ${Math.round(kpis.totalTheoreticalCost).toLocaleString()}
               </Typography>
             </Box>
 
             <Box sx={{ mt: 1.5 }}>
               <Chip
-                label={kpis.foodCostPercentage <= 33 ? '🟢 Rango Saludable (<35%)' : '🟡 Vigilar Mermas'}
+                label={kpis.foodCostPercentage <= 33 ? '🟢 Saludable' : '🟡 Vigilar'}
                 size="small"
                 sx={{
                   height: 22,
@@ -827,7 +827,7 @@ export default function Dashboard() {
         </Grid>
 
         {/* Gross Operating Margin */}
-        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+        <Grid size={{ xs: 6, sm: 6, md: 4, lg: 2 }}>
           <Card
             elevation={0}
             sx={{
@@ -845,24 +845,24 @@ export default function Dashboard() {
           >
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.8 }}>
-                <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: { xs: '0.62rem', sm: '0.75rem' } }}>
                   Margen Bruto
                 </Typography>
                 <Avatar sx={{ width: 28, height: 28, bgcolor: '#f0fdf4', color: '#16a34a' }}>
                   <TrendingUpIcon sx={{ fontSize: 18 }} />
                 </Avatar>
               </Box>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#15803d', lineHeight: 1.1 }}>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: '#15803d', lineHeight: 1.1, fontSize: { xs: '1.15rem', sm: '1.4rem' } }}>
                 ${Math.round(kpis.grossMargin).toLocaleString()}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.4 }}>
+              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.4, fontSize: '0.68rem' }}>
                 {kpis.grossMarginPercentage}% sobre ventas
               </Typography>
             </Box>
 
             <Box sx={{ mt: 1.5 }}>
               <Chip
-                label="Excelente Rentabilidad"
+                label="Rentabilidad Top"
                 size="small"
                 sx={{
                   height: 22,
@@ -878,7 +878,7 @@ export default function Dashboard() {
         </Grid>
 
         {/* Average Ticket Salon vs Delivery */}
-        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+        <Grid size={{ xs: 6, sm: 6, md: 4, lg: 2 }}>
           <Card
             elevation={0}
             sx={{
@@ -896,17 +896,17 @@ export default function Dashboard() {
           >
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.8 }}>
-                <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: { xs: '0.62rem', sm: '0.75rem' } }}>
                   Ticket Promedio
                 </Typography>
                 <Avatar sx={{ width: 28, height: 28, bgcolor: '#e0f2fe', color: '#0284c7' }}>
                   <ReceiptIcon sx={{ fontSize: 18 }} />
                 </Avatar>
               </Box>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#0284c7', lineHeight: 1.1 }}>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: '#0284c7', lineHeight: 1.1, fontSize: { xs: '1.15rem', sm: '1.4rem' } }}>
                 ${kpis.avgTicket.toLocaleString()}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.4 }}>
+              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.4, fontSize: '0.68rem' }}>
                 {kpis.totalOrdersCount} comandas hoy
               </Typography>
             </Box>
@@ -923,7 +923,7 @@ export default function Dashboard() {
         </Grid>
 
         {/* Salon Occupancy Rate */}
-        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+        <Grid size={{ xs: 6, sm: 6, md: 4, lg: 2 }}>
           <Card
             elevation={0}
             sx={{
@@ -941,18 +941,18 @@ export default function Dashboard() {
           >
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.8 }}>
-                <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: { xs: '0.62rem', sm: '0.75rem' } }}>
                   Ocupación Salón
                 </Typography>
                 <Avatar sx={{ width: 28, height: 28, bgcolor: '#faf5ff', color: '#9333ea' }}>
                   <TableIcon sx={{ fontSize: 18 }} />
                 </Avatar>
               </Box>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#9333ea', lineHeight: 1.1 }}>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: '#9333ea', lineHeight: 1.1, fontSize: { xs: '1.15rem', sm: '1.4rem' } }}>
                 {kpis.occupancyRate}%
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.4 }}>
-                {kpis.occupiedTables} de {tables.length} mesas ocupadas
+              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.4, fontSize: '0.68rem' }}>
+                {kpis.occupiedTables} de {tables.length} mesas
               </Typography>
             </Box>
 
@@ -972,7 +972,7 @@ export default function Dashboard() {
         </Grid>
 
         {/* Operational Attention Alerts */}
-        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+        <Grid size={{ xs: 6, sm: 6, md: 4, lg: 2 }}>
           <Card
             elevation={0}
             onClick={() => {

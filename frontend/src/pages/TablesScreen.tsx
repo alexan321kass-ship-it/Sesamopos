@@ -1274,7 +1274,7 @@ export default function TablesScreen() {
           paper: {
             sx: {
               width: { xs: '100%', sm: 420 },
-              p: 3,
+              p: { xs: 2, sm: 3 },
               boxShadow: '-4px 0 24px rgba(0,0,0,0.1)'
             }
           }

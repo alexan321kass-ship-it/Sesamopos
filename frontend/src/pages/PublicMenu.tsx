@@ -204,7 +204,7 @@ export default function PublicMenu() {
               component="h1"
               sx={{
                 fontWeight: 900,
-                fontSize: { xs: '2.2rem', sm: '2.9rem', md: '3.4rem' },
+                fontSize: { xs: '1.85rem', sm: '2.6rem', md: '3.4rem' },
                 lineHeight: 1.12,
                 letterSpacing: '-0.03em',
                 mb: 1.5,
@@ -642,10 +642,11 @@ export default function PublicMenu() {
             sx: {
               bgcolor: '#14200f',
               color: '#ffffff',
-              borderRadius: '26px',
+              borderRadius: { xs: '20px', sm: '26px' },
               border: '1px solid rgba(132, 204, 22, 0.25)',
               boxShadow: '0 25px 50px rgba(0,0,0,0.85)',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              m: { xs: 1.5, sm: 2 }
             }
           }
         }}
@@ -690,11 +691,11 @@ export default function PublicMenu() {
               )}
             </Box>
 
-            <DialogContent sx={{ p: 3 }}>
+            <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
               {/* Title & Price */}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.2 }}>
+              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'flex-start' }, gap: 1, mb: 1.5 }}>
                 <Box>
-                  <Typography variant="h5" sx={{ fontWeight: 900, color: '#ffffff', lineHeight: 1.2 }}>
+                  <Typography variant="h5" sx={{ fontWeight: 900, color: '#ffffff', lineHeight: 1.2, fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
                     {selectedProduct.name}
                   </Typography>
                   {selectedProduct.rating && (
@@ -706,11 +707,11 @@ export default function PublicMenu() {
                     </Box>
                   )}
                 </Box>
-                <Box sx={{ textAlign: 'right' }}>
+                <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
                   <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.68rem', textTransform: 'uppercase', fontWeight: 800, display: 'block' }}>
                     Precio
                   </Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 900, color: '#4ade80' }}>
+                  <Typography variant="h5" sx={{ fontWeight: 900, color: '#4ade80', fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
                     ${selectedProduct.price.toLocaleString()} COP
                   </Typography>
                 </Box>

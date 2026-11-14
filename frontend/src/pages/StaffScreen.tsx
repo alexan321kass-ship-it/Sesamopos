@@ -1237,12 +1237,12 @@ export default function StaffScreen() {
 
       {/* KPI HIGHLIGHTS RIBBON */}
       {isCashier ? (
-        <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
+        <Grid container spacing={1.5} sx={{ mb: 3.5 }}>
           {/* KPI 1: Efectivo en Calle */}
-          <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Grid size={{ xs: 6, sm: 6, lg: 3 }}>
             <Card
               sx={{
-                p: 2.5,
+                p: { xs: 1.5, sm: 2.5 },
                 borderRadius: '20px',
                 border: '1px solid #fed7aa',
                 boxShadow: '0 4px 16px rgba(194, 65, 12, 0.06)',
@@ -1251,28 +1251,28 @@ export default function StaffScreen() {
             >
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <Box>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#c2410c', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Recaudos en Calle
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#c2410c', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: { xs: '0.62rem', sm: '0.75rem' } }}>
+                    Recaudos Calle
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 900, color: '#ea580c', mt: 0.5, letterSpacing: '-0.02em' }}>
+                  <Typography variant="h4" sx={{ fontWeight: 900, color: '#ea580c', mt: 0.5, letterSpacing: '-0.02em', fontSize: { xs: '1.2rem', sm: '1.6rem' } }}>
                     ${totalCashOnStreet.toLocaleString()}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#9a3412', fontWeight: 600, display: 'block', mt: 0.8 }}>
-                    Efectivo cobrado por repartidores
+                  <Typography variant="caption" sx={{ color: '#9a3412', fontWeight: 600, display: 'block', mt: 0.8, fontSize: '0.68rem' }}>
+                    Cobrado en ruta
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: '#ffedd5', color: '#ea580c', width: 48, height: 48, borderRadius: '16px' }}>
-                  <AttachMoneyIcon sx={{ fontSize: 26 }} />
+                <Avatar sx={{ bgcolor: '#ffedd5', color: '#ea580c', width: { xs: 36, sm: 48 }, height: { xs: 36, sm: 48 }, borderRadius: '16px' }}>
+                  <AttachMoneyIcon sx={{ fontSize: { xs: 20, sm: 26 } }} />
                 </Avatar>
               </Box>
             </Card>
           </Grid>
 
           {/* KPI 2: Repartidores con Saldo */}
-          <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Grid size={{ xs: 6, sm: 6, lg: 3 }}>
             <Card
               sx={{
-                p: 2.5,
+                p: { xs: 1.5, sm: 2.5 },
                 borderRadius: '20px',
                 border: '1px solid #e2e8f0',
                 boxShadow: '0 4px 16px rgba(0,0,0,0.02)',
@@ -1281,28 +1281,28 @@ export default function StaffScreen() {
             >
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <Box>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Repartidores en Calle
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: { xs: '0.62rem', sm: '0.75rem' } }}>
+                    Repartidores
                   </Typography>
-                  <Typography variant="h3" sx={{ fontWeight: 900, color: '#0f172a', mt: 0.5, letterSpacing: '-0.03em' }}>
+                  <Typography variant="h3" sx={{ fontWeight: 900, color: '#0f172a', mt: 0.5, letterSpacing: '-0.03em', fontSize: { xs: '1.2rem', sm: '1.8rem' } }}>
                     {riderSettlementData.filter((r) => r.cashTotal > 0 || r.pendingOrdersCount > 0).length}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mt: 0.8 }}>
-                    {riderSettlementData.length} repartidores registrados
+                  <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mt: 0.8, fontSize: '0.68rem' }}>
+                    {riderSettlementData.length} registrados
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: '#f1f5f9', color: '#0f172a', width: 48, height: 48, borderRadius: '16px' }}>
-                  <DeliveryIcon sx={{ fontSize: 26 }} />
+                <Avatar sx={{ bgcolor: '#f1f5f9', color: '#0f172a', width: { xs: 36, sm: 48 }, height: { xs: 36, sm: 48 }, borderRadius: '16px' }}>
+                  <DeliveryIcon sx={{ fontSize: { xs: 20, sm: 26 } }} />
                 </Avatar>
               </Box>
             </Card>
           </Grid>
 
           {/* KPI 3: Fletes Pendientes de Pago */}
-          <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Grid size={{ xs: 6, sm: 6, lg: 3 }}>
             <Card
               sx={{
-                p: 2.5,
+                p: { xs: 1.5, sm: 2.5 },
                 borderRadius: '20px',
                 border: '1px solid #fef08a',
                 boxShadow: '0 4px 16px rgba(202, 138, 4, 0.06)',
@@ -1311,25 +1311,25 @@ export default function StaffScreen() {
             >
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <Box>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#854d0e', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#854d0e', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: { xs: '0.62rem', sm: '0.75rem' } }}>
                     Fletes a Liquidar
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 900, color: '#ca8a04', mt: 0.5, letterSpacing: '-0.02em' }}>
+                  <Typography variant="h4" sx={{ fontWeight: 900, color: '#ca8a04', mt: 0.5, letterSpacing: '-0.02em', fontSize: { xs: '1.2rem', sm: '1.6rem' } }}>
                     ${totalDeliveryFeesPending.toLocaleString()}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#a16207', fontWeight: 600, display: 'block', mt: 0.8 }}>
-                    Pago de carreras a mensajeros
+                  <Typography variant="caption" sx={{ color: '#a16207', fontWeight: 600, display: 'block', mt: 0.8, fontSize: '0.68rem' }}>
+                    Pago carreras
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: '#fef9c3', color: '#ca8a04', width: 48, height: 48, borderRadius: '16px' }}>
-                  <ReceiptIcon sx={{ fontSize: 26 }} />
+                <Avatar sx={{ bgcolor: '#fef9c3', color: '#ca8a04', width: { xs: 36, sm: 48 }, height: { xs: 36, sm: 48 }, borderRadius: '16px' }}>
+                  <ReceiptIcon sx={{ fontSize: { xs: 20, sm: 26 } }} />
                 </Avatar>
               </Box>
             </Card>
           </Grid>
 
           {/* KPI 4: Balance Neto para Caja */}
-          <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Grid size={{ xs: 6, sm: 6, lg: 3 }}>
             <Card
               sx={{
                 p: 2.5,
@@ -1359,9 +1359,9 @@ export default function StaffScreen() {
           </Grid>
         </Grid>
       ) : (
-        <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
+        <Grid container spacing={1.5} sx={{ mb: 3.5 }}>
           {/* KPI 1: Total Colaboradores */}
-          <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Grid size={{ xs: 6, sm: 6, lg: 3 }}>
             <Card
               sx={{
                 p: 2.5,
@@ -1409,7 +1409,7 @@ export default function StaffScreen() {
           </Grid>
 
           {/* KPI 2: En Turno Activo (En Vivo) */}
-          <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Grid size={{ xs: 6, sm: 6, lg: 3 }}>
             <Card
               sx={{
                 p: 2.5,
@@ -1460,7 +1460,7 @@ export default function StaffScreen() {
           </Grid>
 
           {/* KPI 3: Propinas Hoy */}
-          <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Grid size={{ xs: 6, sm: 6, lg: 3 }}>
             <Card
               sx={{
                 p: 2.5,
@@ -1506,7 +1506,7 @@ export default function StaffScreen() {
           </Grid>
 
           {/* KPI 4: Desempeño & Calidad */}
-          <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Grid size={{ xs: 6, sm: 6, lg: 3 }}>
             <Card
               sx={{
                 p: 2.5,
@@ -2197,7 +2197,8 @@ export default function StaffScreen() {
                 borderRadius: '20px',
                 border: '1px solid #e2e8f0',
                 boxShadow: '0 4px 16px rgba(0,0,0,0.02)',
-                overflow: 'hidden',
+                overflowX: 'auto',
+                maxWidth: '100%',
               }}
             >
               <Table>
@@ -2537,7 +2538,8 @@ export default function StaffScreen() {
               borderRadius: '20px',
               border: '1px solid #e2e8f0',
               boxShadow: '0 4px 16px rgba(0,0,0,0.02)',
-              overflow: 'hidden',
+              overflowX: 'auto',
+              maxWidth: '100%',
             }}
           >
             <Table>

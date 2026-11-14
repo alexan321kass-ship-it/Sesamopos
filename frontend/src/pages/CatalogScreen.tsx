@@ -1062,7 +1062,7 @@ export default function CatalogScreen() {
             </Grid>
           ) : (
             /* Vista de Tabla Detallada */
-            <TableContainer component={Paper} elevation={0} sx={{ borderRadius: '18px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+            <TableContainer component={Paper} elevation={0} sx={{ borderRadius: '18px', border: '1px solid #e2e8f0', overflowX: 'auto', maxWidth: '100%' }}>
               <Table>
                 <TableHead sx={{ bgcolor: '#f8fafc' }}>
                   <TableRow>

@@ -22,7 +22,8 @@ import {
   Paper,
   Stack,
   InputAdornment,
-  Tooltip
+  Tooltip,
+  Badge
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -39,7 +40,8 @@ import {
   Check as CheckIcon,
   RoomService as KitchenIcon,
   AttachMoney as CashIcon,
-  TwoWheeler as DeliveryDiningIcon
+  TwoWheeler as DeliveryDiningIcon,
+  ArrowBack as ArrowBackIcon
 } from '@mui/icons-material';
 import { usePosStore } from '../store/posStore';
 import { useAuthStore } from '../store/authStore';
@@ -78,6 +80,9 @@ export default function PosScreen() {
   const [tableSelectZone, setTableSelectZone] = useState<string>('ALL');
   const [pendingAction, setPendingAction] = useState<'KITCHEN' | 'BILLING' | null>(null);
   const [hasPromptedForBar, setHasPromptedForBar] = useState(false);
+
+  // Responsive Mobile/Tablet POS View
+  const [mobileView, setMobileView] = useState<'catalog' | 'ticket'>('catalog');
 
   // Gestión de Domicilios en POS
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
@@ -521,11 +526,29 @@ export default function PosScreen() {
   // Cálculo de precio en modal de personalización
   const currentModifiersPrice = selectedModifiers.reduce((acc, m) => acc + (m.price || 0), 0);
   const modalUnitPrice = (selectedProduct?.price || 0) + currentModifiersPrice;
+  const totalCartUnits = posStore.items.reduce((sum, it) => sum + it.quantity, 0);
 
   return (
-    <Box sx={{ height: 'calc(100vh - 88px)', display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, pb: 1 }}>
+    <Box
+      sx={{
+        height: { xs: 'auto', md: 'calc(100vh - 88px)' },
+        minHeight: { xs: 'calc(100vh - 120px)', md: 'auto' },
+        display: 'flex',
+        flexDirection: { xs: 'column', md: 'row' },
+        gap: 2,
+        pb: { xs: 8, md: 1 },
+        position: 'relative'
+      }}
+    >
       {/* Zona Izquierda/Centro: Catálogo de Productos y Filtros */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <Box
+        sx={{
+          flex: 1,
+          display: { xs: mobileView === 'catalog' ? 'flex' : 'none', md: 'flex' },
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+      >
         
         {/* Barra Superior: Buscador y Categorías */}
         <Paper elevation={0} sx={{ p: 1.5, mb: 1.5, borderRadius: '18px', border: '1px solid rgba(0,0,0,0.06)', bgcolor: '#ffffff' }}>
@@ -632,7 +655,7 @@ export default function PosScreen() {
                 const hasModifiers = Boolean(product.modifiers && product.modifiers.length > 0);
 
                 return (
-                  <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={product.id}>
+                  <Grid size={{ xs: 6, sm: 4, md: 4, lg: 3 }} key={product.id}>
                     <Card
                       elevation={0}
                       sx={{
@@ -662,19 +685,19 @@ export default function PosScreen() {
                         }}
                       >
                         {/* Cabecera Visual con Imagen o Placeholder Gastronómico */}
-                        <Box sx={{ position: 'relative', height: 125, width: '100%', overflow: 'hidden' }}>
+                        <Box sx={{ position: 'relative', height: { xs: 105, sm: 125 }, width: '100%', overflow: 'hidden' }}>
                           {product.imageUrl ? (
                             <CardMedia
                               component="img"
                               height="125"
                               image={product.imageUrl}
                               alt={product.name}
-                              sx={{ objectFit: 'cover' }}
+                              sx={{ objectFit: 'cover', height: { xs: 105, sm: 125 } }}
                             />
                           ) : (
                             <Box
                               sx={{
-                                height: 125,
+                                height: { xs: 105, sm: 125 },
                                 width: '100%',
                                 background: 'linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%)',
                                 display: 'flex',
@@ -839,7 +862,7 @@ export default function PosScreen() {
         elevation={0}
         sx={{
           width: { xs: '100%', md: 400, lg: 430 },
-          display: 'flex',
+          display: { xs: mobileView === 'ticket' ? 'flex' : 'none', md: 'flex' },
           flexDirection: 'column',
           borderRadius: '22px',
           overflow: 'hidden',
@@ -857,6 +880,27 @@ export default function PosScreen() {
             borderBottom: '1px solid rgba(0,0,0,0.1)'
           }}
         >
+          {/* Botón Volver al Catálogo en Móvil */}
+          <Box sx={{ display: { xs: 'block', md: 'none' }, mb: 1.5 }}>
+            <Button
+              size="small"
+              startIcon={<ArrowBackIcon />}
+              onClick={() => setMobileView('catalog')}
+              sx={{
+                color: '#ffffff',
+                bgcolor: 'rgba(255,255,255,0.18)',
+                fontWeight: 800,
+                borderRadius: '10px',
+                textTransform: 'none',
+                py: 0.6,
+                px: 1.5,
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.28)' }
+              }}
+            >
+              ← Volver al Catálogo de Productos
+            </Button>
+          </Box>
+
           {/* Título de comanda y vaciar carrito */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -1368,6 +1412,67 @@ export default function PosScreen() {
           </Grid>
         </Box>
       </Card>
+
+      {/* Floating Bottom Bar en móvil para ver la Comanda */}
+      {mobileView === 'catalog' && totalCartUnits > 0 && (
+        <Box
+          onClick={() => setMobileView('ticket')}
+          sx={{
+            display: { xs: 'flex', md: 'none' },
+            position: 'fixed',
+            bottom: 14,
+            left: 14,
+            right: 14,
+            zIndex: 1200,
+            bgcolor: posStore.editingOrderId ? '#ea580c' : '#1e290b',
+            color: '#ffffff',
+            borderRadius: '20px',
+            p: 1.6,
+            px: 2.2,
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
+            border: '1.5px solid rgba(255,255,255,0.2)',
+            cursor: 'pointer'
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Badge badgeContent={totalCartUnits} color="success">
+              <ReceiptIcon sx={{ fontSize: 26, color: '#bef264' }} />
+            </Badge>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 900, lineHeight: 1.1 }}>
+                {posStore.editingOrderId ? 'Editar Comanda' : 'Ver Comanda'}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#d9f99d', fontWeight: 700 }}>
+                {totalCartUnits} {totalCartUnits === 1 ? 'ítem agregado' : 'ítems agregados'}
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#bef264' }}>
+              ${totals.total.toLocaleString()}
+            </Typography>
+            <Button
+              size="small"
+              variant="contained"
+              sx={{
+                bgcolor: '#84cc16',
+                color: '#0b1307',
+                fontWeight: 900,
+                borderRadius: '12px',
+                px: 1.8,
+                py: 0.6,
+                fontSize: '0.8rem',
+                textTransform: 'none'
+              }}
+            >
+              Comanda →
+            </Button>
+          </Box>
+        </Box>
+      )}
 
       {/* Modifiers Dialog (Personalización de Producto Táctil) */}
       {selectedProduct && (
