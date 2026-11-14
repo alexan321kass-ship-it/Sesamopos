@@ -1,12 +1,12 @@
 // Sésamo POS Service Worker
-const CACHE_NAME = 'sesamo-pos-v1';
+const CACHE_NAME = 'sesamo-pos-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/logo-icon.png',
-  '/logo-icon.svg',
-  '/favicon.svg'
+  '/logo.png',
+  '/icon-512.png',
+  '/icon-192.png'
 ];
 
 // Install: Cache essential shell

@@ -13,21 +13,21 @@
   "categories": ["business", "food", "productivity"],
   "icons": [
     {
-      "src": "/logo-icon.svg",
-      "sizes": "192x192 512x512 any",
-      "type": "image/svg+xml",
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/logo-icon.png",
-      "sizes": "512x512 672x371",
+      "src": "/icon-192.png",
+      "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
-      "src": "/favicon.svg",
-      "sizes": "48x48 72x72 96x96",
-      "type": "image/svg+xml",
+      "src": "/logo.png",
+      "sizes": "672x371",
+      "type": "image/png",
       "purpose": "any"
     }
   ]
