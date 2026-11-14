@@ -199,21 +199,6 @@ export default function PublicMenu() {
       >
         <Container maxWidth="xl">
           <Box sx={{ maxWidth: 780 }}>
-            {/* Tag Chip */}
-            <Chip
-              icon={<StarIcon sx={{ color: '#facc15 !important', fontSize: '15px !important' }} />}
-              label="Cocina de Autor & Sabores Conscientes"
-              size="small"
-              sx={{
-                bgcolor: 'rgba(250, 204, 21, 0.1)',
-                color: '#fef08a',
-                fontWeight: 700,
-                fontSize: '0.75rem',
-                border: '1px solid rgba(250, 204, 21, 0.25)',
-                mb: 1.5
-              }}
-            />
-
             <Typography
               variant="h2"
               component="h1"
