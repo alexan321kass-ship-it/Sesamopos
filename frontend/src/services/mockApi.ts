@@ -10,7 +10,7 @@ export const getApiUrl = (): string => {
   }
   const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl) return envUrl.trim().replace(/\/$/, '');
-  return 'http://localhost:3001/api';
+  return 'https://sesamo-api.onrender.com/api';
 };
 
 export const setApiUrl = (url: string) => {
