@@ -458,51 +458,83 @@ export default function CatalogScreen() {
   return (
     <Box sx={{ pb: 6 }}>
       {/* 1. Header Principal & Acciones Globales */}
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2, mb: 3 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', lg: 'row' },
+          justifyContent: 'space-between',
+          alignItems: { xs: 'flex-start', lg: 'center' },
+          gap: 2,
+          mb: 3,
+        }}
+      >
         <Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-            <Box sx={{ width: 44, height: 44, borderRadius: '14px', bgcolor: '#1e290b', color: '#84cc16', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 3,
+                bgcolor: '#1e290b',
+                color: '#84cc16',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 14px rgba(30, 41, 11, 0.2)',
+                flexShrink: 0,
+              }}
+            >
               <FoodIcon sx={{ fontSize: 26 }} />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 900, color: '#1e290b', letterSpacing: '-0.5px' }}>
-              Catálogo de Menú y Carta
-            </Typography>
-            <Chip
-              label={
-                canManageCatalog
-                  ? 'Admin • Control Total'
-                  : canToggleAvailability
-                  ? 'Cocina • Control Disponibilidad'
-                  : 'Modo Consulta'
-              }
-              size="small"
-              sx={{
-                fontWeight: 800,
-                fontSize: '0.75rem',
-                borderRadius: '8px',
-                bgcolor: canManageCatalog ? 'rgba(101, 163, 13, 0.15)' : 'rgba(234, 88, 12, 0.15)',
-                color: canManageCatalog ? '#4d7c0f' : '#ea580c'
-              }}
-            />
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, flexWrap: 'wrap' }}>
+                <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b', letterSpacing: -0.5 }}>
+                  Catálogo de Menú y Carta
+                </Typography>
+                <Chip
+                  label={
+                    canManageCatalog
+                      ? 'Admin • Control Total'
+                      : canToggleAvailability
+                      ? 'Cocina • Disponibilidad'
+                      : 'Modo Consulta'
+                  }
+                  size="small"
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: '0.72rem',
+                    borderRadius: 2,
+                    bgcolor: canManageCatalog ? '#ecfccb' : '#ffedd5',
+                    color: canManageCatalog ? '#3f6212' : '#c2410c',
+                    border: `1px solid ${canManageCatalog ? '#bef264' : '#fed7aa'}`,
+                    height: 24,
+                  }}
+                />
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.4 }}>
+                Administra platos, precios, recetas, fotos y disponibilidad sincronizados en tiempo real con el POS y el Menú Digital QR.
+              </Typography>
+            </Box>
           </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 500 }}>
-            Administra platos, precios, recetas, fotos y disponibilidad sincronizados en tiempo real con el POS y el Menú Digital QR.
-          </Typography>
         </Box>
 
-        <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
+        {/* Action Buttons Toolbar */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, flexWrap: 'wrap', flexShrink: 0 }}>
           <Button
             variant="outlined"
-            startIcon={<QrCodeIcon />}
+            size="small"
+            startIcon={<QrCodeIcon sx={{ fontSize: 18 }} />}
             onClick={() => setIsQrModalOpen(true)}
             sx={{
-              borderRadius: '12px',
+              borderRadius: 2,
               textTransform: 'none',
               fontWeight: 800,
-              borderColor: '#cbd5e1',
-              color: '#334155',
+              borderColor: '#e2e8f0',
+              color: '#475569',
               bgcolor: '#ffffff',
-              '&:hover': { bgcolor: '#f8fafc', borderColor: '#94a3b8' }
+              px: 1.8,
+              py: 0.9,
+              '&:hover': { bgcolor: '#f8fafc', borderColor: '#cbd5e1' },
             }}
           >
             Menú Digital QR
@@ -512,16 +544,19 @@ export default function CatalogScreen() {
             <>
               <Button
                 variant="outlined"
-                startIcon={<CategoryIcon />}
+                size="small"
+                startIcon={<CategoryIcon sx={{ fontSize: 18 }} />}
                 onClick={() => handleOpenCategoryDialog()}
                 sx={{
-                  borderRadius: '12px',
+                  borderRadius: 2,
                   textTransform: 'none',
                   fontWeight: 800,
-                  borderColor: '#84cc16',
+                  borderColor: '#bef264',
                   color: '#4d7c0f',
                   bgcolor: '#ffffff',
-                  '&:hover': { bgcolor: 'rgba(132, 204, 22, 0.1)', borderColor: '#65a30d' }
+                  px: 1.8,
+                  py: 0.9,
+                  '&:hover': { bgcolor: '#f7fee7', borderColor: '#84cc16' },
                 }}
               >
                 Nueva Categoría
@@ -529,101 +564,298 @@ export default function CatalogScreen() {
 
               <Button
                 variant="contained"
-                startIcon={<AddIcon />}
+                size="small"
+                startIcon={<AddIcon sx={{ fontSize: 18 }} />}
                 onClick={() => handleOpenProductDialog()}
                 sx={{
-                  borderRadius: '12px',
+                  borderRadius: 2,
                   textTransform: 'none',
                   fontWeight: 900,
-                  bgcolor: '#1e290b',
+                  bgcolor: '#65a30d',
                   color: '#ffffff',
-                  px: 2.5,
-                  boxShadow: '0 4px 14px rgba(30, 41, 11, 0.25)',
-                  '&:hover': { bgcolor: '#2d3e11' }
+                  px: 2.2,
+                  py: 0.9,
+                  boxShadow: '0 4px 14px rgba(101, 163, 13, 0.35)',
+                  '&:hover': { bgcolor: '#4d7c0f', boxShadow: '0 6px 18px rgba(101, 163, 13, 0.45)' },
                 }}
               >
                 Nuevo Platillo
               </Button>
             </>
           )}
-        </Stack>
+        </Box>
       </Box>
 
       {/* 2. Tarjetas de Estadísticas & KPIs */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Paper elevation={0} sx={{ p: 2, borderRadius: '18px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{ width: 48, height: 48, borderRadius: '14px', bgcolor: 'rgba(15, 23, 42, 0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1e290b' }}>
-              <FoodIcon />
-            </Box>
+        {/* KPI 1: Total Platillos */}
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              borderRadius: 3,
+              border: '1px solid #e2e8f0',
+              bgcolor: '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': {
+                borderColor: '#cbd5e1',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
+              },
+            }}
+          >
             <Box>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
-                Total Platillos
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b', lineHeight: 1.2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box
+                    sx={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: '50%',
+                      bgcolor: '#f1f5f9',
+                      color: '#334155',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <FoodIcon sx={{ fontSize: 17 }} />
+                  </Box>
+                  <Typography
+                    variant="caption"
+                    sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}
+                  >
+                    Total Platillos
+                  </Typography>
+                </Box>
+                <Chip
+                  label={`${activeCategoriesCount} categorías`}
+                  size="small"
+                  sx={{ height: 20, fontSize: '0.65rem', fontWeight: 800, bgcolor: '#f1f5f9', color: '#475569' }}
+                />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#1e293b', mb: 0.5, letterSpacing: -0.5 }}>
                 {totalProducts}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600 }}>
-                {activeCategoriesCount} categorías activas
-              </Typography>
             </Box>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+              En catálogo activo de restaurante
+            </Typography>
           </Paper>
         </Grid>
 
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Paper elevation={0} sx={{ p: 2, borderRadius: '18px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{ width: 48, height: 48, borderRadius: '14px', bgcolor: 'rgba(22, 163, 74, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
-              <CheckIcon />
-            </Box>
+        {/* KPI 2: Disponibles */}
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              borderRadius: 3,
+              border: '1px solid #e2e8f0',
+              bgcolor: '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': {
+                borderColor: '#86efac',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 6px 18px rgba(22, 163, 74, 0.08)',
+              },
+            }}
+          >
             <Box>
-              <Typography variant="caption" sx={{ color: '#16a34a', fontWeight: 700, textTransform: 'uppercase' }}>
-                Disponibles
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#16a34a', lineHeight: 1.2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box
+                    sx={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: '50%',
+                      bgcolor: '#dcfce7',
+                      color: '#16a34a',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <CheckIcon sx={{ fontSize: 17 }} />
+                  </Box>
+                  <Typography
+                    variant="caption"
+                    sx={{ fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}
+                  >
+                    Disponibles
+                  </Typography>
+                </Box>
+                <Chip
+                  label="EN CARTA"
+                  size="small"
+                  sx={{ height: 20, fontSize: '0.65rem', fontWeight: 900, bgcolor: '#dcfce7', color: '#15803d' }}
+                />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#15803d', mb: 0.5, letterSpacing: -0.5 }}>
                 {availableProducts}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
-                Listos para salón y domicilios
-              </Typography>
             </Box>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+              Listos para pedir en salón y domicilios
+            </Typography>
           </Paper>
         </Grid>
 
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Paper elevation={0} sx={{ p: 2, borderRadius: '18px', border: outOfStockProducts > 0 ? '1px solid #fecaca' : '1px solid #e2e8f0', bgcolor: outOfStockProducts > 0 ? '#fff5f5' : '#ffffff', display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{ width: 48, height: 48, borderRadius: '14px', bgcolor: outOfStockProducts > 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(100, 116, 139, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: outOfStockProducts > 0 ? '#ef4444' : '#64748b' }}>
-              <CancelIcon />
-            </Box>
+        {/* KPI 3: Agotados (86'd) */}
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              borderRadius: 3,
+              border: outOfStockProducts > 0 ? '1px solid #fca5a5' : '1px solid #e2e8f0',
+              bgcolor: outOfStockProducts > 0 ? '#fff5f5' : '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': {
+                borderColor: outOfStockProducts > 0 ? '#ef4444' : '#cbd5e1',
+                transform: 'translateY(-2px)',
+                boxShadow: outOfStockProducts > 0 ? '0 6px 18px rgba(239, 68, 68, 0.12)' : '0 6px 18px rgba(0,0,0,0.06)',
+              },
+            }}
+          >
             <Box>
-              <Typography variant="caption" sx={{ color: outOfStockProducts > 0 ? '#dc2626' : '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
-                Agotados (86'd)
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: outOfStockProducts > 0 ? '#dc2626' : '#1e290b', lineHeight: 1.2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box
+                    sx={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: '50%',
+                      bgcolor: outOfStockProducts > 0 ? '#fee2e2' : '#f1f5f9',
+                      color: outOfStockProducts > 0 ? '#dc2626' : '#64748b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <CancelIcon sx={{ fontSize: 17 }} />
+                  </Box>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontWeight: 800,
+                      color: outOfStockProducts > 0 ? '#dc2626' : '#64748b',
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.5,
+                      fontSize: '0.72rem',
+                    }}
+                  >
+                    Agotados (86'd)
+                  </Typography>
+                </Box>
+                <Chip
+                  label={outOfStockProducts > 0 ? `⚠️ ${outOfStockProducts} SIN STOCK` : '🟢 100% ACTIVO'}
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: '0.65rem',
+                    fontWeight: 900,
+                    bgcolor: outOfStockProducts > 0 ? '#fee2e2' : '#f0fdf4',
+                    color: outOfStockProducts > 0 ? '#b91c1c' : '#15803d',
+                  }}
+                />
+              </Box>
+              <Typography
+                variant="h4"
+                sx={{
+                  fontWeight: 900,
+                  color: outOfStockProducts > 0 ? '#dc2626' : '#1e293b',
+                  mb: 0.5,
+                  letterSpacing: -0.5,
+                }}
+              >
                 {outOfStockProducts}
               </Typography>
-              <Typography variant="caption" sx={{ color: outOfStockProducts > 0 ? '#ef4444' : '#94a3b8', fontWeight: 600 }}>
-                {outOfStockProducts > 0 ? '⚠️ No visibles para orden' : 'Carta 100% disponible'}
-              </Typography>
             </Box>
+            <Typography
+              variant="caption"
+              sx={{ color: outOfStockProducts > 0 ? '#dc2626' : 'text.secondary', fontWeight: 600 }}
+            >
+              {outOfStockProducts > 0 ? 'Ocultos temporalmente en la carta' : 'Carta 100% disponible para orden'}
+            </Typography>
           </Paper>
         </Grid>
 
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Paper elevation={0} sx={{ p: 2, borderRadius: '18px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{ width: 48, height: 48, borderRadius: '14px', bgcolor: 'rgba(2, 132, 199, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284c7' }}>
-              <TrendingUpIcon />
-            </Box>
+        {/* KPI 4: Margen Promedio */}
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              borderRadius: 3,
+              border: '1px solid #e2e8f0',
+              bgcolor: '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': {
+                borderColor: '#7dd3fc',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 6px 18px rgba(2, 132, 199, 0.08)',
+              },
+            }}
+          >
             <Box>
-              <Typography variant="caption" sx={{ color: '#0284c7', fontWeight: 700, textTransform: 'uppercase' }}>
-                Margen Promedio
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#0284c7', lineHeight: 1.2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box
+                    sx={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: '50%',
+                      bgcolor: '#e0f2fe',
+                      color: '#0284c7',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <TrendingUpIcon sx={{ fontSize: 17 }} />
+                  </Box>
+                  <Typography
+                    variant="caption"
+                    sx={{ fontWeight: 800, color: '#0369a1', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}
+                  >
+                    Margen Promedio
+                  </Typography>
+                </Box>
+                <Chip
+                  label="ESTIMADO"
+                  size="small"
+                  sx={{ height: 20, fontSize: '0.65rem', fontWeight: 800, bgcolor: '#e0f2fe', color: '#0284c7' }}
+                />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#0284c7', mb: 0.5, letterSpacing: -0.5 }}>
                 {avgMarginPercentage}%
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
-                Rentabilidad bruta estimada
-              </Typography>
             </Box>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+              Rentabilidad bruta promedio del menú
+            </Typography>
           </Paper>
         </Grid>
       </Grid>
