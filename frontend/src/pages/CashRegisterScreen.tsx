@@ -444,9 +444,9 @@ export default function CashRegisterScreen() {
       <Box
         sx={{
           display: 'flex',
-          flexDirection: { xs: 'column', md: 'row' },
+          flexDirection: { xs: 'column', lg: 'row' },
           justifyContent: 'space-between',
-          alignItems: { xs: 'flex-start', md: 'center' },
+          alignItems: { xs: 'flex-start', lg: 'center' },
           gap: 2,
           mb: 3,
         }}
@@ -464,48 +464,62 @@ export default function CashRegisterScreen() {
               justifyContent: 'center',
               boxShadow: currentRegister ? '0 8px 20px rgba(30, 41, 11, 0.25)' : 'none',
               border: currentRegister ? 'none' : '2px solid #fecaca',
+              flexShrink: 0,
             }}
           >
             {currentRegister ? <LockOpenIcon sx={{ fontSize: 28 }} /> : <LockIcon sx={{ fontSize: 28 }} />}
           </Box>
           <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-              <Typography variant="h4" sx={{ fontWeight: 900, color: '#1e290b', letterSpacing: -0.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, flexWrap: 'wrap' }}>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b', letterSpacing: -0.5 }}>
                 Caja & Arqueo de Turno
               </Typography>
               <Chip
-                label={currentRegister ? '🟢 TURNO ACTIVO' : '🔴 CAJA CERRADA'}
+                label={currentRegister ? 'TURNO ACTIVO' : 'CAJA CERRADA'}
                 size="small"
+                icon={<Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: currentRegister ? '#22c55e' : '#ef4444', ml: '6px !important' }} />}
                 sx={{
-                  bgcolor: currentRegister ? '#ecfccb' : '#fee2e2',
-                  color: currentRegister ? '#4d7c0f' : '#b91c1c',
-                  fontWeight: 900,
-                  fontSize: '0.68rem',
+                  bgcolor: currentRegister ? '#f0fdf4' : '#fef2f2',
+                  color: currentRegister ? '#15803d' : '#b91c1c',
+                  fontWeight: 800,
+                  fontSize: '0.7rem',
                   height: 24,
-                  border: `1px solid ${currentRegister ? '#bef264' : '#fca5a5'}`,
+                  border: `1px solid ${currentRegister ? '#bbf7d0' : '#fecaca'}`,
                 }}
               />
               {currentRegister && (
                 <Chip
+                  icon={<TimeIcon sx={{ fontSize: '14px !important', color: '#64748b' }} />}
                   label={shiftDurationString}
                   size="small"
                   variant="outlined"
-                  sx={{ fontWeight: 700, borderColor: '#cbd5e1', color: '#475569', height: 24 }}
+                  sx={{ fontWeight: 700, borderColor: '#e2e8f0', color: '#475569', height: 24, bgcolor: '#ffffff' }}
                 />
               )}
             </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.3 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.4 }}>
               Cajero responsable: <strong>{currentRegister?.openedBy || user?.name || 'Laura Gómez'}</strong> • Sésamo POS Punto de Venta
             </Typography>
           </Box>
         </Box>
 
-        <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
+        {/* Action Buttons Toolbar */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, flexWrap: 'wrap' }}>
           <Button
             variant="outlined"
-            startIcon={<RefreshIcon />}
+            size="small"
+            startIcon={<RefreshIcon sx={{ fontSize: 18 }} />}
             onClick={() => loadData(true)}
-            sx={{ borderColor: '#cbd5e1', color: '#334155', fontWeight: 700, borderRadius: 2 }}
+            sx={{
+              borderColor: '#e2e8f0',
+              color: '#475569',
+              fontWeight: 700,
+              borderRadius: 2,
+              px: 1.8,
+              py: 0.9,
+              bgcolor: '#ffffff',
+              '&:hover': { bgcolor: '#f8fafc', borderColor: '#cbd5e1' },
+            }}
           >
             Actualizar
           </Button>
@@ -514,31 +528,51 @@ export default function CashRegisterScreen() {
             <>
               <Button
                 variant="outlined"
+                size="small"
                 color="error"
-                startIcon={<RemoveIcon />}
+                startIcon={<RemoveIcon sx={{ fontSize: 18 }} />}
                 onClick={() => {
                   setMovementType('GASTO');
                   setMovementDialogOpen(true);
                 }}
-                sx={{ fontWeight: 800, borderRadius: 2 }}
+                sx={{
+                  fontWeight: 800,
+                  borderRadius: 2,
+                  px: 1.8,
+                  py: 0.9,
+                  bgcolor: '#ffffff',
+                  borderColor: '#fca5a5',
+                  color: '#dc2626',
+                  '&:hover': { bgcolor: '#fef2f2', borderColor: '#ef4444' },
+                }}
               >
                 Gasto Menor
               </Button>
               <Button
                 variant="outlined"
-                startIcon={<AddIcon />}
+                size="small"
+                startIcon={<AddIcon sx={{ fontSize: 18 }} />}
                 onClick={() => {
                   setMovementType('INGRESO');
                   setMovementDialogOpen(true);
                 }}
-                sx={{ fontWeight: 800, borderColor: '#65a30d', color: '#4d7c0f', borderRadius: 2 }}
+                sx={{
+                  fontWeight: 800,
+                  borderRadius: 2,
+                  px: 1.8,
+                  py: 0.9,
+                  bgcolor: '#ffffff',
+                  borderColor: '#bef264',
+                  color: '#4d7c0f',
+                  '&:hover': { bgcolor: '#f7fee7', borderColor: '#84cc16' },
+                }}
               >
                 Ingreso Extra
               </Button>
               <Button
                 variant="contained"
-                color="error"
-                startIcon={<LockIcon />}
+                size="small"
+                startIcon={<LockIcon sx={{ fontSize: 18 }} />}
                 onClick={() => {
                   setCountedCash(0);
                   setShowDenomCalc(true);
@@ -547,8 +581,12 @@ export default function CashRegisterScreen() {
                 sx={{
                   fontWeight: 900,
                   borderRadius: 2,
-                  px: 2.5,
-                  boxShadow: '0 4px 14px rgba(220, 38, 38, 0.3)',
+                  px: 2.2,
+                  py: 0.9,
+                  bgcolor: '#dc2626',
+                  color: '#ffffff',
+                  boxShadow: '0 4px 14px rgba(220, 38, 38, 0.25)',
+                  '&:hover': { bgcolor: '#b91c1c', boxShadow: '0 6px 18px rgba(220, 38, 38, 0.35)' },
                 }}
               >
                 Arqueo Z & Cerrar Turno
@@ -557,7 +595,8 @@ export default function CashRegisterScreen() {
           ) : (
             <Button
               variant="contained"
-              startIcon={<LockOpenIcon />}
+              size="small"
+              startIcon={<LockOpenIcon sx={{ fontSize: 18 }} />}
               onClick={() => setOpenRegisterDialogOpen(true)}
               sx={{
                 bgcolor: '#65a30d',
@@ -565,14 +604,15 @@ export default function CashRegisterScreen() {
                 color: '#ffffff',
                 fontWeight: 900,
                 borderRadius: 2,
-                px: 3,
+                px: 2.5,
+                py: 0.9,
                 boxShadow: '0 4px 14px rgba(101, 163, 13, 0.35)',
               }}
             >
               Abrir Caja e Iniciar Turno
             </Button>
           )}
-        </Stack>
+        </Box>
       </Box>
 
       {loading && <LinearProgress sx={{ mb: 2, height: 4, borderRadius: 2, '& .MuiLinearProgress-bar': { bgcolor: '#84cc16' } }} />}
@@ -643,152 +683,304 @@ export default function CashRegisterScreen() {
       {currentRegister && (
         <>
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            {/* KPI 1: Base Inicial */}
-            <Grid size={{ xs: 6, sm: 4, md: 2 }}>
-              <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: 2.5, bgcolor: '#ffffff' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#0369a1', textTransform: 'uppercase', fontSize: '0.65rem' }}>
-                    Base Inicial
+            {/* ROW 1: Core Financial Balances (4 balanced cards - 3 cols each = 12 cols) */}
+
+            {/* KPI 1: Efectivo Físico Esperado en Gaveta (HERO CARD) */}
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.5,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  borderRadius: 3,
+                  border: '2px solid #f97316',
+                  background: 'linear-gradient(135deg, #ffffff 0%, #fff7ed 100%)',
+                  boxShadow: '0 4px 16px rgba(249, 115, 22, 0.08)',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 6px 20px rgba(249, 115, 22, 0.16)',
+                  },
+                }}
+              >
+                <Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ width: 30, height: 30, borderRadius: '50%', bgcolor: '#ffedd5', color: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <CalculateIcon sx={{ fontSize: 17 }} />
+                      </Box>
+                      <Typography variant="caption" sx={{ fontWeight: 900, color: '#c2410c', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
+                        Efectivo en Gaveta
+                      </Typography>
+                    </Box>
+                    <Chip label="EN CAJA" size="small" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 900, bgcolor: '#ea580c', color: '#ffffff' }} />
+                  </Box>
+                  <Typography variant="h4" sx={{ fontWeight: 900, color: '#9a3412', mb: 0.5, letterSpacing: -0.5 }}>
+                    ${expectedCashInBox.toLocaleString()}
                   </Typography>
-                  <WalletIcon sx={{ fontSize: 18, color: '#0284c7' }} />
                 </Box>
-                <Typography variant="h5" sx={{ fontWeight: 900, color: '#0284c7' }}>
-                  ${initialFloat.toLocaleString()}
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#c2410c' }}>
+                  Físico esperado que debe haber en caja
                 </Typography>
-                <Typography variant="caption" color="text.secondary">Fondo de sencillo</Typography>
               </Paper>
             </Grid>
 
-            {/* KPI 2: Ventas Totales */}
-            <Grid size={{ xs: 6, sm: 4, md: 2 }}>
-              <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: 2.5, bgcolor: '#ffffff' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#166534', textTransform: 'uppercase', fontSize: '0.65rem' }}>
-                    Ventas del Turno
+            {/* KPI 2: Ventas Totales del Turno */}
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.5,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  borderRadius: 3,
+                  border: '1px solid #e2e8f0',
+                  bgcolor: '#ffffff',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                  transition: 'all 0.2s ease',
+                  '&:hover': { borderColor: '#86efac', transform: 'translateY(-2px)' },
+                }}
+              >
+                <Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ width: 30, height: 30, borderRadius: '50%', bgcolor: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <MoneyIcon sx={{ fontSize: 17 }} />
+                      </Box>
+                      <Typography variant="caption" sx={{ fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
+                        Ventas del Turno
+                      </Typography>
+                    </Box>
+                    <Chip label={`${paidOrders.length + completedDeliveries.length} pedidos`} size="small" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 800, bgcolor: '#dcfce7', color: '#15803d' }} />
+                  </Box>
+                  <Typography variant="h4" sx={{ fontWeight: 900, color: '#15803d', mb: 0.5, letterSpacing: -0.5 }}>
+                    ${totalTurnoSales.toLocaleString()}
                   </Typography>
-                  <MoneyIcon sx={{ fontSize: 18, color: '#16a34a' }} />
                 </Box>
-                <Typography variant="h5" sx={{ fontWeight: 900, color: '#16a34a' }}>
-                  ${totalTurnoSales.toLocaleString()}
+                <Typography variant="caption" color="text.secondary">
+                  {paidOrders.length} salón • {completedDeliveries.length} domicilios
                 </Typography>
-                <Typography variant="caption" color="text.secondary">{paidOrders.length} salón • {completedDeliveries.length} dom.</Typography>
               </Paper>
             </Grid>
 
             {/* KPI 3: Cuentas Pendientes por Cobrar */}
-            <Grid size={{ xs: 12, sm: 4, md: 2.3 }}>
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
               <Paper
                 elevation={0}
                 onClick={() => setCurrentTab(0)}
                 sx={{
-                  p: 2,
+                  p: 2.5,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  borderRadius: 3,
                   border: requestedBillsCount > 0 ? '2px solid #ea580c' : '1px solid #e2e8f0',
-                  borderRadius: 2.5,
                   bgcolor: requestedBillsCount > 0 ? '#fff7ed' : '#ffffff',
+                  boxShadow: requestedBillsCount > 0 ? '0 4px 14px rgba(234, 88, 12, 0.12)' : '0 2px 8px rgba(0,0,0,0.02)',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
                   '&:hover': {
+                    borderColor: '#ea580c',
                     transform: 'translateY(-2px)',
-                    boxShadow: '0 6px 16px rgba(234, 88, 12, 0.15)',
+                    boxShadow: '0 6px 18px rgba(234, 88, 12, 0.15)',
                   },
                 }}
               >
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      fontWeight: 900,
-                      color: requestedBillsCount > 0 ? '#c2410c' : '#475569',
-                      textTransform: 'uppercase',
-                      fontSize: '0.65rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.5,
-                    }}
-                  >
-                    {requestedBillsCount > 0 && <AlertBellIcon sx={{ fontSize: 14, color: '#ea580c' }} />}
-                    Por Cobrar (Salón)
+                <Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ width: 30, height: 30, borderRadius: '50%', bgcolor: requestedBillsCount > 0 ? '#fed7aa' : '#f1f5f9', color: requestedBillsCount > 0 ? '#ea580c' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {requestedBillsCount > 0 ? <AlertBellIcon sx={{ fontSize: 17 }} /> : <ReceiptIcon sx={{ fontSize: 17 }} />}
+                      </Box>
+                      <Typography variant="caption" sx={{ fontWeight: 800, color: requestedBillsCount > 0 ? '#c2410c' : '#475569', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
+                        Por Cobrar (Salón)
+                      </Typography>
+                    </Box>
+                    {requestedBillsCount > 0 ? (
+                      <Chip label={`${requestedBillsCount} en caja`} size="small" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 900, bgcolor: '#ea580c', color: '#ffffff' }} />
+                    ) : (
+                      <Chip label={`${pendingAccounts.length} mesas`} size="small" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 700, bgcolor: '#f1f5f9', color: '#64748b' }} />
+                    )}
+                  </Box>
+                  <Typography variant="h4" sx={{ fontWeight: 900, color: requestedBillsCount > 0 ? '#c2410c' : '#1e293b', mb: 0.5, letterSpacing: -0.5 }}>
+                    ${pendingTotalVolume.toLocaleString()}
                   </Typography>
-                  <ReceiptIcon sx={{ fontSize: 18, color: requestedBillsCount > 0 ? '#ea580c' : '#94a3b8' }} />
                 </Box>
-                <Typography variant="h5" sx={{ fontWeight: 900, color: requestedBillsCount > 0 ? '#c2410c' : '#1e293b' }}>
-                  ${pendingTotalVolume.toLocaleString()}
+                <Typography variant="caption" sx={{ fontWeight: 700, color: requestedBillsCount > 0 ? '#ea580c' : '#64748b' }}>
+                  {requestedBillsCount > 0 ? '⚠️ Cuentas listas para cobrar →' : 'Ver mesas activas →'}
                 </Typography>
-                <Typography variant="caption" sx={{ fontWeight: 700, color: requestedBillsCount > 0 ? '#c2410c' : 'text.secondary' }}>
-                  {pendingAccounts.length} cuentas ({requestedBillsCount} en caja)
-                </Typography>
-              </Paper>
-            </Grid>
-
-            {/* KPI 3: Efectivo Físico Esperado */}
-            <Grid size={{ xs: 12, sm: 4, md: 2.5 }}>
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2,
-                  border: '2px solid #ea580c',
-                  borderRadius: 2.5,
-                  background: 'linear-gradient(135deg, #ffffff 0%, #fff7ed 100%)',
-                }}
-              >
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                  <Typography variant="caption" sx={{ fontWeight: 900, color: '#c2410c', textTransform: 'uppercase', fontSize: '0.65rem' }}>
-                    💼 Efectivo en Gaveta
-                  </Typography>
-                  <CalculateIcon sx={{ fontSize: 18, color: '#ea580c' }} />
-                </Box>
-                <Typography variant="h5" sx={{ fontWeight: 900, color: '#c2410c' }}>
-                  ${expectedCashInBox.toLocaleString()}
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#c2410c', fontWeight: 700 }}>Efectivo físico a entregar</Typography>
               </Paper>
             </Grid>
 
             {/* KPI 4: Tarjetas & Digital */}
-            <Grid size={{ xs: 6, sm: 4, md: 2 }}>
-              <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: 2.5, bgcolor: '#ffffff' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#6d28d9', textTransform: 'uppercase', fontSize: '0.65rem' }}>
-                    Tarjeta / Nequi
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.5,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  borderRadius: 3,
+                  border: '1px solid #e2e8f0',
+                  bgcolor: '#ffffff',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                  transition: 'all 0.2s ease',
+                  '&:hover': { borderColor: '#c4b5fd', transform: 'translateY(-2px)' },
+                }}
+              >
+                <Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ width: 30, height: 30, borderRadius: '50%', bgcolor: '#ede9fe', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <CardIcon sx={{ fontSize: 17 }} />
+                      </Box>
+                      <Typography variant="caption" sx={{ fontWeight: 800, color: '#6d28d9', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
+                        Tarjeta / Digital
+                      </Typography>
+                    </Box>
+                    <Chip label="DATÁFONO / NEQUI" size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 800, bgcolor: '#f5f3ff', color: '#7c3aed' }} />
+                  </Box>
+                  <Typography variant="h4" sx={{ fontWeight: 900, color: '#7c3aed', mb: 0.5, letterSpacing: -0.5 }}>
+                    ${cardDigitalSales.toLocaleString()}
                   </Typography>
-                  <CardIcon sx={{ fontSize: 18, color: '#7c3aed' }} />
                 </Box>
-                <Typography variant="h5" sx={{ fontWeight: 900, color: '#7c3aed' }}>
-                  ${cardDigitalSales.toLocaleString()}
+                <Typography variant="caption" color="text.secondary">
+                  Comprobantes bancarios y transferencias
                 </Typography>
-                <Typography variant="caption" color="text.secondary">Comprobantes bancarios</Typography>
               </Paper>
             </Grid>
 
-            {/* KPI 5: Propinas */}
-            <Grid size={{ xs: 6, sm: 4, md: 1.75 }}>
-              <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: 2.5, bgcolor: '#ffffff' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: '0.65rem' }}>
-                    Propinas
+            {/* ROW 2: Audit & Operational Float (3 balanced cards - 4 cols each = 12 cols, 100% width) */}
+
+            {/* KPI 5: Base Inicial */}
+            <Grid size={{ xs: 12, sm: 4, lg: 4 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.5,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  borderRadius: 3,
+                  border: '1px solid #e2e8f0',
+                  bgcolor: '#ffffff',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                  transition: 'all 0.2s ease',
+                  '&:hover': { borderColor: '#7dd3fc', transform: 'translateY(-2px)' },
+                }}
+              >
+                <Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ width: 28, height: 28, borderRadius: '50%', bgcolor: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <WalletIcon sx={{ fontSize: 16 }} />
+                      </Box>
+                      <Typography variant="caption" sx={{ fontWeight: 800, color: '#0369a1', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.7rem' }}>
+                        Base Inicial
+                      </Typography>
+                    </Box>
+                    <Chip label="FONDO DE APERTURA" size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 800, bgcolor: '#e0f2fe', color: '#0284c7' }} />
+                  </Box>
+                  <Typography variant="h5" sx={{ fontWeight: 900, color: '#0284c7', mb: 0.5 }}>
+                    ${initialFloat.toLocaleString()}
                   </Typography>
-                  <Typography variant="caption" sx={{ fontWeight: 900, color: '#65a30d' }}>10%</Typography>
                 </Box>
-                <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b' }}>
-                  ${totalTips.toLocaleString()}
+                <Typography variant="caption" color="text.secondary">
+                  Fondo de sencillo entregado al iniciar el turno
                 </Typography>
-                <Typography variant="caption" color="text.secondary">Fondo meseros</Typography>
               </Paper>
             </Grid>
 
-            {/* KPI 6: Gastos Menores */}
-            <Grid size={{ xs: 12, sm: 4, md: 1.75 }}>
-              <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: 2.5, bgcolor: '#ffffff' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#dc2626', textTransform: 'uppercase', fontSize: '0.65rem' }}>
-                    Gastos Menores
+            {/* KPI 6: Propinas */}
+            <Grid size={{ xs: 12, sm: 4, lg: 4 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.5,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  borderRadius: 3,
+                  border: '1px solid #e2e8f0',
+                  bgcolor: '#ffffff',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                  transition: 'all 0.2s ease',
+                  '&:hover': { borderColor: '#bef264', transform: 'translateY(-2px)' },
+                }}
+              >
+                <Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ width: 28, height: 28, borderRadius: '50%', bgcolor: '#ecfccb', color: '#4d7c0f', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <MoneyIcon sx={{ fontSize: 16 }} />
+                      </Box>
+                      <Typography variant="caption" sx={{ fontWeight: 800, color: '#4d7c0f', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.7rem' }}>
+                        Propinas Acumuladas
+                      </Typography>
+                    </Box>
+                    <Chip label="10% SERVICIO" size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 900, bgcolor: '#ecfccb', color: '#3f6212' }} />
+                  </Box>
+                  <Typography variant="h5" sx={{ fontWeight: 900, color: '#3f6212', mb: 0.5 }}>
+                    ${totalTips.toLocaleString()}
                   </Typography>
-                  <RemoveIcon sx={{ fontSize: 18, color: '#dc2626' }} />
                 </Box>
-                <Typography variant="h5" sx={{ fontWeight: 900, color: '#dc2626' }}>
-                  -${manualGastos.toLocaleString()}
+                <Typography variant="caption" color="text.secondary">
+                  Fondo voluntario recaudado para el equipo de meseros
                 </Typography>
-                <Typography variant="caption" color="text.secondary">{manualMovements.filter(m => m.amount < 0).length} salidas</Typography>
+              </Paper>
+            </Grid>
+
+            {/* KPI 7: Gastos Menores */}
+            <Grid size={{ xs: 12, sm: 4, lg: 4 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.5,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  borderRadius: 3,
+                  border: '1px solid #e2e8f0',
+                  bgcolor: '#ffffff',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                  transition: 'all 0.2s ease',
+                  '&:hover': { borderColor: '#fca5a5', transform: 'translateY(-2px)' },
+                }}
+              >
+                <Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ width: 28, height: 28, borderRadius: '50%', bgcolor: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <RemoveIcon sx={{ fontSize: 16 }} />
+                      </Box>
+                      <Typography variant="caption" sx={{ fontWeight: 800, color: '#dc2626', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.7rem' }}>
+                        Gastos de Caja Menor
+                      </Typography>
+                    </Box>
+                    <Chip
+                      label={`${manualMovements.filter(m => m.amount < 0).length} salidas`}
+                      size="small"
+                      sx={{ height: 20, fontSize: '0.62rem', fontWeight: 800, bgcolor: '#fee2e2', color: '#b91c1c' }}
+                    />
+                  </Box>
+                  <Typography variant="h5" sx={{ fontWeight: 900, color: '#dc2626', mb: 0.5 }}>
+                    -${manualGastos.toLocaleString()}
+                  </Typography>
+                </Box>
+                <Typography variant="caption" color="text.secondary">
+                  Egresos y compras operativas de urgencia
+                </Typography>
               </Paper>
             </Grid>
           </Grid>
