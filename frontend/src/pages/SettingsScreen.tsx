@@ -72,11 +72,20 @@ export default function SettingsScreen() {
     latencyMs: 35,
     lastCheck: null,
   });
-  const [apiUrlInput, setApiUrlInput] = useState<string>(() => getApiUrl());
+  const [apiUrlInput, setApiUrlInput] = useState<string>(() => {
+    const active = getApiUrl();
+    return active.includes('tu-url-de-render') || active.includes('tu-servicio') ? 'https://sesamo-api.onrender.com/api' : active;
+  });
   const [apiUrlSaved, setApiUrlSaved] = useState(false);
   const [isPinging, setIsPinging] = useState(false);
 
   useEffect(() => {
+    // Limpieza de URLs de plantilla si quedaron guardadas en localStorage
+    const saved = localStorage.getItem('sesamo_api_url');
+    if (saved && (saved.includes('tu-url-de-render') || saved.includes('tu-servicio') || saved === 'http://localhost:3001/api')) {
+      localStorage.removeItem('sesamo_api_url');
+      setApiUrlInput('https://sesamo-api.onrender.com/api');
+    }
     loadSettings();
     checkDatabaseHealth();
   }, []);
@@ -115,7 +124,9 @@ export default function SettingsScreen() {
   };
 
   const handleSaveApiUrl = () => {
-    setApiUrl(apiUrlInput);
+    const urlToSave = (apiUrlInput.trim() && !apiUrlInput.includes('tu-url-de-render')) ? apiUrlInput.trim() : 'https://sesamo-api.onrender.com/api';
+    setApiUrl(urlToSave);
+    setApiUrlInput(urlToSave);
     setApiUrlSaved(true);
     setTimeout(() => setApiUrlSaved(false), 3000);
     checkDatabaseHealth();
@@ -538,7 +549,7 @@ export default function SettingsScreen() {
                 size="small"
                 value={apiUrlInput}
                 onChange={(e) => setApiUrlInput(e.target.value)}
-                placeholder="https://tu-servicio-render.onrender.com/api"
+                placeholder="https://sesamo-api.onrender.com/api"
                 sx={{ flex: 1, minWidth: 260, bgcolor: '#ffffff' }}
                 slotProps={{ input: { sx: { borderRadius: '10px' } } }}
               />
