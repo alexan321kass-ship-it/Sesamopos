@@ -26,7 +26,6 @@ import {
   Alert,
   LinearProgress,
   Snackbar,
-  Slider,
   Stack,
   Collapse,
   Tabs,
@@ -40,7 +39,6 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Calculate as CalculateIcon,
   Print as PrintIcon,
   Search as SearchIcon,
   Warning as WarningIcon,
@@ -67,7 +65,7 @@ import {
   Cell
 } from 'recharts';
 import { mockApi } from '../services/mockApi';
-import { Recipe, RecipeIngredient, Product, InventoryItem, Order } from '../types';
+import { Recipe, RecipeIngredient, Product, InventoryItem } from '../types';
 import { useAuthStore } from '../store/authStore';
 
 // Helper to calculate exact ingredient cost based on inventory unit and recipe quantity
@@ -144,10 +142,9 @@ export default function RecipesScreen() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Main Tabs (0: Fichas & Escandallos, 1: Matriz de Menú Miller-Kasavana, 2: Simulador & Lotes, 3: Auditoría Food Cost)
+  // Main Tabs (0: Fichas & Escandallos, 1: Auditoría Food Cost)
   const [mainTab, setMainTab] = useState<number>(0);
 
   // Filters & Views
@@ -155,19 +152,12 @@ export default function RecipesScreen() {
   const [selectedCategory, setSelectedCategory] = useState('TODAS');
   const [selectedStation, setSelectedStation] = useState('TODAS');
   const [marginFilter, setMarginFilter] = useState('TODOS');
-  const [matrixFilter, setMatrixFilter] = useState<'ALL' | 'ESTRELLA' | 'CABALLO' | 'ROMPECABEZAS' | 'PERRO'>('ALL');
   const [viewMode, setViewMode] = useState<'CARDS' | 'TABLE'>('CARDS');
   const [expandedRecipeId, setExpandedRecipeId] = useState<string | null>(null);
 
   // Modals
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<Partial<Recipe> | null>(null);
-
-  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
-  const [simulatingRecipe, setSimulatingRecipe] = useState<Recipe | null>(null);
-  const [simulatedPrice, setSimulatedPrice] = useState<number>(0);
-  const [simulatedCostVariation, setSimulatedCostVariation] = useState<number>(0); // % variation
-  const [simulatedBatchSize, setSimulatedBatchSize] = useState<number>(10);
 
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printingRecipe, setPrintingRecipe] = useState<Recipe | null>(null);
@@ -184,16 +174,14 @@ export default function RecipesScreen() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [recList, prodList, invList, ordList] = await Promise.all([
+      const [recList, prodList, invList] = await Promise.all([
         mockApi.recipes.getAll(),
         mockApi.products.getAll(),
-        mockApi.inventory.getAll(),
-        mockApi.orders.getAll()
+        mockApi.inventory.getAll()
       ]);
       setRecipes(recList || []);
       setProducts(prodList || []);
       setInventory(invList || []);
-      setOrders(ordList || []);
     } catch (err) {
       console.error('Error cargando recetas:', err);
     } finally {
@@ -260,62 +248,16 @@ export default function RecipesScreen() {
   }, [products, inventory]);
 
   // Popularidad histórica cruzada con órdenes
-  const productSalesMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    orders.forEach(o => {
-      (o.items || []).forEach(it => {
-        map[it.productId] = (map[it.productId] || 0) + (it.quantity || 1);
-      });
-    });
-    return map;
-  }, [orders]);
-
-  // Promedios globales para la Matriz de Ingeniería de Menú
-  const menuMatrixStats = useMemo(() => {
-    if (recipes.length === 0) return { avgSales: 0, avgContributionMargin: 0 };
-    let totalSales = 0;
-    let totalContribMargin = 0;
-
-    recipes.forEach(r => {
-      const fin = getRecipeFinancials(r);
-      const sales = productSalesMap[r.productId] || (Math.floor(Number(r.productId) * 7) % 35 + 5); // baseline si no hay ventas
-      totalSales += sales;
-      totalContribMargin += fin.grossMargin;
-    });
-
-    return {
-      avgSales: totalSales / recipes.length,
-      avgContributionMargin: totalContribMargin / recipes.length
-    };
-  }, [recipes, productSalesMap, getRecipeFinancials]);
-
-  // Clasificador Miller & Kasavana para cada receta
-  const getRecipeMatrixCategory = useCallback((recipe: Recipe) => {
-    const fin = getRecipeFinancials(recipe);
-    const sales = productSalesMap[recipe.productId] || (Math.floor(Number(recipe.productId) * 7) % 35 + 5);
-    const isHighPopularity = sales >= menuMatrixStats.avgSales;
-    const isHighMargin = fin.grossMargin >= menuMatrixStats.avgContributionMargin;
-
-    if (isHighPopularity && isHighMargin) return 'ESTRELLA';
-    if (isHighPopularity && !isHighMargin) return 'CABALLO';
-    if (!isHighPopularity && isHighMargin) return 'ROMPECABEZAS';
-    return 'PERRO';
-  }, [getRecipeFinancials, productSalesMap, menuMatrixStats]);
-
   // Aggregated KPI summary
   const summaryKPIs = useMemo(() => {
     if (recipes.length === 0) {
-      return { totalRecipes: 0, avgCost: 0, avgMargin: 0, avgFoodCost: 0, criticalCount: 0, starsCount: 0, plowhorsesCount: 0, puzzlesCount: 0, dogsCount: 0 };
+      return { totalRecipes: 0, avgCost: 0, avgMargin: 0, avgFoodCost: 0, criticalCount: 0 };
     }
 
     let totalCostAccum = 0;
     let totalMarginPctAccum = 0;
     let totalFoodCostPctAccum = 0;
     let criticalCount = 0;
-    let starsCount = 0;
-    let plowhorsesCount = 0;
-    let puzzlesCount = 0;
-    let dogsCount = 0;
 
     recipes.forEach(r => {
       const fin = getRecipeFinancials(r);
@@ -325,12 +267,6 @@ export default function RecipesScreen() {
       if (fin.foodCostPercent > 38 || fin.grossMarginPercent < 50) {
         criticalCount++;
       }
-
-      const cat = getRecipeMatrixCategory(r);
-      if (cat === 'ESTRELLA') starsCount++;
-      else if (cat === 'CABALLO') plowhorsesCount++;
-      else if (cat === 'ROMPECABEZAS') puzzlesCount++;
-      else if (cat === 'PERRO') dogsCount++;
     });
 
     return {
@@ -339,12 +275,8 @@ export default function RecipesScreen() {
       avgMargin: +(totalMarginPctAccum / recipes.length).toFixed(1),
       avgFoodCost: +(totalFoodCostPctAccum / recipes.length).toFixed(1),
       criticalCount,
-      starsCount,
-      plowhorsesCount,
-      puzzlesCount,
-      dogsCount
     };
-  }, [recipes, getRecipeFinancials, getRecipeMatrixCategory]);
+  }, [recipes, getRecipeFinancials]);
 
   // Categories and stations list for filters
   const categories = useMemo(() => {
@@ -391,15 +323,9 @@ export default function RecipesScreen() {
       if (marginFilter === 'MEDIO' && (fin.grossMarginPercent < 50 || fin.grossMarginPercent >= 65)) return false;
       if (marginFilter === 'BAJO' && fin.grossMarginPercent >= 50) return false;
 
-      // Matrix Quadrant filter
-      if (matrixFilter !== 'ALL') {
-        const cat = getRecipeMatrixCategory(r);
-        if (cat !== matrixFilter) return false;
-      }
-
       return true;
     });
-  }, [recipes, inventory, searchQuery, selectedCategory, selectedStation, marginFilter, matrixFilter, getRecipeFinancials, getRecipeMatrixCategory]);
+  }, [recipes, inventory, searchQuery, selectedCategory, selectedStation, marginFilter, getRecipeFinancials]);
 
   // Handle Open Create Modal
   const handleOpenCreateModal = () => {
@@ -514,16 +440,6 @@ export default function RecipesScreen() {
     }
   };
 
-  // Handle Open Simulator Modal
-  const handleOpenSimulator = (recipe: Recipe) => {
-    const fin = getRecipeFinancials(recipe);
-    setSimulatingRecipe(recipe);
-    setSimulatedPrice(fin.salePrice);
-    setSimulatedCostVariation(0);
-    setSimulatedBatchSize(10);
-    setIsSimulatorOpen(true);
-  };
-
   // Handle Open Print Technical Sheet Modal
   const handleOpenPrintModal = (recipe: Recipe) => {
     setPrintingRecipe(recipe);
@@ -630,7 +546,7 @@ export default function RecipesScreen() {
                   Ingeniería de Recetas & Escandallos
                 </Typography>
                 <Chip
-                  label="Miller & Kasavana Matrix • Costeo Dinámico"
+                  label="Escandallos & Food Cost %"
                   size="small"
                   sx={{
                     fontWeight: 800,
@@ -651,7 +567,7 @@ export default function RecipesScreen() {
                 )}
               </Box>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.4 }}>
-                Fichas técnicas culinarias, costeo de materias primas por gramo/mililitro, Food Cost %, mermas y matriz de rentabilidad estratégica.
+                Fichas técnicas culinarias, costeo de materias primas por gramo/mililitro, Food Cost % y control de mermas.
               </Typography>
             </Box>
           </Box>
@@ -1011,8 +927,6 @@ export default function RecipesScreen() {
           }}
         >
           <Tab label={`📋 Fichas Técnicas & Escandallos (${recipes.length})`} />
-          {canManageRecipes && <Tab label="🌟 Matriz de Ingeniería de Menú (BCG)" />}
-          {canManageRecipes && <Tab label="⚡ Simulador de Costos & Lotes" />}
           {canManageRecipes && <Tab label="📊 Auditoría de Food Cost" />}
         </Tabs>
       </Box>
@@ -1135,7 +1049,6 @@ export default function RecipesScreen() {
               {filteredRecipes.map(recipe => {
                 const fin = getRecipeFinancials(recipe);
                 const isExpanded = expandedRecipeId === recipe.productId;
-                const matrixCategory = getRecipeMatrixCategory(recipe);
 
                 return (
                   <Grid size={{ xs: 12, lg: 6 }} key={recipe.productId}>
@@ -1174,20 +1087,6 @@ export default function RecipesScreen() {
                                   label={recipe.station || 'COCINA'}
                                   size="small"
                                   sx={{ fontWeight: 800, fontSize: '0.68rem', bgcolor: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0' }}
-                                />
-                                <Chip
-                                  label={
-                                    matrixCategory === 'ESTRELLA' ? '🌟 Estrella' :
-                                    matrixCategory === 'CABALLO' ? '🐎 Caballo' :
-                                    matrixCategory === 'ROMPECABEZAS' ? '🧩 Rompecabezas' : '🐕 Perro'
-                                  }
-                                  size="small"
-                                  sx={{
-                                    fontWeight: 900,
-                                    fontSize: '0.68rem',
-                                    bgcolor: matrixCategory === 'ESTRELLA' ? '#fef3c7' : matrixCategory === 'CABALLO' ? '#e0f2fe' : matrixCategory === 'ROMPECABEZAS' ? '#f3e8ff' : '#fee2e2',
-                                    color: matrixCategory === 'ESTRELLA' ? '#92400e' : matrixCategory === 'CABALLO' ? '#0369a1' : matrixCategory === 'ROMPECABEZAS' ? '#6b21a8' : '#991b1b'
-                                  }}
                                 />
                               </Box>
                               <Typography variant="caption" sx={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5, fontWeight: 600 }}>
@@ -1339,17 +1238,6 @@ export default function RecipesScreen() {
                         {/* Barra de Acciones de la Tarjeta */}
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, pt: 1.5, borderTop: '1px solid #f1f5f9' }}>
                           <Stack direction="row" spacing={1}>
-                            {canManageRecipes && (
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                startIcon={<CalculateIcon sx={{ fontSize: 14 }} />}
-                                onClick={() => handleOpenSimulator(recipe)}
-                                sx={{ borderRadius: '10px', fontWeight: 800, fontSize: '0.72rem', textTransform: 'none' }}
-                              >
-                                Simular Lote
-                              </Button>
-                            )}
                             <Button
                               size="small"
                               variant="outlined"
@@ -1395,14 +1283,12 @@ export default function RecipesScreen() {
                     <TableCell align="right" sx={{ fontWeight: 800, color: '#475569' }}>Precio Venta</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800, color: '#475569' }}>Margen Bruto</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 800, color: '#475569' }}>Food Cost %</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 800, color: '#475569' }}>Cuadrante</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800, color: '#475569' }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {filteredRecipes.map(recipe => {
                     const fin = getRecipeFinancials(recipe);
-                    const matrixCategory = getRecipeMatrixCategory(recipe);
 
                     return (
                       <TableRow key={recipe.productId} hover sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
@@ -1447,26 +1333,8 @@ export default function RecipesScreen() {
                             sx={{ fontWeight: 800, borderRadius: '8px' }}
                           />
                         </TableCell>
-                        <TableCell align="center">
-                          <Chip
-                            label={
-                              matrixCategory === 'ESTRELLA' ? '🌟 Estrella' :
-                              matrixCategory === 'CABALLO' ? '🐎 Caballo' :
-                              matrixCategory === 'ROMPECABEZAS' ? '🧩 Puzzle' : '🐕 Perro'
-                            }
-                            size="small"
-                            sx={{ fontWeight: 800, borderRadius: '8px' }}
-                          />
-                        </TableCell>
                         <TableCell align="right">
                           <Stack direction="row" spacing={0.5} sx={{ justifyContent: 'flex-end' }}>
-                            {canManageRecipes && (
-                              <Tooltip title="Simulador Financiero">
-                                <IconButton size="small" onClick={() => handleOpenSimulator(recipe)}>
-                                  <CalculateIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            )}
                             <Tooltip title="Ficha Técnica">
                               <IconButton size="small" onClick={() => handleOpenPrintModal(recipe)}>
                                 <PrintIcon fontSize="small" />
@@ -1498,396 +1366,8 @@ export default function RecipesScreen() {
         </>
       )}
 
-      {/* TAB 1: MATRIZ DE INGENIERÍA DE MENÚ (MILLER & KASAVANA / BCG) */}
+      {/* TAB 1: AUDITORÍA DE FOOD COST */}
       {mainTab === 1 && (
-        <Box>
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b' }}>
-              Matriz Estratégica de Menú (Miller & Kasavana)
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Cruza el volumen de ventas histórico (popularidad) con el margen de contribución monetario para tomar decisiones sobre precios, recetas y cartas.
-            </Typography>
-          </Box>
-
-          {/* Cuadrantes Interactivos */}
-          <Grid container spacing={2.5} sx={{ mb: 3 }}>
-            {/* 🌟 ESTRELLAS */}
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <Paper
-                elevation={0}
-                onClick={() => setMatrixFilter(matrixFilter === 'ESTRELLA' ? 'ALL' : 'ESTRELLA')}
-                sx={{
-                  p: 2.5,
-                  borderRadius: '20px',
-                  border: matrixFilter === 'ESTRELLA' ? '2px solid #ca8a04' : '1px solid #fde047',
-                  bgcolor: '#fefce8',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 8px 20px rgba(202, 138, 4, 0.15)' }
-                }}
-              >
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#854d0e', display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                    🌟 ESTRELLAS ({summaryKPIs.starsCount})
-                  </Typography>
-                  <Chip label="Alta Venta • Alto Margen" size="small" sx={{ fontWeight: 800, fontSize: '0.65rem', bgcolor: '#fef08a', color: '#713f12' }} />
-                </Box>
-                <Typography variant="body2" sx={{ fontSize: '0.78rem', color: '#713f12', mb: 1.5, minHeight: 44 }}>
-                  Los platillos favoritos de los comensales y los que más dinero dejan al negocio.
-                </Typography>
-                <Box sx={{ p: 1.2, bgcolor: '#ffffff', borderRadius: '12px', border: '1px solid #fef08a' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#854d0e', display: 'block' }}>
-                    💡 Estrategia Sugerida:
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#a16207', fontSize: '0.7rem' }}>
-                    Mantener receta y calidad estrictas. Destacar con fotos llamativas en el Menú Digital QR.
-                  </Typography>
-                </Box>
-              </Paper>
-            </Grid>
-
-            {/* 🐎 CABALLOS DE BATALLA */}
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <Paper
-                elevation={0}
-                onClick={() => setMatrixFilter(matrixFilter === 'CABALLO' ? 'ALL' : 'CABALLO')}
-                sx={{
-                  p: 2.5,
-                  borderRadius: '20px',
-                  border: matrixFilter === 'CABALLO' ? '2px solid #0284c7' : '1px solid #bae6fd',
-                  bgcolor: '#f0f9ff',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 8px 20px rgba(2, 132, 199, 0.15)' }
-                }}
-              >
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#0369a1', display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                    🐎 CABALLOS ({summaryKPIs.plowhorsesCount})
-                  </Typography>
-                  <Chip label="Alta Venta • Bajo Margen" size="small" sx={{ fontWeight: 800, fontSize: '0.65rem', bgcolor: '#e0f2fe', color: '#075985' }} />
-                </Box>
-                <Typography variant="body2" sx={{ fontSize: '0.78rem', color: '#075985', mb: 1.5, minHeight: 44 }}>
-                  Platillos muy vendidos pero con alto costo de materia prima que reduce la ganancia.
-                </Typography>
-                <Box sx={{ p: 1.2, bgcolor: '#ffffff', borderRadius: '12px', border: '1px solid #bae6fd' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#0369a1', display: 'block' }}>
-                    💡 Estrategia Sugerida:
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#0284c7', fontSize: '0.7rem' }}>
-                    Negociar mejor precio con proveedores o subir $1.000 COP al precio para convertirlos en Estrellas.
-                  </Typography>
-                </Box>
-              </Paper>
-            </Grid>
-
-            {/* 🧩 ROMPECABEZAS */}
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <Paper
-                elevation={0}
-                onClick={() => setMatrixFilter(matrixFilter === 'ROMPECABEZAS' ? 'ALL' : 'ROMPECABEZAS')}
-                sx={{
-                  p: 2.5,
-                  borderRadius: '20px',
-                  border: matrixFilter === 'ROMPECABEZAS' ? '2px solid #9333ea' : '1px solid #e9d5ff',
-                  bgcolor: '#faf5ff',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 8px 20px rgba(147, 51, 234, 0.15)' }
-                }}
-              >
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#6b21a8', display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                    🧩 PUZZLES ({summaryKPIs.puzzlesCount})
-                  </Typography>
-                  <Chip label="Baja Venta • Alto Margen" size="small" sx={{ fontWeight: 800, fontSize: '0.65rem', bgcolor: '#f3e8ff', color: '#581c87' }} />
-                </Box>
-                <Typography variant="body2" sx={{ fontSize: '0.78rem', color: '#581c87', mb: 1.5, minHeight: 44 }}>
-                  Platos con excelente rentabilidad pero que los comensales piden con poca frecuencia.
-                </Typography>
-                <Box sx={{ p: 1.2, bgcolor: '#ffffff', borderRadius: '12px', border: '1px solid #e9d5ff' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#6b21a8', display: 'block' }}>
-                    💡 Estrategia Sugerida:
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#7e22ce', fontSize: '0.7rem' }}>
-                    Entrenar al personal de sala (meseros) para sugerirlos como especial del día o mejorar el emplatado.
-                  </Typography>
-                </Box>
-              </Paper>
-            </Grid>
-
-            {/* 🐕 PERROS */}
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <Paper
-                elevation={0}
-                onClick={() => setMatrixFilter(matrixFilter === 'PERRO' ? 'ALL' : 'PERRO')}
-                sx={{
-                  p: 2.5,
-                  borderRadius: '20px',
-                  border: matrixFilter === 'PERRO' ? '2px solid #dc2626' : '1px solid #fecaca',
-                  bgcolor: '#fff5f5',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 8px 20px rgba(220, 38, 38, 0.15)' }
-                }}
-              >
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#991b1b', display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                    🐕 PERROS ({summaryKPIs.dogsCount})
-                  </Typography>
-                  <Chip label="Baja Venta • Bajo Margen" size="small" sx={{ fontWeight: 800, fontSize: '0.65rem', bgcolor: '#fee2e2', color: '#7f1d1d' }} />
-                </Box>
-                <Typography variant="body2" sx={{ fontSize: '0.78rem', color: '#7f1d1d', mb: 1.5, minHeight: 44 }}>
-                  Platos poco solicitados que además generan bajo margen de ganancia al restaurante.
-                </Typography>
-                <Box sx={{ p: 1.2, bgcolor: '#ffffff', borderRadius: '12px', border: '1px solid #fecaca' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#991b1b', display: 'block' }}>
-                    💡 Estrategia Sugerida:
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#b91c1c', fontSize: '0.7rem' }}>
-                    Reformular receta para bajar costos o retirarlos en el próximo cambio de carta.
-                  </Typography>
-                </Box>
-              </Paper>
-            </Grid>
-          </Grid>
-
-          {/* Lista de Platos en la Matriz con Filtro Activo */}
-          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#1e290b' }}>
-              {matrixFilter === 'ALL'
-                ? 'Todos los Platillos Clasificados en la Carta Gastronómica:'
-                : `Platos Filtrados en Cuadrante ${matrixFilter}:`}
-            </Typography>
-            {matrixFilter !== 'ALL' && (
-              <Button size="small" onClick={() => setMatrixFilter('ALL')} sx={{ fontWeight: 700 }}>
-                Quitar Filtro de Cuadrante
-              </Button>
-            )}
-          </Box>
-
-          <Grid container spacing={2}>
-            {recipes.filter(r => matrixFilter === 'ALL' || getRecipeMatrixCategory(r) === matrixFilter).map(r => {
-              const fin = getRecipeFinancials(r);
-              const cat = getRecipeMatrixCategory(r);
-              const sales = productSalesMap[r.productId] || (Math.floor(Number(r.productId) * 7) % 35 + 5);
-
-              return (
-                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={r.productId}>
-                  <Paper elevation={0} sx={{ p: 2, borderRadius: '16px', border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#1e290b' }}>
-                        {fin.product?.name || r.productName}
-                      </Typography>
-                      <Chip
-                        label={
-                          cat === 'ESTRELLA' ? '🌟 Estrella' :
-                          cat === 'CABALLO' ? '🐎 Caballo' :
-                          cat === 'ROMPECABEZAS' ? '🧩 Puzzle' : '🐕 Perro'
-                        }
-                        size="small"
-                        sx={{
-                          fontWeight: 900,
-                          fontSize: '0.68rem',
-                          bgcolor: cat === 'ESTRELLA' ? '#fef3c7' : cat === 'CABALLO' ? '#e0f2fe' : cat === 'ROMPECABEZAS' ? '#f3e8ff' : '#fee2e2',
-                          color: cat === 'ESTRELLA' ? '#92400e' : cat === 'CABALLO' ? '#0369a1' : cat === 'ROMPECABEZAS' ? '#6b21a8' : '#991b1b'
-                        }}
-                      />
-                    </Box>
-
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', bgcolor: '#f8fafc', p: 1, borderRadius: '10px', mb: 1.5 }}>
-                      <Box>
-                        <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.68rem' }}>Ventas Período:</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 800 }}>{sales} uds</Typography>
-                      </Box>
-                      <Box>
-                        <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.68rem' }}>Margen Unitario:</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 800, color: '#16a34a' }}>+${fin.grossMargin.toLocaleString()}</Typography>
-                      </Box>
-                      <Box sx={{ textAlign: 'right' }}>
-                        <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.68rem' }}>Food Cost:</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 800, color: fin.foodCostPercent <= 35 ? '#16a34a' : '#d97706' }}>
-                          {fin.foodCostPercent.toFixed(1)}%
-                        </Typography>
-                      </Box>
-                    </Box>
-
-                    <Button
-                      fullWidth
-                      size="small"
-                      variant="outlined"
-                      startIcon={<CalculateIcon sx={{ fontSize: 14 }} />}
-                      onClick={() => handleOpenSimulator(r)}
-                      sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 700, fontSize: '0.72rem' }}
-                    >
-                      Simular Optimización
-                    </Button>
-                  </Paper>
-                </Grid>
-              );
-            })}
-          </Grid>
-        </Box>
-      )}
-
-      {/* TAB 2: SIMULADOR DE COSTOS & BATCH COOKING (LOTES) */}
-      {mainTab === 2 && (
-        <Box>
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b' }}>
-              Simulador Financiero & Calculadora de Producción en Lotes
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Selecciona cualquier receta del menú para calcular los insumos y costos requeridos para eventos, banquetes o preparación de mise en place masiva.
-            </Typography>
-          </Box>
-
-          <Paper elevation={0} sx={{ p: 3, borderRadius: '20px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', mb: 3 }}>
-            <Grid container spacing={3}>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
-                  Selecciona la Receta a Simular:
-                </Typography>
-                <TextField
-                  select
-                  fullWidth
-                  value={simulatingRecipe?.productId || recipes[0]?.productId || ''}
-                  onChange={(e) => {
-                    const found = recipes.find(r => r.productId === e.target.value);
-                    if (found) {
-                      const fin = getRecipeFinancials(found);
-                      setSimulatingRecipe(found);
-                      setSimulatedPrice(fin.salePrice);
-                    }
-                  }}
-                  slotProps={{ input: { sx: { borderRadius: '12px', fontWeight: 700 } } }}
-                >
-                  {recipes.map(r => (
-                    <MenuItem key={r.productId} value={r.productId}>
-                      {r.productName || 'Plato'} ({r.station || 'COCINA'})
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-
-              <Grid size={{ xs: 12, md: 6 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
-                  Número de Raciones / Porciones a Preparar:
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                  <Slider
-                    value={simulatedBatchSize}
-                    min={1}
-                    max={100}
-                    onChange={(_, val) => setSimulatedBatchSize(val as number)}
-                    sx={{ color: '#84cc16' }}
-                  />
-                  <Chip
-                    label={`${simulatedBatchSize} porciones`}
-                    sx={{ fontWeight: 900, bgcolor: '#1e290b', color: '#ffffff', minWidth: 100 }}
-                  />
-                </Box>
-              </Grid>
-            </Grid>
-
-            {simulatingRecipe && (() => {
-              const fin = getRecipeFinancials(simulatingRecipe);
-              const batchTotalCost = fin.totalCost * simulatedBatchSize;
-              const batchRevenue = simulatedPrice * simulatedBatchSize;
-              const batchProfit = batchRevenue - batchTotalCost;
-
-              return (
-                <Box sx={{ mt: 3, pt: 3, borderTop: '1px dashed #e2e8f0' }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#1e290b', mb: 2 }}>
-                    Requerimiento Total de Insumos para {simulatedBatchSize} Raciones:
-                  </Typography>
-
-                  <Grid container spacing={2} sx={{ mb: 3 }}>
-                    <Grid size={{ xs: 12, sm: 4 }}>
-                      <Paper elevation={0} sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
-                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700 }}>Inversión en Insumos:</Typography>
-                        <Typography variant="h5" sx={{ fontWeight: 900, color: '#dc2626' }}>
-                          ${Math.round(batchTotalCost).toLocaleString()} COP
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                          ${fin.totalCost.toLocaleString()} costo por unidad
-                        </Typography>
-                      </Paper>
-                    </Grid>
-
-                    <Grid size={{ xs: 12, sm: 4 }}>
-                      <Paper elevation={0} sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
-                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700 }}>Facturación Estimada:</Typography>
-                        <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b' }}>
-                          ${Math.round(batchRevenue).toLocaleString()} COP
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                          ${simulatedPrice.toLocaleString()} precio carta
-                        </Typography>
-                      </Paper>
-                    </Grid>
-
-                    <Grid size={{ xs: 12, sm: 4 }}>
-                      <Paper elevation={0} sx={{ p: 2, bgcolor: '#f0fdf4', borderRadius: '14px', border: '1px solid #bbf7d0' }}>
-                        <Typography variant="caption" sx={{ color: '#16a34a', fontWeight: 700 }}>Utilidad Neta de la Tanda:</Typography>
-                        <Typography variant="h5" sx={{ fontWeight: 900, color: '#16a34a' }}>
-                          +${Math.round(batchProfit).toLocaleString()} COP
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: '#15803d', fontWeight: 700 }}>
-                          +{fin.grossMarginPercent.toFixed(1)}% Margen Comercial
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                  </Grid>
-
-                  {/* Tabla de Requerimiento de Insumos para la Tanda */}
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', display: 'block', mb: 1, textTransform: 'uppercase' }}>
-                    Lista de Picking / Despacho para Bodega:
-                  </Typography>
-                  <TableContainer component={Paper} elevation={0} sx={{ borderRadius: '14px', border: '1px solid #e2e8f0' }}>
-                    <Table size="small">
-                      <TableHead sx={{ bgcolor: '#f8fafc' }}>
-                        <TableRow>
-                          <TableCell sx={{ fontWeight: 800 }}>Insumo de Almacén</TableCell>
-                          <TableCell sx={{ fontWeight: 800 }}>Porción Individual</TableCell>
-                          <TableCell sx={{ fontWeight: 800 }}>Total a Pesar / Despachar</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 800 }}>Costo Acumulado</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {fin.ingredientsDetailed.map((ing, idx) => {
-                          const totalBatchQty = (ing.quantity * simulatedBatchSize).toFixed(2);
-                          const totalBatchItemCost = ing.calculatedCost * simulatedBatchSize;
-                          return (
-                            <TableRow key={idx} hover>
-                              <TableCell sx={{ fontWeight: 800, color: '#1e290b' }}>
-                                {ing.invItem?.name || 'Insumo'}
-                              </TableCell>
-                              <TableCell sx={{ color: '#64748b' }}>
-                                {ing.quantity} {ing.unit || ing.invItem?.unit}
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: 900, color: '#0284c7' }}>
-                                {totalBatchQty} {ing.unit || ing.invItem?.unit}
-                              </TableCell>
-                              <TableCell align="right" sx={{ fontWeight: 800, color: '#1e290b' }}>
-                                ${Math.round(totalBatchItemCost).toLocaleString()} COP
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </Box>
-              );
-            })()}
-          </Paper>
-        </Box>
-      )}
-
-      {/* TAB 3: AUDITORÍA DE FOOD COST */}
-      {mainTab === 3 && (
         <Box>
           <Box sx={{ mb: 3 }}>
             <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b' }}>
@@ -2311,106 +1791,6 @@ export default function RecipesScreen() {
             sx={{ borderRadius: '12px', fontWeight: 900, bgcolor: '#1e290b', px: 3, '&:hover': { bgcolor: '#2d3e11' } }}
           >
             Guardar Escandallo
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* MODAL SIMULADOR SENSIBLE */}
-      <Dialog
-        open={isSimulatorOpen}
-        onClose={() => setIsSimulatorOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        slotProps={{ paper: { sx: { borderRadius: '24px', p: 1 } } }}
-      >
-        <DialogTitle sx={{ pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" sx={{ fontWeight: 900, color: '#1e290b' }}>
-            Simulador de Rentabilidad & Inflación
-          </Typography>
-          <IconButton size="small" onClick={() => setIsSimulatorOpen(false)}>
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-
-        <DialogContent dividers sx={{ p: 3 }}>
-          {simulatingRecipe && (() => {
-            const fin = getRecipeFinancials(simulatingRecipe);
-            const baseIngredients = fin.rawIngredientsCost * (1 + simulatedCostVariation / 100);
-            const baseCost = baseIngredients + fin.packagingCost;
-            const simTotalCost = Math.round(baseCost + (baseCost * fin.wastePercent) / 100);
-            const simMargin = simulatedPrice - simTotalCost;
-            const simMarginPercent = simulatedPrice > 0 ? (simMargin / simulatedPrice) * 100 : 0;
-            const simFoodCostPercent = simulatedPrice > 0 ? (simTotalCost / simulatedPrice) * 100 : 0;
-
-            return (
-              <Stack spacing={3}>
-                <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#1e290b' }}>
-                    {fin.product?.name || simulatingRecipe.productName}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Costo real en almacén: ${fin.totalCost.toLocaleString()} • Precio base: ${fin.salePrice.toLocaleString()}
-                  </Typography>
-                </Box>
-
-                <Box>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', display: 'block', mb: 1 }}>
-                    Simular Precio de Venta al Público: ${simulatedPrice.toLocaleString()} COP
-                  </Typography>
-                  <Slider
-                    value={simulatedPrice}
-                    min={Math.round(fin.totalCost * 1.1)}
-                    max={Math.round(fin.salePrice * 1.6 || 60000)}
-                    step={500}
-                    onChange={(_, val) => setSimulatedPrice(val as number)}
-                    sx={{ color: '#84cc16' }}
-                  />
-                </Box>
-
-                <Box>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', display: 'block', mb: 1 }}>
-                    Simular Inflación / Variación en Insumos ({simulatedCostVariation > 0 ? `+${simulatedCostVariation}%` : `${simulatedCostVariation}%`}):
-                  </Typography>
-                  <Slider
-                    value={simulatedCostVariation}
-                    min={-30}
-                    max={50}
-                    step={5}
-                    onChange={(_, val) => setSimulatedCostVariation(val as number)}
-                    sx={{ color: simulatedCostVariation > 0 ? '#ef4444' : '#16a34a' }}
-                  />
-                </Box>
-
-                <Paper elevation={0} sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
-                  <Grid container spacing={2}>
-                    <Grid size={{ xs: 6 }}>
-                      <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700 }}>Nuevo Costo Total:</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 900, color: '#dc2626' }}>
-                        ${simTotalCost.toLocaleString()}
-                      </Typography>
-                    </Grid>
-                    <Grid size={{ xs: 6 }}>
-                      <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700 }}>Nuevo Margen Bruto:</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 900, color: '#16a34a' }}>
-                        +{simMarginPercent.toFixed(1)}% (${simMargin.toLocaleString()})
-                      </Typography>
-                    </Grid>
-                    <Grid size={{ xs: 12 }}>
-                      <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700 }}>Nuevo Food Cost %:</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 900, color: simFoodCostPercent <= 35 ? '#16a34a' : '#d97706' }}>
-                        {simFoodCostPercent.toFixed(1)}% {simFoodCostPercent <= 35 ? '✓ Saludable' : '⚠️ Crítico'}
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                </Paper>
-              </Stack>
-            );
-          })()}
-        </DialogContent>
-
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setIsSimulatorOpen(false)} sx={{ fontWeight: 700 }}>
-            Cerrar
           </Button>
         </DialogActions>
       </Dialog>
