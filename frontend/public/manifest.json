@@ -1,0 +1,34 @@
+{
+  "name": "Sésamo - Sistema POS & Restaurante",
+  "short_name": "Sésamo POS",
+  "description": "Sistema punto de venta, comandas, mesas, cocina y gestión gastronómica Sésamo.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1e290b",
+  "theme_color": "#65a30d",
+  "scope": "/",
+  "lang": "es",
+  "categories": ["business", "food", "productivity"],
+  "icons": [
+    {
+      "src": "/logo-icon.svg",
+      "sizes": "192x192 512x512 any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo-icon.png",
+      "sizes": "512x512 672x371",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "48x48 72x72 96x96",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

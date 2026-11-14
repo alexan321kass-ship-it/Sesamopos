@@ -19,7 +19,8 @@ import {
   Breadcrumbs,
   Link,
   Collapse,
-  Chip
+  Chip,
+  Button
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -36,6 +37,7 @@ import {
   Settings as SettingsIcon,
   LocalShipping as DeliveryIcon,
   ShoppingCart as PurchasesIcon,
+  GetApp as InstallIcon,
 } from '@mui/icons-material';
 import { useAuthStore } from '../store/authStore';
 
@@ -85,10 +87,40 @@ export default function MainLayout() {
     '5. Stock y Abastecimiento': true,
   });
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [isAppInstalled, setIsAppInstalled] = useState(false);
   
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
+
+  useEffect(() => {
+    // Check if app is already running in standalone desktop mode
+    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone) {
+      setIsAppInstalled(true);
+    }
+
+    const handler = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setInstallPrompt(null);
+        setIsAppInstalled(true);
+      }
+    } else {
+      alert('Para instalar Sésamo POS como app en tu computadora:\n\n1. En Google Chrome, mira arriba a la derecha en la barra de direcciones.\n2. Haz clic en el ícono de pantalla con una flecha hacia abajo (Instalar Sésamo POS).\n3. O abre el menú de Chrome (los 3 puntos ⋮) > "Guardar y compartir" > "Instalar Sésamo POS".');
+    }
+  };
 
   // Redirect role-restricted users if accessing unauthorized route
   useEffect(() => {
@@ -364,46 +396,85 @@ export default function MainLayout() {
             )}
           </Box>
 
-          <div>
-            <IconButton
-              size="large"
-              aria-label="account of current user"
-              aria-controls="menu-appbar"
-              aria-haspopup="true"
-              onClick={handleMenu}
-              color="inherit"
-            >
-              <Avatar sx={{ bgcolor: user?.role === 'COCINA' ? '#ea580c' : user?.role === 'MESERO' ? '#65a30d' : 'secondary.main', width: 32, height: 32 }}>
-                {user?.name?.charAt(0) || 'U'}
-              </Avatar>
-            </IconButton>
-            <Menu
-              id="menu-appbar"
-              anchorEl={anchorEl}
-              anchorOrigin={{
-                vertical: 'bottom',
-                horizontal: 'right',
-              }}
-              keepMounted
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'right',
-              }}
-              open={Boolean(anchorEl)}
-              onClose={handleClose}
-            >
-              <MenuItem disabled>
-                <Typography variant="body2">{user?.name} ({user?.role})</Typography>
-              </MenuItem>
-              <Divider />
-              <MenuItem onClick={handleLogout}>
-                <ListItemIcon>
-                  <Logout fontSize="small" />
-                </ListItemIcon>
-                Cerrar Sesión
-              </MenuItem>
-            </Menu>
-          </div>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            {!isAppInstalled && (
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<InstallIcon sx={{ fontSize: 17 }} />}
+                onClick={handleInstallClick}
+                sx={{
+                  borderRadius: 2,
+                  fontWeight: 800,
+                  textTransform: 'none',
+                  fontSize: '0.78rem',
+                  color: '#4d7c0f',
+                  borderColor: '#bef264',
+                  bgcolor: 'rgba(132, 204, 22, 0.1)',
+                  px: 1.5,
+                  py: 0.6,
+                  display: { xs: 'none', md: 'inline-flex' },
+                  '&:hover': {
+                    bgcolor: 'rgba(132, 204, 22, 0.2)',
+                    borderColor: '#84cc16',
+                  }
+                }}
+              >
+                Instalar App en PC
+              </Button>
+            )}
+
+            <div>
+              <IconButton
+                size="large"
+                aria-label="account of current user"
+                aria-controls="menu-appbar"
+                aria-haspopup="true"
+                onClick={handleMenu}
+                color="inherit"
+              >
+                <Avatar sx={{ bgcolor: user?.role === 'COCINA' ? '#ea580c' : user?.role === 'MESERO' ? '#65a30d' : 'secondary.main', width: 32, height: 32 }}>
+                  {user?.name?.charAt(0) || 'U'}
+                </Avatar>
+              </IconButton>
+              <Menu
+                id="menu-appbar"
+                anchorEl={anchorEl}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'right',
+                }}
+                keepMounted
+                transformOrigin={{
+                  vertical: 'top',
+                  horizontal: 'right',
+                }}
+                open={Boolean(anchorEl)}
+                onClose={handleClose}
+              >
+                <MenuItem disabled>
+                  <Typography variant="body2">{user?.name} ({user?.role})</Typography>
+                </MenuItem>
+                {!isAppInstalled && (
+                  <MenuItem onClick={() => { handleClose(); handleInstallClick(); }}>
+                    <ListItemIcon>
+                      <InstallIcon fontSize="small" sx={{ color: '#4d7c0f' }} />
+                    </ListItemIcon>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#4d7c0f' }}>
+                      Instalar en PC (Chrome)
+                    </Typography>
+                  </MenuItem>
+                )}
+                <Divider />
+                <MenuItem onClick={handleLogout}>
+                  <ListItemIcon>
+                    <Logout fontSize="small" />
+                  </ListItemIcon>
+                  Cerrar Sesión
+                </MenuItem>
+              </Menu>
+            </div>
+          </Box>
         </Toolbar>
       </AppBar>
       <Box
