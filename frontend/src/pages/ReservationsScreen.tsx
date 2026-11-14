@@ -56,6 +56,8 @@ import {
   Send as SendIcon,
   Stars as StarsIcon,
   WarningAmber as WarningIcon,
+  GridView as GridViewIcon,
+  ViewList as TableViewIcon,
 } from '@mui/icons-material';
 import { mockApi } from '../services/mockApi';
 import { Reservation, ReservationStatus, Table as RestaurantTable, Customer } from '../types';
@@ -427,181 +429,370 @@ export default function ReservationsScreen() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1600, mx: 'auto' }}>
-      {/* HEADER SECTION */}
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 2, mb: 3 }}>
+      {/* 1. HEADER SECTION */}
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { md: 'center' }, gap: 2, mb: 3 }}>
         <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
             <Box
               sx={{
-                width: 44,
-                height: 44,
-                borderRadius: 2,
-                bgcolor: '#ecfccb',
+                width: 48,
+                height: 48,
+                borderRadius: 3,
+                bgcolor: '#1e290b',
+                color: '#84cc16',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#65a30d',
+                boxShadow: '0 4px 14px rgba(30, 41, 11, 0.2)',
+                flexShrink: 0,
               }}
             >
-              <EventIcon sx={{ fontSize: 28 }} />
+              <EventIcon sx={{ fontSize: 26 }} />
             </Box>
             <Box>
-              <Typography variant="h4" sx={{ fontWeight: 800, color: '#1e290b', letterSpacing: -0.5 }}>
-                Agenda de Reservas & Salón
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, flexWrap: 'wrap' }}>
+                <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b', letterSpacing: -0.5 }}>
+                  Agenda de Reservas & Salón
+                </Typography>
+                <Chip
+                  label="Recepción & Salón Activo"
+                  size="small"
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: '0.72rem',
+                    bgcolor: 'rgba(132, 204, 22, 0.15)',
+                    color: '#4d7c0f',
+                    borderRadius: 2,
+                    border: '1px solid #bef264',
+                    height: 24,
+                  }}
+                />
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.4 }}>
                 Control de mesas, recepción de comensales, ocasiones especiales y confirmaciones WhatsApp automáticas.
               </Typography>
             </Box>
           </Box>
         </Box>
 
-        <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
+        {/* Action Buttons Toolbar */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, flexWrap: 'wrap', flexShrink: 0 }}>
           <Button
             variant="outlined"
-            startIcon={<DownloadIcon />}
+            size="small"
+            startIcon={<DownloadIcon sx={{ fontSize: 18 }} />}
             onClick={handleExportCSV}
-            sx={{ borderColor: '#cbd5e1', color: '#334155' }}
+            sx={{
+              borderRadius: 2,
+              fontWeight: 800,
+              textTransform: 'none',
+              color: '#475569',
+              borderColor: '#e2e8f0',
+              bgcolor: '#ffffff',
+              px: 1.8,
+              py: 0.9,
+              '&:hover': { bgcolor: '#f8fafc', borderColor: '#cbd5e1' },
+            }}
           >
             Exportar CSV
           </Button>
           <Button
             variant="outlined"
-            startIcon={<RefreshIcon />}
+            size="small"
+            startIcon={<RefreshIcon sx={{ fontSize: 18 }} />}
             onClick={loadData}
-            sx={{ borderColor: '#cbd5e1', color: '#334155' }}
+            sx={{
+              borderRadius: 2,
+              fontWeight: 800,
+              textTransform: 'none',
+              color: '#475569',
+              borderColor: '#e2e8f0',
+              bgcolor: '#ffffff',
+              px: 1.8,
+              py: 0.9,
+              '&:hover': { bgcolor: '#f8fafc', borderColor: '#cbd5e1' },
+            }}
           >
             Sincronizar
           </Button>
           <Button
             variant="contained"
-            color="primary"
-            startIcon={<AddIcon />}
+            size="small"
+            startIcon={<AddIcon sx={{ fontSize: 18 }} />}
             onClick={handleOpenCreateModal}
-            sx={{ fontWeight: 'bold', px: 2.5, bgcolor: '#65a30d', '&:hover': { bgcolor: '#4d7c0f' } }}
+            sx={{
+              borderRadius: 2,
+              fontWeight: 900,
+              textTransform: 'none',
+              bgcolor: '#1e290b',
+              color: '#ffffff',
+              px: 2.2,
+              py: 0.9,
+              boxShadow: '0 4px 14px rgba(30, 41, 11, 0.25)',
+              '&:hover': { bgcolor: '#2a3b0f', boxShadow: '0 6px 18px rgba(30, 41, 11, 0.35)' },
+            }}
           >
             Nueva Reserva
           </Button>
-        </Stack>
+        </Box>
       </Box>
 
-      {/* KPI RIBBON */}
+      {/* 2. KPI RIBBON */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
-          <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: 2.5, bgcolor: '#ffffff' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-                Reservas Hoy
+        {/* KPI 1: Reservas Hoy */}
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              bgcolor: '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': { borderColor: '#cbd5e1', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(0,0,0,0.06)' },
+            }}
+          >
+            <Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: '#ecfccb', color: '#65a30d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <EventIcon sx={{ fontSize: 18 }} />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
+                    Reservas Hoy
+                  </Typography>
+                </Box>
+                <Chip
+                  label="HOY"
+                  size="small"
+                  sx={{ height: 20, fontSize: '0.65rem', fontWeight: 900, bgcolor: '#ecfccb', color: '#4d7c0f' }}
+                />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#1e290b', mb: 0.5, letterSpacing: -0.5 }}>
+                {kpis.todayCount}
               </Typography>
-              <EventIcon sx={{ fontSize: 20, color: '#65a30d' }} />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#1e290b' }}>
-              {kpis.todayCount}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Agendadas para el día de hoy
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+              Agendadas para la jornada de hoy
             </Typography>
           </Paper>
         </Grid>
 
-        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
-          <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: 2.5, bgcolor: '#ffffff' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-                Comensales (Pax)
+        {/* KPI 2: Comensales (Pax) */}
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              bgcolor: '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': { borderColor: '#cbd5e1', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(0,0,0,0.06)' },
+            }}
+          >
+            <Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <PeopleIcon sx={{ fontSize: 18 }} />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
+                    Comensales (Pax)
+                  </Typography>
+                </Box>
+                <Chip
+                  label="PAX"
+                  size="small"
+                  sx={{ height: 20, fontSize: '0.65rem', fontWeight: 900, bgcolor: '#e0f2fe', color: '#0369a1' }}
+                />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#0284c7', mb: 0.5, letterSpacing: -0.5 }}>
+                {kpis.todayGuests}
               </Typography>
-              <PeopleIcon sx={{ fontSize: 20, color: '#0284c7' }} />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#0284c7' }}>
-              {kpis.todayGuests}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
               Personas esperadas en salón
             </Typography>
           </Paper>
         </Grid>
 
-        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
-          <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: 2.5, bgcolor: '#ffffff' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-                Por Confirmar
+        {/* KPI 3: Por Confirmar */}
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid',
+              borderColor: kpis.pendingCount > 0 ? '#fed7aa' : '#e2e8f0',
+              borderRadius: 3,
+              bgcolor: kpis.pendingCount > 0 ? '#fffbeb' : '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': { borderColor: kpis.pendingCount > 0 ? '#f97316' : '#cbd5e1', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(0,0,0,0.06)' },
+            }}
+          >
+            <Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <WarningIcon sx={{ fontSize: 18 }} />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
+                    Por Confirmar
+                  </Typography>
+                </Box>
+                <Chip
+                  label={kpis.pendingCount > 0 ? `${kpis.pendingCount} req.` : 'Al día'}
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: '0.65rem',
+                    fontWeight: 900,
+                    bgcolor: kpis.pendingCount > 0 ? '#ffedd5' : '#dcfce7',
+                    color: kpis.pendingCount > 0 ? '#c2410c' : '#15803d',
+                  }}
+                />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: kpis.pendingCount > 0 ? '#d97706' : '#1e290b', mb: 0.5, letterSpacing: -0.5 }}>
+                {kpis.pendingCount}
               </Typography>
-              <Chip
-                label={kpis.pendingCount > 0 ? `${kpis.pendingCount} req.` : 'Al día'}
-                size="small"
-                color={kpis.pendingCount > 0 ? 'warning' : 'success'}
-                sx={{ height: 20, fontSize: '0.65rem', fontWeight: 'bold' }}
-              />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: kpis.pendingCount > 0 ? '#d97706' : '#1e290b' }}>
-              {kpis.pendingCount}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
               Esperando WhatsApp / llamada
             </Typography>
           </Paper>
         </Grid>
 
-        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
-          <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: 2.5, bgcolor: '#ffffff' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-                Salón Ocupado
-              </Typography>
-              <ChairIcon sx={{ fontSize: 20, color: '#7c3aed' }} />
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-              <Typography variant="h4" sx={{ fontWeight: 800, color: '#7c3aed' }}>
+        {/* KPI 4: Salón Ocupado */}
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              bgcolor: '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': { borderColor: '#cbd5e1', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(0,0,0,0.06)' },
+            }}
+          >
+            <Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: '#f5f3ff', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <ChairIcon sx={{ fontSize: 18 }} />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
+                    Salón Ocupado
+                  </Typography>
+                </Box>
+                <Chip
+                  label={`${kpis.occupiedTables + kpis.reservedTables}/${tables.length} mesas`}
+                  size="small"
+                  sx={{ height: 20, fontSize: '0.65rem', fontWeight: 900, bgcolor: '#f5f3ff', color: '#6d28d9' }}
+                />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#7c3aed', mb: 0.5, letterSpacing: -0.5 }}>
                 {kpis.salonOccupancyPct}%
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b' }}>
-                ({kpis.occupiedTables + kpis.reservedTables}/{tables.length} mesas)
-              </Typography>
             </Box>
-            <Typography variant="caption" color="text.secondary">
-              {kpis.seatedCount} reservas sentadas
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+              {kpis.seatedCount} reservas sentadas activas
             </Typography>
           </Paper>
         </Grid>
 
-        <Grid size={{ xs: 12, sm: 4, md: 2.4 }}>
-          <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: 2.5, bgcolor: '#ffffff' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-                Anticipos / Garantías
+        {/* KPI 5: Anticipos / Garantías */}
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              bgcolor: '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': { borderColor: '#cbd5e1', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(0,0,0,0.06)' },
+            }}
+          >
+            <Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <MoneyIcon sx={{ fontSize: 18 }} />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
+                    Anticipos & Garantías
+                  </Typography>
+                </Box>
+                <Chip
+                  label={`${depositReservations.length} depósitos`}
+                  size="small"
+                  sx={{ height: 20, fontSize: '0.65rem', fontWeight: 900, bgcolor: '#dcfce7', color: '#15803d' }}
+                />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#16a34a', mb: 0.5, letterSpacing: -0.5 }}>
+                ${kpis.totalDeposits.toLocaleString('es-CO')}
               </Typography>
-              <MoneyIcon sx={{ fontSize: 20, color: '#16a34a' }} />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#16a34a' }}>
-              ${kpis.totalDeposits.toLocaleString()}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {depositReservations.length} depósitos registrados
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+              Garantías y abonos registrados
             </Typography>
           </Paper>
         </Grid>
       </Grid>
 
-      {/* MODULE NAVIGATION TABS */}
-      <Paper elevation={0} sx={{ borderBottom: '1px solid #e2e8f0', mb: 3, borderRadius: '12px 12px 0 0', bgcolor: '#ffffff' }}>
+      {/* 3. NAVIGATION TABS */}
+      <Box sx={{ borderBottom: 1, borderColor: '#e2e8f0', mb: 3 }}>
         <Tabs
           value={currentTab}
           onChange={(_, v) => setCurrentTab(v)}
           variant="scrollable"
           scrollButtons="auto"
           sx={{
-            '& .MuiTab-root': { fontWeight: 700, textTransform: 'none', minHeight: 52, fontSize: '0.95rem' },
-            '& .Mui-selected': { color: '#65a30d !important' },
-            '& .MuiTabs-indicator': { backgroundColor: '#65a30d', height: 3 },
+            minHeight: 48,
+            '& .MuiTab-root': {
+              fontWeight: 800,
+              fontSize: '0.88rem',
+              textTransform: 'none',
+              minHeight: 48,
+              color: '#64748b',
+              '&.Mui-selected': { color: '#1e290b' },
+            },
+            '& .MuiTabs-indicator': { bgcolor: '#84cc16', height: 3, borderRadius: '3px 3px 0 0' },
           }}
         >
-          <Tab icon={<EventIcon />} iconPosition="start" label={`Cronograma & Reservas (${filteredReservations.length})`} />
-          <Tab icon={<TableIcon />} iconPosition="start" label={`Mapa de Salón & Mesas (${tables.length})`} />
-          <Tab icon={<CelebrationIcon />} iconPosition="start" label={`Celebraciones & Ocasiones (${celebrationReservations.length})`} />
-          <Tab icon={<MoneyIcon />} iconPosition="start" label={`Anticipos & Garantías (${depositReservations.length})`} />
+          <Tab icon={<EventIcon sx={{ fontSize: 18 }} />} iconPosition="start" label={`Cronograma & Reservas (${filteredReservations.length})`} />
+          <Tab icon={<TableIcon sx={{ fontSize: 18 }} />} iconPosition="start" label={`Mapa de Salón & Mesas (${tables.length})`} />
+          <Tab icon={<CelebrationIcon sx={{ fontSize: 18 }} />} iconPosition="start" label={`Celebraciones & Ocasiones (${celebrationReservations.length})`} />
+          <Tab icon={<MoneyIcon sx={{ fontSize: 18 }} />} iconPosition="start" label={`Anticipos & Garantías (${depositReservations.length})`} />
         </Tabs>
-      </Paper>
+      </Box>
 
       {/* ======================================================== */}
       {/* TAB 0: CRONOGRAMA & RESERVAS ACTIVAS                     */}
@@ -609,9 +800,9 @@ export default function ReservationsScreen() {
       {currentTab === 0 && (
         <Box>
           {/* FILTER & TIMELINE TOOLBAR */}
-          <Paper elevation={0} sx={{ p: 2, mb: 3, border: '1px solid #e2e8f0', borderRadius: 2.5, bgcolor: '#ffffff' }}>
+          <Paper elevation={0} sx={{ p: 2, mb: 3, border: '1px solid #e2e8f0', borderRadius: 3, bgcolor: '#ffffff', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
             <Grid container spacing={2} sx={{ alignItems: 'center' }}>
-              <Grid size={{ xs: 12, md: 3.5 }}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -625,6 +816,7 @@ export default function ReservationsScreen() {
                           <SearchIcon color="action" fontSize="small" />
                         </InputAdornment>
                       ),
+                      sx: { borderRadius: 2, bgcolor: '#f8fafc' },
                     },
                   }}
                 />
@@ -638,6 +830,9 @@ export default function ReservationsScreen() {
                   label="Día / Período"
                   value={selectedDayFilter}
                   onChange={(e) => setSelectedDayFilter(e.target.value as any)}
+                  slotProps={{
+                    input: { sx: { borderRadius: 2 } }
+                  }}
                 >
                   <MenuItem value="HOY">📅 Hoy ({reservations.filter(r => isToday(r.date)).length})</MenuItem>
                   <MenuItem value="MANANA">Mañana ({reservations.filter(r => isTomorrow(r.date)).length})</MenuItem>
@@ -654,6 +849,9 @@ export default function ReservationsScreen() {
                   label="Estado de Reserva"
                   value={selectedStatus}
                   onChange={(e) => setSelectedStatus(e.target.value)}
+                  slotProps={{
+                    input: { sx: { borderRadius: 2 } }
+                  }}
                 >
                   <MenuItem value="TODOS">Todos los Estados</MenuItem>
                   <MenuItem value="CONFIRMADA">Confirmadas</MenuItem>
@@ -665,37 +863,47 @@ export default function ReservationsScreen() {
                 </TextField>
               </Grid>
 
-              <Grid size={{ xs: 12, sm: 6, md: 3.5 }} sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
-                <Stack direction="row" spacing={1}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
+                <Box sx={{ display: 'inline-flex', bgcolor: '#f1f5f9', p: 0.5, borderRadius: 2, border: '1px solid #e2e8f0' }}>
                   <Button
-                    variant={viewMode === 'TIMELINE' ? 'contained' : 'outlined'}
                     size="small"
                     onClick={() => setViewMode('TIMELINE')}
+                    startIcon={<GridViewIcon sx={{ fontSize: 18 }} />}
                     sx={{
-                      fontWeight: 700,
-                      bgcolor: viewMode === 'TIMELINE' ? '#1e290b' : 'transparent',
-                      color: viewMode === 'TIMELINE' ? '#ffffff' : '#334155',
-                      borderColor: '#cbd5e1',
-                      '&:hover': { bgcolor: viewMode === 'TIMELINE' ? '#2e3d14' : '#f8fafc' }
+                      fontWeight: 800,
+                      fontSize: '0.8rem',
+                      textTransform: 'none',
+                      px: 1.5,
+                      py: 0.5,
+                      borderRadius: 1.5,
+                      bgcolor: viewMode === 'TIMELINE' ? '#ffffff' : 'transparent',
+                      color: viewMode === 'TIMELINE' ? '#1e290b' : '#64748b',
+                      boxShadow: viewMode === 'TIMELINE' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                      '&:hover': { bgcolor: viewMode === 'TIMELINE' ? '#ffffff' : 'rgba(0,0,0,0.04)' }
                     }}
                   >
-                    Tarjetas (Timeline)
+                    Tarjetas
                   </Button>
                   <Button
-                    variant={viewMode === 'TABLE' ? 'contained' : 'outlined'}
                     size="small"
                     onClick={() => setViewMode('TABLE')}
+                    startIcon={<TableViewIcon sx={{ fontSize: 18 }} />}
                     sx={{
-                      fontWeight: 700,
-                      bgcolor: viewMode === 'TABLE' ? '#1e290b' : 'transparent',
-                      color: viewMode === 'TABLE' ? '#ffffff' : '#334155',
-                      borderColor: '#cbd5e1',
-                      '&:hover': { bgcolor: viewMode === 'TABLE' ? '#2e3d14' : '#f8fafc' }
+                      fontWeight: 800,
+                      fontSize: '0.8rem',
+                      textTransform: 'none',
+                      px: 1.5,
+                      py: 0.5,
+                      borderRadius: 1.5,
+                      bgcolor: viewMode === 'TABLE' ? '#ffffff' : 'transparent',
+                      color: viewMode === 'TABLE' ? '#1e290b' : '#64748b',
+                      boxShadow: viewMode === 'TABLE' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                      '&:hover': { bgcolor: viewMode === 'TABLE' ? '#ffffff' : 'rgba(0,0,0,0.04)' }
                     }}
                   >
-                    Tabla Detallada
+                    Tabla
                   </Button>
-                </Stack>
+                </Box>
               </Grid>
             </Grid>
           </Paper>
