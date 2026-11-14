@@ -439,76 +439,82 @@ export default function Dashboard() {
     };
   }, [orders, deliveries, tables, inventory, reservations, staff, tableMetrics, recipes, cashRegister]);
 
-  // Hourly sales distribution dynamically computed
+  // Hourly sales distribution dynamically computed according to actual sales hours & shift timing
   const hourlySalesData = useMemo(() => {
-    const SLOTS = [
-      { key: 11, hora: '11 AM' },
-      { key: 12, hora: '12 PM' },
-      { key: 13, hora: '1 PM' },
-      { key: 14, hora: '2 PM' },
-      { key: 15, hora: '3 PM' },
-      { key: 16, hora: '4 PM' },
-      { key: 17, hora: '5 PM' },
-      { key: 18, hora: '6 PM' },
-      { key: 19, hora: '7 PM' },
-      { key: 20, hora: '8 PM' },
-      { key: 21, hora: '9 PM' },
-      { key: 22, hora: '10 PM' },
-    ];
-
-    const salesBySlot: Record<number, { total: number; pedidos: number; salon: number; domicilios: number }> = {};
-    SLOTS.forEach((s) => {
-      salesBySlot[s.key] = { total: 0, pedidos: 0, salon: 0, domicilios: 0 };
-    });
-
-    const mapHourToSlot = (hour: number): number => {
-      if (hour >= 11 && hour <= 22) return hour;
-      if (hour === 23 || hour === 0) return 22;
-      if (hour === 1) return 21;
-      if (hour === 2) return 20;
-      if (hour === 3) return 19;
-      return 12;
+    const formatHourLabel = (h: number): string => {
+      const period = h >= 12 ? 'PM' : 'AM';
+      const hour12 = h % 12 === 0 ? 12 : h % 12;
+      return `${hour12} ${period}`;
     };
 
     const isShiftActive = Boolean(cashRegister && cashRegister.isOpen);
     const shiftStart = cashRegister?.openedAt || 0;
+    const now = new Date();
+    const currentHour = now.getHours();
 
+    const salesByHour: Record<number, { total: number; pedidos: number; salon: number; domicilios: number }> = {};
+    for (let h = 0; h < 24; h++) {
+      salesByHour[h] = { total: 0, pedidos: 0, salon: 0, domicilios: 0 };
+    }
+
+    const recordedHours: number[] = [currentHour];
+    if (isShiftActive && shiftStart > 0) {
+      recordedHours.push(new Date(shiftStart).getHours());
+    }
+
+    // Filtrar ventas de salón cobradas
     orders.forEach((o) => {
       if (o.status !== 'PAGADO') return;
       if (isShiftActive && ((o.paidAt && o.paidAt < shiftStart) || (!o.paidAt && o.createdAt < shiftStart))) return;
       const ts = Number(o.paidAt || o.createdAt) || Date.now();
       const h = new Date(ts).getHours();
-      const slot = mapHourToSlot(h);
-      if (salesBySlot[slot]) {
-        const amt = Number(o.total) || 0;
-        salesBySlot[slot].total += amt;
-        salesBySlot[slot].salon += amt;
-        salesBySlot[slot].pedidos += 1;
-      }
+      recordedHours.push(h);
+      const amt = Number(o.total) || 0;
+      salesByHour[h].total += amt;
+      salesByHour[h].salon += amt;
+      salesByHour[h].pedidos += 1;
     });
 
+    // Filtrar domicilios entregados o cobrados
     deliveries.forEach((d) => {
       const isDeliveredOrPaid = d.deliveryStatus === 'ENTREGADO' || d.status === 'ENTREGADO' || d.status === 'PAGADO';
       if (!isDeliveredOrPaid) return;
       if (isShiftActive && ((d.deliveredAt && d.deliveredAt < shiftStart) || (!d.deliveredAt && d.createdAt < shiftStart))) return;
       const ts = Number(d.deliveredAt || d.dispatchedAt || d.createdAt) || Date.now();
       const h = new Date(ts).getHours();
-      const slot = mapHourToSlot(h);
-      if (salesBySlot[slot]) {
-        const amt = Number(d.total) || 0;
-        salesBySlot[slot].total += amt;
-        salesBySlot[slot].domicilios += amt;
-        salesBySlot[slot].pedidos += 1;
-      }
+      recordedHours.push(h);
+      const amt = Number(d.total) || 0;
+      salesByHour[h].total += amt;
+      salesByHour[h].domicilios += amt;
+      salesByHour[h].pedidos += 1;
     });
 
-    return SLOTS.map((s) => ({
-      hora: s.hora,
-      total: salesBySlot[s.key].total,
-      pedidos: salesBySlot[s.key].pedidos,
-      salon: salesBySlot[s.key].salon,
-      domicilios: salesBySlot[s.key].domicilios,
-    }));
+    // Rango dinámico de horas: desde la hora más temprana con actividad hasta la más tardía
+    let minHour = Math.min(...recordedHours);
+    let maxHour = Math.max(...recordedHours);
+
+    // Aseguramos una ventana mínima de al menos 4 franjas para que la curva tenga buen aspecto visual
+    if (maxHour - minHour < 3) {
+      minHour = Math.max(0, minHour - 1);
+      maxHour = Math.min(23, maxHour + 2);
+      if (maxHour - minHour < 3 && minHour > 0) {
+        minHour = Math.max(0, minHour - 1);
+      }
+    }
+
+    const result = [];
+    for (let h = minHour; h <= maxHour; h++) {
+      result.push({
+        hora: formatHourLabel(h),
+        hour: h,
+        total: salesByHour[h].total,
+        pedidos: salesByHour[h].pedidos,
+        salon: salesByHour[h].salon,
+        domicilios: salesByHour[h].domicilios,
+      });
+    }
+
+    return result;
   }, [orders, deliveries, cashRegister]);
 
   // Top selling products with profit margin
