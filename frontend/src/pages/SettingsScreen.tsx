@@ -30,7 +30,7 @@ import {
   LockClock as LockClockIcon,
   Shield as SecurityIcon
 } from '@mui/icons-material';
-import { mockApi } from '../services/mockApi';
+import { mockApi, getApiUrl, setApiUrl } from '../services/mockApi';
 import { StoreSettings } from '../types';
 import { useAuthStore } from '../store/authStore';
 import { Navigate } from 'react-router-dom';
@@ -72,6 +72,8 @@ export default function SettingsScreen() {
     latencyMs: 35,
     lastCheck: null,
   });
+  const [apiUrlInput, setApiUrlInput] = useState<string>(() => getApiUrl());
+  const [apiUrlSaved, setApiUrlSaved] = useState(false);
   const [isPinging, setIsPinging] = useState(false);
 
   useEffect(() => {
@@ -88,14 +90,14 @@ export default function SettingsScreen() {
       if (stats && stats.connected) {
         setDbHealth({
           connected: true,
-          engine: stats.engine || 'PostgreSQL 18 (Prisma)',
+          engine: stats.engine || 'Neon PostgreSQL (Prisma)',
           latencyMs: latency,
           lastCheck: new Date(),
         });
       } else {
         setDbHealth({
           connected: false,
-          engine: 'Almacenamiento Local (Sincronizado)',
+          engine: 'Modo Local / Desconectado',
           latencyMs: latency,
           lastCheck: new Date(),
         });
@@ -103,13 +105,20 @@ export default function SettingsScreen() {
     } catch (e) {
       setDbHealth({
         connected: false,
-        engine: 'Error de Conexión',
+        engine: 'Modo Local / Desconectado',
         latencyMs: 0,
         lastCheck: new Date(),
       });
     } finally {
       setIsPinging(false);
     }
+  };
+
+  const handleSaveApiUrl = () => {
+    setApiUrl(apiUrlInput);
+    setApiUrlSaved(true);
+    setTimeout(() => setApiUrlSaved(false), 3000);
+    checkDatabaseHealth();
   };
 
   const loadSettings = async () => {
@@ -509,6 +518,46 @@ export default function SettingsScreen() {
               </Box>
             </Grid>
           </Grid>
+
+          {/* Configuración de Endpoint Backend Cloud */}
+          <Box sx={{ mt: 3, p: 2.5, bgcolor: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1e290b' }}>
+                🌐 URL del Backend en la Nube (Render / Vercel)
+              </Typography>
+              {apiUrlSaved && (
+                <Chip label="¡URL guardada con éxito!" size="small" color="success" sx={{ fontWeight: 700 }} />
+              )}
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+              Ingresa aquí la URL de tu backend desplegado en Render (por ejemplo: <code>https://tu-servicio.onrender.com/api</code>). Si cambias la URL o estás en un dispositivo nuevo, puedes guardarla aquí directamente para sincronizar con la base de datos en Neon.
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+              <TextField
+                fullWidth
+                size="small"
+                value={apiUrlInput}
+                onChange={(e) => setApiUrlInput(e.target.value)}
+                placeholder="https://tu-servicio-render.onrender.com/api"
+                sx={{ flex: 1, minWidth: 260, bgcolor: '#ffffff' }}
+                slotProps={{ input: { sx: { borderRadius: '10px' } } }}
+              />
+              <Button
+                variant="contained"
+                onClick={handleSaveApiUrl}
+                disabled={isPinging}
+                sx={{
+                  borderRadius: '10px',
+                  textTransform: 'none',
+                  fontWeight: 800,
+                  bgcolor: 'primary.main',
+                  px: 3,
+                }}
+              >
+                {isPinging ? 'Comprobando...' : 'Guardar & Conectar'}
+              </Button>
+            </Box>
+          </Box>
         </Paper>
 
         {/* Card 5: Seguridad y Control de Sesión */}

@@ -25,8 +25,10 @@ export class DatabaseService implements OnModuleInit {
   async onModuleInit() {
     try {
       const userCount = await this.prisma.user.count();
-      this.logger.log(`🐘 Conectado a PostgreSQL en sesamo DB. (${userCount} usuarios registrados)`);
-      if (userCount === 0) {
+      const productCount = await this.prisma.product.count();
+      this.logger.log(`🐘 Conectado a PostgreSQL en sesamo DB (${userCount} usuarios, ${productCount} productos registrados).`);
+      if (userCount === 0 || productCount === 0) {
+        this.logger.log('🌱 Inicializando o completando siembra de datos desde database.json...');
         await this.seedFromDatabaseJson();
       } else {
         this.logger.log('✨ Base de datos ya inicializada con datos. Omitiendo sobrescritura de seed.');

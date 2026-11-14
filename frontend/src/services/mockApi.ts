@@ -3,7 +3,25 @@ import { User, StaffMember, StaffShiftRecord, Category, Product, Table, Order, I
 import { playKitchenBellSound } from '../utils/audioAlerts';
 import { notifyRealtimeEvent } from './eventBus';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+export const getApiUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem('sesamo_api_url');
+    if (custom) return custom.trim().replace(/\/$/, '');
+  }
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl) return envUrl.trim().replace(/\/$/, '');
+  return 'http://localhost:3001/api';
+};
+
+export const setApiUrl = (url: string) => {
+  if (typeof window !== 'undefined') {
+    if (url && url.trim()) {
+      localStorage.setItem('sesamo_api_url', url.trim().replace(/\/$/, ''));
+    } else {
+      localStorage.removeItem('sesamo_api_url');
+    }
+  }
+};
 
 const getStoredUserRole = (): string | undefined => {
   try {
@@ -363,7 +381,7 @@ export const saveStoredDeliveries = (deliveries: DeliveryOrder[]) => {
 const delay = (_ms?: number) => Promise.resolve();
 
 // Reliable fetch helper with 5000ms timeout for database queries
-const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 5000): Promise<Response> => {
+const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 25000): Promise<Response> => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -677,7 +695,7 @@ export const mockApi = {
   auth: {
     login: async (email: string, password?: string): Promise<User> => {
       try {
-        const response = await fetchWithTimeout(`${API_URL}/auth/login`, {
+        const response = await fetchWithTimeout(`${getApiUrl()}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password: password || '' })
@@ -718,7 +736,7 @@ export const mockApi = {
   categories: {
     getAll: async (): Promise<Category[]> => {
       try {
-        const response = await fetchWithTimeout(`${API_URL}/categories`);
+        const response = await fetchWithTimeout(`${getApiUrl()}/categories`);
         if (response.ok) return await response.json();
       } catch (e) {}
       return getStoredCategories();
@@ -730,7 +748,7 @@ export const mockApi = {
       }
       let created: Category | null = null;
       try {
-        const response = await fetchWithTimeout(`${API_URL}/categories`, {
+        const response = await fetchWithTimeout(`${getApiUrl()}/categories`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -754,7 +772,7 @@ export const mockApi = {
       }
       let updatedCat: Category | null = null;
       try {
-        const response = await fetchWithTimeout(`${API_URL}/categories/${id}`, {
+        const response = await fetchWithTimeout(`${getApiUrl()}/categories/${id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -783,7 +801,7 @@ export const mockApi = {
         throw new Error('Solo el Administrador o Gerente tiene permisos para eliminar categorías.');
       }
       try {
-        await fetchWithTimeout(`${API_URL}/categories/${id}`, { 
+        await fetchWithTimeout(`${getApiUrl()}/categories/${id}`, { 
           method: 'DELETE',
           headers: {
             ...(storedRole ? { 'x-user-role': storedRole } : {})
@@ -798,7 +816,7 @@ export const mockApi = {
   products: {
     getAll: async (): Promise<Product[]> => {
       try {
-        const response = await fetchWithTimeout(`${API_URL}/products`);
+        const response = await fetchWithTimeout(`${getApiUrl()}/products`);
         if (response.ok) {
           const data = await response.json();
           if (Array.isArray(data)) {
@@ -821,7 +839,7 @@ export const mockApi = {
       }
       let created: Product | null = null;
       try {
-        const response = await fetchWithTimeout(`${API_URL}/products`, {
+        const response = await fetchWithTimeout(`${getApiUrl()}/products`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -850,7 +868,7 @@ export const mockApi = {
       }
       let updatedProd: Product | null = null;
       try {
-        const response = await fetchWithTimeout(`${API_URL}/products/${id}`, {
+        const response = await fetchWithTimeout(`${getApiUrl()}/products/${id}`, {
           method: 'PUT',
           headers: { 
             'Content-Type': 'application/json',
@@ -883,7 +901,7 @@ export const mockApi = {
       if (index === -1) throw new Error('Producto no encontrado');
       const newAvail = !products[index].isAvailable;
       try {
-        await fetchWithTimeout(`${API_URL}/products/${id}`, {
+        await fetchWithTimeout(`${getApiUrl()}/products/${id}`, {
           method: 'PATCH',
           headers: { 
             'Content-Type': 'application/json',
@@ -902,7 +920,7 @@ export const mockApi = {
         throw new Error('Solo el Administrador o Gerente tiene permisos para eliminar productos.');
       }
       try {
-        await fetchWithTimeout(`${API_URL}/products/${id}`, { 
+        await fetchWithTimeout(`${getApiUrl()}/products/${id}`, { 
           method: 'DELETE',
           headers: {
             ...(storedRole ? { 'x-user-role': storedRole } : {})
@@ -917,7 +935,7 @@ export const mockApi = {
   tables: {
     getAll: async (): Promise<Table[]> => {
       try {
-        const response = await fetchWithTimeout(`${API_URL}/tables`);
+        const response = await fetchWithTimeout(`${getApiUrl()}/tables`);
         if (response.ok) {
           const data = await response.json();
           if (Array.isArray(data)) {
@@ -969,7 +987,7 @@ export const mockApi = {
       };
 
       try {
-        const resp = await fetchWithTimeout(`${API_URL}/tables`, {
+        const resp = await fetchWithTimeout(`${getApiUrl()}/tables`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -1043,7 +1061,7 @@ export const mockApi = {
       saveStoredTables(tables);
 
       try {
-        await fetchWithTimeout(`${API_URL}/tables/${targetId}`, {
+        await fetchWithTimeout(`${getApiUrl()}/tables/${targetId}`, {
           method: 'PATCH',
           headers: { 
             'Content-Type': 'application/json',
@@ -1072,7 +1090,7 @@ export const mockApi = {
       const targetNum = target ? target.number : Number(id);
 
       try {
-        await fetchWithTimeout(`${API_URL}/tables/${targetId}`, {
+        await fetchWithTimeout(`${getApiUrl()}/tables/${targetId}`, {
           method: 'DELETE',
           headers: {
             ...(storedRole ? { 'x-user-role': storedRole } : {})
@@ -1106,7 +1124,7 @@ export const mockApi = {
       saveStoredTables(tables);
 
       try {
-        await fetchWithTimeout(`${API_URL}/tables/${id}/status`, {
+        await fetchWithTimeout(`${getApiUrl()}/tables/${id}/status`, {
           method: 'PATCH',
           headers: { 
             'Content-Type': 'application/json',
@@ -1150,7 +1168,7 @@ export const mockApi = {
       saveStoredTables(tables);
 
       try {
-        await fetchWithTimeout(`${API_URL}/tables/${id}/assign`, {
+        await fetchWithTimeout(`${getApiUrl()}/tables/${id}/assign`, {
           method: 'PATCH',
           headers: { 
             'Content-Type': 'application/json',
@@ -1214,7 +1232,7 @@ export const mockApi = {
   orders: {
     getAll: async (): Promise<Order[]> => {
       try {
-        const response = await fetchWithTimeout(`${API_URL}/orders`);
+        const response = await fetchWithTimeout(`${getApiUrl()}/orders`);
         if (response.ok) {
           const data = await response.json();
           if (Array.isArray(data)) {
@@ -1245,7 +1263,7 @@ export const mockApi = {
       }
 
       try {
-        await fetchWithTimeout(`${API_URL}/orders`, {
+        await fetchWithTimeout(`${getApiUrl()}/orders`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newOrder)
@@ -1277,7 +1295,7 @@ export const mockApi = {
       let updatedOrder: Order | null = index !== -1 ? orders[index] : null;
 
       try {
-        const response = await fetchWithTimeout(`${API_URL}/orders/${id}/status`, {
+        const response = await fetchWithTimeout(`${getApiUrl()}/orders/${id}/status`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status })
@@ -1374,7 +1392,7 @@ export const mockApi = {
       }
 
       try {
-        await fetchWithTimeout(`${API_URL}/orders/${orders[index].id}`, {
+        await fetchWithTimeout(`${getApiUrl()}/orders/${orders[index].id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatedData)
@@ -1388,7 +1406,7 @@ export const mockApi = {
   inventory: {
     getAll: async (): Promise<InventoryItem[]> => {
       try {
-        const response = await fetchWithTimeout(`${API_URL}/inventory`);
+        const response = await fetchWithTimeout(`${getApiUrl()}/inventory`);
         if (response.ok) {
           const data = await response.json();
           if (Array.isArray(data) && data.length > 0) {
@@ -1408,7 +1426,7 @@ export const mockApi = {
     create: async (item: Omit<InventoryItem, 'id'>): Promise<InventoryItem> => {
       let created: any = null;
       try {
-        const res = await fetchWithTimeout(`${API_URL}/inventory`, {
+        const res = await fetchWithTimeout(`${getApiUrl()}/inventory`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(item),
@@ -1426,7 +1444,7 @@ export const mockApi = {
     },
     update: async (id: string, updates: Partial<InventoryItem>): Promise<InventoryItem> => {
       try {
-        await fetchWithTimeout(`${API_URL}/inventory/${id}`, {
+        await fetchWithTimeout(`${getApiUrl()}/inventory/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updates),
@@ -1450,7 +1468,7 @@ export const mockApi = {
       saveStoredInventory([...items]);
 
       try {
-        await fetchWithTimeout(`${API_URL}/inventory/${id}`, {
+        await fetchWithTimeout(`${getApiUrl()}/inventory/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ currentStock: newStock }),
@@ -1479,7 +1497,7 @@ export const mockApi = {
       saveStoredInventory([...items]);
 
       try {
-        await fetchWithTimeout(`${API_URL}/inventory/${id}`, {
+        await fetchWithTimeout(`${getApiUrl()}/inventory/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ currentStock: item.currentStock }),
@@ -1508,7 +1526,7 @@ export const mockApi = {
       saveStoredInventory([...items]);
 
       try {
-        await fetchWithTimeout(`${API_URL}/inventory/${id}`, {
+        await fetchWithTimeout(`${getApiUrl()}/inventory/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ currentStock: item.currentStock }),
@@ -1531,7 +1549,7 @@ export const mockApi = {
     },
     delete: async (id: string): Promise<boolean> => {
       try {
-        await fetchWithTimeout(`${API_URL}/inventory/${id}`, {
+        await fetchWithTimeout(`${getApiUrl()}/inventory/${id}`, {
           method: 'DELETE',
         });
       } catch (e) {}
@@ -1637,7 +1655,7 @@ export const mockApi = {
   cash: {
     getCurrentRegister: async (): Promise<CashRegister | undefined> => {
       try {
-        const response = await fetchWithTimeout(`${API_URL}/cash/current`);
+        const response = await fetchWithTimeout(`${getApiUrl()}/cash/current`);
         if (response.ok) {
           const data = await response.json();
           if (data && data.isOpen) return data;
@@ -1657,7 +1675,7 @@ export const mockApi = {
     openRegister: async (initialAmount: number, openedBy: string): Promise<CashRegister> => {
       let newReg: CashRegister | null = null;
       try {
-        const response = await fetchWithTimeout(`${API_URL}/cash/open`, {
+        const response = await fetchWithTimeout(`${getApiUrl()}/cash/open`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ initialAmount, openedBy })
@@ -1685,7 +1703,7 @@ export const mockApi = {
     },
     closeRegister: async (countedCash: number, notes?: string, reportSnapshot?: any): Promise<void> => {
       try {
-        await fetchWithTimeout(`${API_URL}/cash/close`, {
+        await fetchWithTimeout(`${getApiUrl()}/cash/close`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ countedCash, notes })
@@ -1725,7 +1743,7 @@ export const mockApi = {
     addMovement: async (type: 'INGRESO' | 'GASTO', amount: number, reason: string): Promise<any> => {
       let newMov: any = null;
       try {
-        const response = await fetchWithTimeout(`${API_URL}/cash/movements`, {
+        const response = await fetchWithTimeout(`${getApiUrl()}/cash/movements`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type, amount, reason })
@@ -1754,7 +1772,7 @@ export const mockApi = {
     },
     getMovements: async (): Promise<any[]> => {
       try {
-        const response = await fetchWithTimeout(`${API_URL}/cash/movements`);
+        const response = await fetchWithTimeout(`${getApiUrl()}/cash/movements`);
         if (response.ok) return await response.json();
       } catch (e) {}
 
@@ -1763,7 +1781,7 @@ export const mockApi = {
     },
     getHistory: async (): Promise<any[]> => {
       try {
-        const response = await fetchWithTimeout(`${API_URL}/cash/history`);
+        const response = await fetchWithTimeout(`${getApiUrl()}/cash/history`);
         if (response.ok) return await response.json();
       } catch (e) {}
 
@@ -1801,7 +1819,7 @@ export const mockApi = {
   deliveries: {
     getAll: async (): Promise<DeliveryOrder[]> => {
       try {
-        const response = await fetchWithTimeout(`${API_URL}/deliveries`);
+        const response = await fetchWithTimeout(`${getApiUrl()}/deliveries`);
         if (response.ok) {
           const data = await response.json();
           if (Array.isArray(data)) {
@@ -1831,7 +1849,7 @@ export const mockApi = {
 
       let created: any = null;
       try {
-        const res = await fetchWithTimeout(`${API_URL}/deliveries`, {
+        const res = await fetchWithTimeout(`${getApiUrl()}/deliveries`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newDelivery),
@@ -1859,7 +1877,7 @@ export const mockApi = {
     },
     update: async (id: string, data: Partial<DeliveryOrder>): Promise<DeliveryOrder> => {
       try {
-        await fetchWithTimeout(`${API_URL}/deliveries/${id}`, {
+        await fetchWithTimeout(`${getApiUrl()}/deliveries/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
@@ -1884,7 +1902,7 @@ export const mockApi = {
         estimatedDeliveryTime: Date.now() + 1800000 // +30 min
       };
       try {
-        await fetchWithTimeout(`${API_URL}/deliveries/${id}`, {
+        await fetchWithTimeout(`${getApiUrl()}/deliveries/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(patchData),
@@ -1908,7 +1926,7 @@ export const mockApi = {
         deliveredAt: Date.now()
       };
       try {
-        await fetchWithTimeout(`${API_URL}/deliveries/${id}`, {
+        await fetchWithTimeout(`${getApiUrl()}/deliveries/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(patchData),
@@ -1932,7 +1950,7 @@ export const mockApi = {
         deliveryNotes: reason ? `[Cancelado: ${reason}]` : 'Cancelado'
       };
       try {
-        await fetchWithTimeout(`${API_URL}/deliveries/${id}`, {
+        await fetchWithTimeout(`${getApiUrl()}/deliveries/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(patchData),
@@ -1959,7 +1977,7 @@ export const mockApi = {
     },
     delete: async (id: string): Promise<boolean> => {
       try {
-        await fetchWithTimeout(`${API_URL}/deliveries/${id}`, {
+        await fetchWithTimeout(`${getApiUrl()}/deliveries/${id}`, {
           method: 'DELETE',
         });
       } catch (e) {}
@@ -2046,7 +2064,7 @@ export const mockApi = {
   reservations: {
     getAll: async (): Promise<Reservation[]> => {
       try {
-        const response = await fetchWithTimeout(`${API_URL}/reservations`);
+        const response = await fetchWithTimeout(`${getApiUrl()}/reservations`);
         if (response.ok) {
           const data = await response.json();
           if (Array.isArray(data)) {
@@ -2073,7 +2091,7 @@ export const mockApi = {
 
       let created: any = null;
       try {
-        const res = await fetchWithTimeout(`${API_URL}/reservations`, {
+        const res = await fetchWithTimeout(`${getApiUrl()}/reservations`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newReservation),
@@ -2100,7 +2118,7 @@ export const mockApi = {
     },
     update: async (id: string, data: Partial<Reservation>): Promise<Reservation> => {
       try {
-        await fetchWithTimeout(`${API_URL}/reservations/${id}`, {
+        await fetchWithTimeout(`${getApiUrl()}/reservations/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
@@ -2138,7 +2156,7 @@ export const mockApi = {
     },
     delete: async (id: string): Promise<boolean> => {
       try {
-        await fetchWithTimeout(`${API_URL}/reservations/${id}`, {
+        await fetchWithTimeout(`${getApiUrl()}/reservations/${id}`, {
           method: 'DELETE',
         });
       } catch (e) {}
@@ -2283,7 +2301,7 @@ export const mockApi = {
   staff: {
     getAll: async (): Promise<StaffMember[]> => {
       try {
-        const response = await fetchWithTimeout(`${API_URL}/staff`);
+        const response = await fetchWithTimeout(`${getApiUrl()}/staff`);
         if (response.ok) {
           const dbStaff = await response.json();
           if (Array.isArray(dbStaff)) {
@@ -2296,7 +2314,7 @@ export const mockApi = {
               );
               if (!alreadyInDb && localMember.name && localMember.email) {
                 try {
-                  const syncRes = await fetchWithTimeout(`${API_URL}/staff`, {
+                  const syncRes = await fetchWithTimeout(`${getApiUrl()}/staff`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(localMember),
@@ -2321,7 +2339,7 @@ export const mockApi = {
     },
     getById: async (id: string): Promise<StaffMember | null> => {
       try {
-        const response = await fetchWithTimeout(`${API_URL}/staff/${id}`);
+        const response = await fetchWithTimeout(`${getApiUrl()}/staff/${id}`);
         if (response.ok) return await response.json();
       } catch (e) {}
       return getStoredStaff().find(s => String(s.id) === String(id)) || null;
@@ -2330,7 +2348,7 @@ export const mockApi = {
       const staff = getStoredStaff();
       let createdMember: StaffMember | null = null;
       try {
-        const response = await fetchWithTimeout(`${API_URL}/staff`, {
+        const response = await fetchWithTimeout(`${getApiUrl()}/staff`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
@@ -2357,7 +2375,7 @@ export const mockApi = {
       const staff = getStoredStaff();
       let updatedMember: StaffMember | null = null;
       try {
-        const response = await fetchWithTimeout(`${API_URL}/staff/${id}`, {
+        const response = await fetchWithTimeout(`${getApiUrl()}/staff/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updates),
@@ -2380,7 +2398,7 @@ export const mockApi = {
     },
     delete: async (id: string): Promise<void> => {
       try {
-        await fetchWithTimeout(`${API_URL}/staff/${id}`, {
+        await fetchWithTimeout(`${getApiUrl()}/staff/${id}`, {
           method: 'DELETE',
         });
       } catch (e) {}
@@ -2389,7 +2407,7 @@ export const mockApi = {
     },
     clockIn: async (id: string): Promise<StaffMember> => {
       try {
-        const response = await fetchWithTimeout(`${API_URL}/staff/${id}/clock-in`, {
+        const response = await fetchWithTimeout(`${getApiUrl()}/staff/${id}/clock-in`, {
           method: 'POST',
         });
         if (response.ok) {
@@ -2428,7 +2446,7 @@ export const mockApi = {
     },
     clockOut: async (id: string): Promise<StaffMember> => {
       try {
-        const response = await fetchWithTimeout(`${API_URL}/staff/${id}/clock-out`, {
+        const response = await fetchWithTimeout(`${getApiUrl()}/staff/${id}/clock-out`, {
           method: 'POST',
         });
         if (response.ok) {
@@ -2464,7 +2482,7 @@ export const mockApi = {
     },
     setBreak: async (id: string): Promise<StaffMember> => {
       try {
-        const response = await fetchWithTimeout(`${API_URL}/staff/${id}/break`, {
+        const response = await fetchWithTimeout(`${getApiUrl()}/staff/${id}/break`, {
           method: 'POST',
         });
         if (response.ok) {
@@ -2491,7 +2509,7 @@ export const mockApi = {
     },
     getShifts: async (): Promise<StaffShiftRecord[]> => {
       try {
-        const response = await fetchWithTimeout(`${API_URL}/staff/shifts`);
+        const response = await fetchWithTimeout(`${getApiUrl()}/staff/shifts`);
         if (response.ok) {
           const shifts = await response.json();
           if (Array.isArray(shifts) && shifts.length > 0) {
@@ -2505,7 +2523,7 @@ export const mockApi = {
     addShiftRecord: async (record: Omit<StaffShiftRecord, 'id'>): Promise<StaffShiftRecord> => {
       let created: StaffShiftRecord | null = null;
       try {
-        const response = await fetchWithTimeout(`${API_URL}/staff/shifts`, {
+        const response = await fetchWithTimeout(`${getApiUrl()}/staff/shifts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(record),
@@ -2527,7 +2545,7 @@ export const mockApi = {
   dashboard: {
     getStats: async (): Promise<any> => {
       try {
-        const response = await fetchWithTimeout(`${API_URL}/dashboard/stats`, {}, 2500);
+        const response = await fetchWithTimeout(`${getApiUrl()}/dashboard/stats`, {}, 25000);
         if (response.ok) {
           return await response.json();
         }

@@ -1,9 +1,11 @@
+import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import theme from './theme';
 import MainLayout from './layouts/MainLayout';
 import { useAuthStore } from './store/authStore';
+import { getApiUrl } from './services/mockApi';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import PosScreen from './pages/PosScreen';
@@ -33,6 +35,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  useEffect(() => {
+    // Despertar backend en segundo plano (útil para Render Free Tier)
+    try {
+      const url = getApiUrl();
+      fetch(url, { method: 'GET', mode: 'no-cors' }).catch(() => {});
+    } catch (e) {}
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
