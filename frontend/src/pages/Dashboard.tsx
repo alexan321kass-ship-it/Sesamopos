@@ -32,7 +32,6 @@ import {
   Restaurant as RestaurantIcon,
   PieChart as PieIcon,
   Inventory2 as InventoryIcon,
-  Add as AddIcon,
 } from '@mui/icons-material';
 import {
   AreaChart,
@@ -723,60 +722,6 @@ export default function Dashboard() {
               </Typography>
             </Box>
           </Box>
-
-          {/* Quick Action Shortcuts */}
-          <Stack direction="row" spacing={1.2} sx={{ flexWrap: 'wrap' }}>
-            <Button
-              variant="contained"
-              size="medium"
-              startIcon={<AddIcon />}
-              onClick={() => navigate('/tables')}
-              sx={{
-                bgcolor: '#84cc16',
-                color: '#1e290b',
-                fontWeight: 800,
-                borderRadius: '12px',
-                px: 2,
-                py: 1,
-                boxShadow: '0 4px 14px rgba(132, 204, 22, 0.4)',
-                '&:hover': { bgcolor: '#65a30d', color: '#ffffff' },
-              }}
-            >
-              Nueva Comanda
-            </Button>
-            <Button
-              variant="outlined"
-              size="medium"
-              startIcon={<KitchenIcon />}
-              onClick={() => navigate('/kitchen')}
-              sx={{
-                borderColor: 'rgba(255,255,255,0.3)',
-                color: '#ffffff',
-                fontWeight: 700,
-                borderRadius: '12px',
-                px: 1.8,
-                '&:hover': { borderColor: '#84cc16', bgcolor: 'rgba(132, 204, 22, 0.1)' },
-              }}
-            >
-              KDS Cocina ({kitchenOrders.length})
-            </Button>
-            <Button
-              variant="outlined"
-              size="medium"
-              startIcon={<CartIcon />}
-              onClick={() => navigate('/purchases')}
-              sx={{
-                borderColor: 'rgba(255,255,255,0.3)',
-                color: '#ffffff',
-                fontWeight: 700,
-                borderRadius: '12px',
-                px: 1.8,
-                '&:hover': { borderColor: '#84cc16', bgcolor: 'rgba(132, 204, 22, 0.1)' },
-              }}
-            >
-              Abastecimiento
-            </Button>
-          </Stack>
         </Box>
       </Paper>
 
