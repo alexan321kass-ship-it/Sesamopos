@@ -1684,12 +1684,15 @@ export default function TablesScreen() {
       {billingModalOpen && (
         <BillingModal
           open={billingModalOpen}
-          onClose={() => setBillingModalOpen(false)}
+          onClose={() => {
+            setBillingModalOpen(false);
+            setSelectedTable(null);
+            loadData();
+          }}
           order={billingOrder}
           table={selectedTable}
           onPaymentSuccess={() => {
-            setBillingModalOpen(false);
-            setSelectedTable(null);
+            // Keep billingModalOpen = true so user can view and print the invoice
             loadData();
           }}
         />

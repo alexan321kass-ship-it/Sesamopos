@@ -76,7 +76,6 @@ export default function BillingModal({ open, onClose, order, table, onPaymentSuc
 
   useEffect(() => {
     if (open) {
-      setCompletedInvoice(null);
       setIsSplitMode(false);
       setSplitDiners(2);
       setDiscountAmount(0);
@@ -99,6 +98,35 @@ export default function BillingModal({ open, onClose, order, table, onPaymentSuc
         setCashReceived(Math.ceil(initialTotal / 1000) * 1000);
         setCashPart(Math.floor(initialTotal / 2));
         setCardPart(Math.ceil(initialTotal / 2));
+
+        // If the order is already paid, show its invoice immediately (allows viewing & reprinting)
+        if (order && (order.status === 'PAGADO' || order.paidAt || order.invoiceNumber)) {
+          const inv: Invoice = {
+            id: order.id,
+            invoiceNumber: order.invoiceNumber || `FACT-${order.orderNumber || order.id.slice(-4)}`,
+            orderId: order.id,
+            createdAt: order.paidAt || order.createdAt,
+            customerName: order.customerName || 'Consumidor Final',
+            customerDocument: order.customerDocument || '222222222222',
+            customerEmail: (order as any).customerEmail,
+            tableNumber: table?.number || order.tableId,
+            waiterName: order.waiterName || table?.currentWaiterName || 'Atención General',
+            items: order.items || [],
+            subtotal: order.subtotal || 0,
+            discount: order.discount || 0,
+            tax: order.tax || 0,
+            tip: order.tip || 0,
+            total: order.total || 0,
+            paymentMethod: (order.paymentMethod as any) || 'EFECTIVO',
+            cashReceived: order.cashReceived,
+            changeGiven: order.changeGiven,
+            mixedPayments: order.mixedPayments,
+            resolutionInfo: s.ticketFooter || 'Res. DIAN POS #1876400921 del 2026-01-15'
+          };
+          setCompletedInvoice(inv);
+        } else {
+          setCompletedInvoice(null);
+        }
       });
 
       mockApi.cash.getCurrentRegister().then((reg) => {
@@ -227,8 +255,8 @@ export default function BillingModal({ open, onClose, order, table, onPaymentSuc
 
       if (storeSettings?.autoPrintReceipt) {
         setTimeout(() => {
-          window.print();
-        }, 400);
+          handlePrintReceipt();
+        }, 500);
       }
     } catch (err) {
       console.error('Error al procesar la facturación:', err);
@@ -237,6 +265,66 @@ export default function BillingModal({ open, onClose, order, table, onPaymentSuc
   };
 
   const handlePrintReceipt = () => {
+    const el = document.getElementById('printable-ticket');
+    if (el) {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow?.document;
+      if (doc) {
+        doc.open();
+        doc.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Factura de Venta POS - Sésamo</title>
+              <style>
+                @page {
+                  size: 80mm auto;
+                  margin: 0;
+                }
+                body {
+                  font-family: 'Courier New', Courier, monospace, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                  margin: 0;
+                  padding: 5mm 4mm;
+                  width: 72mm;
+                  max-width: 72mm;
+                  color: #000000;
+                  font-size: 11px;
+                  line-height: 1.35;
+                }
+                * { box-sizing: border-box; }
+                hr { border: none; border-top: 1px dashed #000; margin: 6px 0; }
+                .text-center { text-align: center; }
+                .text-right { text-align: right; }
+                .bold { font-weight: bold; }
+              </style>
+            </head>
+            <body>
+              ${el.innerHTML}
+            </body>
+          </html>
+        `);
+        doc.close();
+
+        iframe.contentWindow?.focus();
+        setTimeout(() => {
+          iframe.contentWindow?.print();
+          setTimeout(() => {
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
+          }, 2000);
+        }, 250);
+        return;
+      }
+    }
     window.print();
   };
 

@@ -376,7 +376,17 @@ export default function CashRegisterScreen() {
 
   // Combine sales, deliveries, and manual movements for audit table
   const allHistoryMovements = useMemo(() => {
-    const list = [
+    interface MovementItem {
+      id: string;
+      date: number;
+      type: string;
+      category: string;
+      reason: string;
+      amount: number;
+      paymentMethod: string;
+      order?: Order;
+    }
+    const list: MovementItem[] = [
       ...manualMovements.map(m => ({
         id: m.id,
         date: m.date,
@@ -391,9 +401,10 @@ export default function CashRegisterScreen() {
         date: o.paidAt || o.createdAt,
         type: 'VENTA SALÓN',
         category: 'SALON',
-        reason: `Mesa ${o.tableId || 'Barra'} • Orden #${o.orderNumber}`,
+        reason: `Mesa ${o.tableId || 'Barra'} • Orden #${o.orderNumber}${o.invoiceNumber ? ` • ${o.invoiceNumber}` : ''}`,
         amount: o.total,
-        paymentMethod: o.paymentMethod || 'EFECTIVO'
+        paymentMethod: o.paymentMethod || 'EFECTIVO',
+        order: o
       })),
       ...completedDeliveries.map(d => ({
         id: d.id,
@@ -1184,12 +1195,13 @@ export default function CashRegisterScreen() {
                   <TableCell sx={{ fontWeight: 800, color: '#334155' }}>Concepto / Detalle</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: '#334155' }}>Método de Pago</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 800, color: '#334155' }}>Monto</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 800, color: '#334155' }}>Comprobante</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {allHistoryMovements.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
+                    <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
                       <Typography variant="body2" color="text.secondary">
                         No hay movimientos registrados en este turno que coincidan con los filtros.
                       </Typography>
@@ -1244,6 +1256,36 @@ export default function CashRegisterScreen() {
                           >
                             {isPositive ? '+' : ''}${mov.amount.toLocaleString()} COP
                           </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          {mov.order ? (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<ReceiptIcon />}
+                              onClick={() => {
+                                const targetOrder = mov.order!;
+                                setSelectedBillingOrder(targetOrder);
+                                setSelectedBillingTable(tables.find(t => String(t.id) === String(targetOrder.tableId)) || null);
+                                setBillingModalOpen(true);
+                              }}
+                              sx={{
+                                borderRadius: '10px',
+                                fontWeight: 800,
+                                fontSize: '0.72rem',
+                                py: 0.4,
+                                px: 1.2,
+                                borderColor: '#65a30d',
+                                color: '#4d7c0f',
+                                textTransform: 'none',
+                                '&:hover': { bgcolor: '#f7fee7', borderColor: '#4d7c0f' }
+                              }}
+                            >
+                              Ver Factura
+                            </Button>
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">—</Typography>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -1923,16 +1965,15 @@ export default function CashRegisterScreen() {
             setBillingModalOpen(false);
             setSelectedBillingOrder(null);
             setSelectedBillingTable(null);
+            loadData();
           }}
           order={selectedBillingOrder}
           table={selectedBillingTable}
           onPaymentSuccess={() => {
-            setBillingModalOpen(false);
-            setSelectedBillingOrder(null);
-            setSelectedBillingTable(null);
+            // Keep billingModalOpen = true so cashier can view and print the invoice receipt
             setSnackbar({
               open: true,
-              message: '¡Cuenta liquidada con éxito en Caja! Factura generada y mesa liberada.',
+              message: '¡Cuenta liquidada con éxito en Caja! Factura generada y lista para imprimir.',
               severity: 'success',
             });
             loadData();

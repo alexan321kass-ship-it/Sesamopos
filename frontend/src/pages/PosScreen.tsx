@@ -1623,7 +1623,10 @@ export default function PosScreen() {
       {billingModalOpen && (
         <BillingModal
           open={billingModalOpen}
-          onClose={() => setBillingModalOpen(false)}
+          onClose={() => {
+            setBillingModalOpen(false);
+            setBillingOrder(null);
+          }}
           order={billingOrder}
           onPaymentSuccess={() => {
             posStore.clearOrder();
