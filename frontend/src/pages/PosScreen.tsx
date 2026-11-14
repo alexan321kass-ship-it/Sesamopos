@@ -655,20 +655,20 @@ export default function PosScreen() {
                 const hasModifiers = Boolean(product.modifiers && product.modifiers.length > 0);
 
                 return (
-                  <Grid size={{ xs: 6, sm: 4, md: 4, lg: 3 }} key={product.id}>
+                  <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={product.id}>
                     <Card
                       elevation={0}
                       sx={{
                         height: '100%',
-                        borderRadius: '18px',
-                        border: inCartCount > 0 ? '2px solid #16a34a' : '1px solid #e2e8f0',
+                        borderRadius: '20px',
+                        border: inCartCount > 0 ? '2.5px solid #16a34a' : '1px solid #e2e8f0',
                         overflow: 'hidden',
                         transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                         bgcolor: '#ffffff',
-                        boxShadow: inCartCount > 0 ? '0 6px 16px rgba(22, 163, 74, 0.15)' : '0 2px 6px rgba(0,0,0,0.02)',
+                        boxShadow: inCartCount > 0 ? '0 6px 18px rgba(22, 163, 74, 0.18)' : '0 2px 8px rgba(0,0,0,0.03)',
                         '&:hover': {
                           transform: 'translateY(-3px)',
-                          boxShadow: '0 10px 22px rgba(0,0,0,0.08)',
+                          boxShadow: '0 12px 24px rgba(0,0,0,0.08)',
                           borderColor: inCartCount > 0 ? '#15803d' : '#cbd5e1'
                         }
                       }}
@@ -685,19 +685,19 @@ export default function PosScreen() {
                         }}
                       >
                         {/* Cabecera Visual con Imagen o Placeholder Gastronómico */}
-                        <Box sx={{ position: 'relative', height: { xs: 105, sm: 125 }, width: '100%', overflow: 'hidden' }}>
+                        <Box sx={{ position: 'relative', height: 135, width: '100%', overflow: 'hidden' }}>
                           {product.imageUrl ? (
                             <CardMedia
                               component="img"
-                              height="125"
+                              height="135"
                               image={product.imageUrl}
                               alt={product.name}
-                              sx={{ objectFit: 'cover', height: { xs: 105, sm: 125 } }}
+                              sx={{ objectFit: 'cover' }}
                             />
                           ) : (
                             <Box
                               sx={{
-                                height: { xs: 105, sm: 125 },
+                                height: 135,
                                 width: '100%',
                                 background: 'linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%)',
                                 display: 'flex',
@@ -707,8 +707,8 @@ export default function PosScreen() {
                                 color: '#9a3412'
                               }}
                             >
-                              <FoodIcon sx={{ fontSize: 36, opacity: 0.8, mb: 0.5 }} />
-                              <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.65rem' }}>
+                              <FoodIcon sx={{ fontSize: 40, opacity: 0.8, mb: 0.5 }} />
+                              <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.75rem' }}>
                                 Especial Sésamo
                               </Typography>
                             </Box>
@@ -718,17 +718,17 @@ export default function PosScreen() {
                           <Box
                             sx={{
                               position: 'absolute',
-                              bottom: 8,
-                              right: 8,
-                              bgcolor: 'rgba(15, 23, 42, 0.85)',
-                              backdropFilter: 'blur(6px)',
+                              bottom: 10,
+                              right: 10,
+                              bgcolor: 'rgba(15, 23, 42, 0.88)',
+                              backdropFilter: 'blur(8px)',
                               color: '#ffffff',
-                              px: 1.2,
-                              py: 0.4,
-                              borderRadius: '10px',
+                              px: 1.4,
+                              py: 0.5,
+                              borderRadius: '12px',
                               fontWeight: 900,
-                              fontSize: '0.85rem',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                              fontSize: '0.92rem',
+                              boxShadow: '0 2px 10px rgba(0,0,0,0.25)'
                             }}
                           >
                             ${product.price.toLocaleString()}
@@ -739,22 +739,22 @@ export default function PosScreen() {
                             <Box
                               sx={{
                                 position: 'absolute',
-                                top: 8,
-                                left: 8,
+                                top: 10,
+                                left: 10,
                                 bgcolor: '#16a34a',
                                 color: '#ffffff',
-                                px: 1,
-                                py: 0.3,
-                                borderRadius: '8px',
+                                px: 1.2,
+                                py: 0.4,
+                                borderRadius: '10px',
                                 fontWeight: 900,
-                                fontSize: '0.72rem',
+                                fontSize: '0.78rem',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: 0.4,
-                                boxShadow: '0 2px 8px rgba(22, 163, 74, 0.4)'
+                                gap: 0.5,
+                                boxShadow: '0 2px 8px rgba(22, 163, 74, 0.45)'
                               }}
                             >
-                              <CheckIcon sx={{ fontSize: 13 }} />
+                              <CheckIcon sx={{ fontSize: 15 }} />
                               {inCartCount} en comanda
                             </Box>
                           )}
@@ -764,15 +764,15 @@ export default function PosScreen() {
                             <Box
                               sx={{
                                 position: 'absolute',
-                                top: 8,
-                                right: 8,
-                                bgcolor: 'rgba(255,255,255,0.92)',
+                                top: 10,
+                                right: 10,
+                                bgcolor: 'rgba(255,255,255,0.95)',
                                 color: '#0284c7',
-                                px: 0.8,
-                                py: 0.2,
-                                borderRadius: '6px',
+                                px: 1,
+                                py: 0.3,
+                                borderRadius: '8px',
                                 fontWeight: 800,
-                                fontSize: '0.65rem',
+                                fontSize: '0.72rem',
                                 border: '1px solid #bae6fd'
                               }}
                             >
@@ -803,13 +803,14 @@ export default function PosScreen() {
                         </Box>
 
                         {/* Detalle del Producto */}
-                        <CardContent sx={{ p: 1.5, flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <CardContent sx={{ p: 2, flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                           <Box>
                             <Typography
-                              variant="subtitle2"
+                              variant="subtitle1"
                               sx={{
                                 fontWeight: 900,
                                 color: '#1e290b',
+                                fontSize: '1.02rem',
                                 lineHeight: 1.25,
                                 display: '-webkit-box',
                                 WebkitLineClamp: 2,
@@ -821,14 +822,16 @@ export default function PosScreen() {
                             </Typography>
                             {product.description && (
                               <Typography
-                                variant="caption"
+                                variant="body2"
                                 color="text.secondary"
                                 sx={{
                                   display: '-webkit-box',
-                                  WebkitLineClamp: 1,
+                                  WebkitLineClamp: 2,
                                   WebkitBoxOrient: 'vertical',
                                   overflow: 'hidden',
-                                  mt: 0.3
+                                  mt: 0.5,
+                                  fontSize: '0.84rem',
+                                  lineHeight: 1.35
                                 }}
                               >
                                 {product.description}
@@ -836,12 +839,12 @@ export default function PosScreen() {
                             )}
                           </Box>
 
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
-                            <Typography variant="caption" sx={{ color: '#65a30d', fontWeight: 800 }}>
-                              Toca para agregar +
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1.5 }}>
+                            <Typography variant="body2" sx={{ color: '#16a34a', fontWeight: 800, fontSize: '0.85rem' }}>
+                              + Agregar
                             </Typography>
                             {product.calories && (
-                              <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem' }}>
+                              <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 600 }}>
                                 {product.calories} kcal
                               </Typography>
                             )}

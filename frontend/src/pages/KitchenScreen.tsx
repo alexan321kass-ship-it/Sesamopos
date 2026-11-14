@@ -584,37 +584,38 @@ export default function KitchenScreen() {
                             }
                           }}
                           sx={{
-                            p: 0.8,
-                            mb: 0.8,
-                            borderRadius: '10px',
+                            p: 1.2,
+                            mb: 1.2,
+                            borderRadius: '12px',
                             cursor: isDelivered ? 'default' : 'pointer',
                             bgcolor: isDelivered ? '#f8fafc' : isChecked ? '#f1f5f9' : isAdditionOrder ? '#fffbeb' : '#ffffff',
-                            border: `1px solid ${isDelivered ? '#e2e8f0' : isChecked ? '#cbd5e1' : isAdditionOrder ? '#fde68a' : '#e2e8f0'}`,
+                            border: `1.5px solid ${isDelivered ? '#e2e8f0' : isChecked ? '#cbd5e1' : isAdditionOrder ? '#fde68a' : '#e2e8f0'}`,
                             opacity: isDelivered ? 0.65 : isChecked ? 0.55 : 1,
                             transition: 'all 0.15s ease',
                             '&:hover': { bgcolor: isDelivered ? '#f8fafc' : isChecked ? '#e2e8f0' : '#f8fafc' },
                           }}
                         >
                           {/* Checkbox */}
-                          <Box sx={{ mr: 1, color: isDelivered ? '#16a34a' : isChecked ? '#16a34a' : '#cbd5e1', display: 'flex', alignItems: 'center' }}>
-                            {isChecked ? <CheckCircleIcon sx={{ fontSize: 18 }} /> : <UncheckedIcon sx={{ fontSize: 18 }} />}
+                          <Box sx={{ mr: 1.2, color: isDelivered ? '#16a34a' : isChecked ? '#16a34a' : '#cbd5e1', display: 'flex', alignItems: 'center' }}>
+                            {isChecked ? <CheckCircleIcon sx={{ fontSize: 22 }} /> : <UncheckedIcon sx={{ fontSize: 22 }} />}
                           </Box>
 
                           {/* Quantity Badge */}
                           <Box
                             sx={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: '8px',
+                              width: 32,
+                              height: 32,
+                              borderRadius: '10px',
                               bgcolor: isDelivered ? '#e2e8f0' : isChecked ? '#cbd5e1' : isAdditionOrder ? '#fed7aa' : '#ecfccb',
-                              color: isDelivered ? '#64748b' : isChecked ? '#64748b' : '#3f6212',
+                              color: isDelivered ? '#64748b' : isChecked ? '#64748b' : '#1e290b',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               fontWeight: 900,
-                              fontSize: '0.85rem',
-                              mr: 1.2,
+                              fontSize: '1rem',
+                              mr: 1.4,
                               flexShrink: 0,
+                              border: '1px solid rgba(0,0,0,0.06)'
                             }}
                           >
                             {item.quantity}
@@ -622,57 +623,61 @@ export default function KitchenScreen() {
 
                           <ListItemText
                             primary={
-                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-                                <Typography
-                                  variant="body2"
-                                  sx={{
-                                    fontWeight: 900,
-                                    color: isDelivered ? '#64748b' : isChecked ? '#64748b' : '#1e290b',
-                                    textDecoration: isChecked || isDelivered ? 'line-through' : 'none',
-                                    lineHeight: 1.2,
-                                  }}
-                                >
-                                  {item.productName}
-                                </Typography>
-
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  {/* Culinary Station Chip */}
-                                  <Chip
-                                    label={itemStation === 'PARRILLA' ? '🥩 Parrilla' : itemStation === 'BARRA' ? '🍹 Bar' : itemStation === 'ENSALADAS_FRIOS' ? '🥗 Frío' : '🍳 Cocina'}
-                                    size="small"
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                                  <Typography
+                                    variant="subtitle1"
                                     sx={{
-                                      height: 18,
-                                      fontSize: '0.58rem',
-                                      fontWeight: 800,
-                                      bgcolor: '#f1f5f9',
-                                      color: '#475569',
+                                      fontWeight: 900,
+                                      color: isDelivered ? '#64748b' : isChecked ? '#64748b' : '#0f172a',
+                                      textDecoration: isChecked || isDelivered ? 'line-through' : 'none',
+                                      fontSize: '1rem',
+                                      lineHeight: 1.25,
                                     }}
-                                  />
-                                  {isDelivered ? (
+                                  >
+                                    {item.productName}
+                                  </Typography>
+
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, flexShrink: 0 }}>
+                                    {/* Culinary Station Chip */}
                                     <Chip
-                                      label="✓ Servido"
+                                      label={itemStation === 'PARRILLA' ? '🥩 Parrilla' : itemStation === 'BARRA' ? '🍹 Bar' : itemStation === 'ENSALADAS_FRIOS' ? '🥗 Frío' : '🍳 Cocina'}
                                       size="small"
                                       sx={{
-                                        height: 18,
-                                        fontSize: '0.6rem',
+                                        height: 22,
+                                        fontSize: '0.72rem',
                                         fontWeight: 800,
                                         bgcolor: '#f1f5f9',
-                                        color: '#64748b',
+                                        color: '#334155',
+                                        border: '1px solid #e2e8f0'
                                       }}
                                     />
-                                  ) : isAdditionOrder ? (
-                                    <Chip
-                                      label="🔥 NUEVO"
-                                      size="small"
-                                      sx={{
-                                        height: 18,
-                                        fontSize: '0.6rem',
-                                        fontWeight: 900,
-                                        bgcolor: '#ea580c',
-                                        color: '#ffffff',
-                                      }}
-                                    />
-                                  ) : null}
+                                    {isDelivered ? (
+                                      <Chip
+                                        label="✓ Servido"
+                                        size="small"
+                                        sx={{
+                                          height: 22,
+                                          fontSize: '0.72rem',
+                                          fontWeight: 800,
+                                          bgcolor: '#dcfce7',
+                                          color: '#15803d',
+                                        }}
+                                      />
+                                    ) : isAdditionOrder ? (
+                                      <Chip
+                                        label="🔥 NUEVO"
+                                        size="small"
+                                        sx={{
+                                          height: 22,
+                                          fontSize: '0.72rem',
+                                          fontWeight: 900,
+                                          bgcolor: '#ea580c',
+                                          color: '#ffffff',
+                                        }}
+                                      />
+                                    ) : null}
+                                  </Box>
                                 </Box>
                               </Box>
                             }
@@ -680,15 +685,24 @@ export default function KitchenScreen() {
                               <>
                                 {/* Modifiers */}
                                 {item.modifiers && item.modifiers.length > 0 && (
-                                  <span style={{ display: 'block', color: '#0284c7', fontWeight: 700, fontSize: '0.72rem', marginTop: 2 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      color: '#0284c7',
+                                      fontWeight: 800,
+                                      fontSize: '0.85rem',
+                                      mt: 0.6,
+                                      display: 'block'
+                                    }}
+                                  >
                                     + {item.modifiers.map((m) => m.name).join(', ')}
-                                  </span>
+                                  </Typography>
                                 )}
                                 {/* Special Kitchen Notes / Allergies */}
                                 {item.notes && (
-                                  <Box sx={{ mt: 0.5, p: 0.6, bgcolor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca', display: 'inline-block' }}>
-                                    <Typography variant="caption" sx={{ color: '#dc2626', fontWeight: 900, fontStyle: 'italic', display: 'block' }}>
-                                       {item.notes}
+                                  <Box sx={{ mt: 0.8, p: 0.8, px: 1.2, bgcolor: '#fef2f2', borderRadius: '8px', border: '1.5px solid #fca5a5', display: 'block' }}>
+                                    <Typography variant="body2" sx={{ color: '#b91c1c', fontWeight: 900, fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: 0.6 }}>
+                                      <span>⚠️</span> <span>NOTA: {item.notes}</span>
                                     </Typography>
                                   </Box>
                                 )}

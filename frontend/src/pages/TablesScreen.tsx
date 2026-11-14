@@ -762,46 +762,53 @@ export default function TablesScreen() {
         </Stack>
       </Box>
 
-      {/* KPI Status Strip */}
-      <Grid container spacing={1.5} sx={{ mb: 2 }}>
+      {/* KPI Status Strip (Distribución Proporcional 5 Estados) */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(5, 1fr)' },
+          gap: 1.5,
+          mb: 2.5
+        }}
+      >
         {[
-          { key: 'ALL', label: 'Todas', count: displayPool.length, color: '#1e290b', bg: '#ffffff' },
-          { key: 'DISPONIBLE', label: 'Libres', count: availableCount, color: '#16a34a', bg: '#f0fdf4' },
+          { key: 'ALL', label: 'Todas las Mesas', count: displayPool.length, color: '#1e290b', bg: '#ffffff' },
+          { key: 'DISPONIBLE', label: 'Mesas Libres', count: availableCount, color: '#16a34a', bg: '#f0fdf4' },
           { key: 'OCUPADA', label: 'En Cocina', count: occupiedCount, color: '#ea580c', bg: '#fff7ed' },
-          { key: 'LISTO', label: '¡Listas!', count: readyCount, color: '#0284c7', bg: '#f0f9ff' },
+          { key: 'LISTO', label: '¡Listas Servir!', count: readyCount, color: '#0284c7', bg: '#f0f9ff' },
           { key: 'ENTREGADO', label: 'Comiendo', count: servedCount, color: '#7c3aed', bg: '#faf5ff' }
         ].map(kpi => {
           const isActive = selectedStatus === kpi.key;
           return (
-            <Grid size={{ xs: 6, sm: 2.4 }} key={kpi.key}>
-              <Paper
-                elevation={0}
-                onClick={() => setSelectedStatus(kpi.key)}
-                sx={{
-                  p: 1.6,
-                  borderRadius: '16px',
-                  bgcolor: isActive ? kpi.color : '#ffffff',
-                  color: isActive ? '#ffffff' : kpi.color,
-                  border: `1.5px solid ${isActive ? kpi.color : 'rgba(0,0,0,0.07)'}`,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  boxShadow: isActive ? '0 6px 16px rgba(0,0,0,0.12)' : '0 1px 3px rgba(0,0,0,0.02)',
-                  '&:hover': { transform: 'translateY(-2px)' }
-                }}
-              >
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase', opacity: isActive ? 0.95 : 0.75, letterSpacing: 0.5 }}>
-                    {kpi.label}
-                  </Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 900, lineHeight: 1 }}>
-                    {kpi.count}
-                  </Typography>
-                </Box>
-              </Paper>
-            </Grid>
+            <Paper
+              key={kpi.key}
+              elevation={0}
+              onClick={() => setSelectedStatus(kpi.key)}
+              sx={{
+                p: { xs: 1.4, sm: 1.8 },
+                borderRadius: '16px',
+                bgcolor: isActive ? kpi.color : '#ffffff',
+                color: isActive ? '#ffffff' : kpi.color,
+                border: `1.5px solid ${isActive ? kpi.color : 'rgba(0,0,0,0.08)'}`,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                boxShadow: isActive ? '0 6px 16px rgba(0,0,0,0.12)' : '0 1px 3px rgba(0,0,0,0.02)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                '&:hover': { transform: 'translateY(-2px)' }
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 800, textTransform: 'uppercase', opacity: isActive ? 0.95 : 0.8, letterSpacing: 0.5, fontSize: { xs: '0.75rem', sm: '0.82rem' } }}>
+                {kpi.label}
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 900, lineHeight: 1, fontSize: { xs: '1.2rem', sm: '1.45rem' } }}>
+                {kpi.count}
+              </Typography>
+            </Paper>
           );
         })}
-      </Grid>
+      </Box>
 
       {/* Filter and Zone Selector Bar */}
       <Paper elevation={0} sx={{ p: 2, mb: 2.5, borderRadius: '18px', bgcolor: '#ffffff', border: '1px solid rgba(0,0,0,0.06)' }}>
@@ -934,11 +941,11 @@ export default function TablesScreen() {
                   }}
                 >
                   {/* Table Badge and Basic Details */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                     <Box
                       sx={{
-                        width: 46,
-                        height: 46,
+                        width: 48,
+                        height: 48,
                         borderRadius: '14px',
                         bgcolor: config.badgeBg,
                         color: config.badgeColor,
@@ -951,30 +958,30 @@ export default function TablesScreen() {
                         boxShadow: '0 2px 6px rgba(0,0,0,0.05)'
                       }}
                     >
-                      <Typography variant="caption" sx={{ fontSize: '0.62rem', fontWeight: 900, lineHeight: 1, textTransform: 'uppercase', opacity: 0.8 }}>
+                      <Typography variant="caption" sx={{ fontSize: '0.72rem', fontWeight: 900, lineHeight: 1, textTransform: 'uppercase', opacity: 0.9 }}>
                         Mesa
                       </Typography>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 900, lineHeight: 1 }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 900, lineHeight: 1, fontSize: '1.15rem' }}>
                         {String(table.number).padStart(2, '0')}
                       </Typography>
                     </Box>
 
                     <Box>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#1e290b', lineHeight: 1.2 }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#1e290b', lineHeight: 1.2, fontSize: '1rem' }}>
                         {table.location || 'Salón Principal'}
                       </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.4 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mt: 0.5 }}>
                         <Tooltip title={isAdmin ? "Capacidad comensales (Click para editar)" : "Capacidad comensales"}>
                           <Chip
-                            icon={<PeopleIcon sx={{ fontSize: '12px !important', color: '#475569 !important' }} />}
-                            label={`${table.capacity}p`}
+                            icon={<PeopleIcon sx={{ fontSize: '14px !important', color: '#475569 !important' }} />}
+                            label={`${table.capacity} personas`}
                             size="small"
                             onClick={isAdmin ? (e) => handleOpenEditTable(table, e) : undefined}
                             sx={{
-                              height: 20,
-                              fontSize: '0.68rem',
+                              height: 22,
+                              fontSize: '0.75rem',
                               fontWeight: 800,
-                              bgcolor: 'rgba(255,255,255,0.9)',
+                              bgcolor: 'rgba(255,255,255,0.95)',
                               border: '1px solid rgba(0,0,0,0.08)',
                               color: '#334155',
                               cursor: isAdmin ? 'pointer' : 'default'
@@ -986,18 +993,19 @@ export default function TablesScreen() {
                   </Box>
 
                   {/* Status Chip & Admin actions */}
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.6 }}>
                     <Chip
                       icon={config.icon}
                       label={config.label}
                       size="small"
                       sx={{
                         fontWeight: 900,
-                        fontSize: '0.72rem',
-                        height: 24,
+                        fontSize: '0.8rem',
+                        height: 26,
+                        px: 0.5,
                         bgcolor: config.badgeBg,
                         color: config.badgeColor,
-                        border: `1px solid ${config.borderColor}`
+                        border: `1.5px solid ${config.borderColor}`
                       }}
                     />
 
@@ -1007,9 +1015,9 @@ export default function TablesScreen() {
                           <IconButton
                             size="small"
                             onClick={(e) => handleOpenEditTable(table, e)}
-                            sx={{ width: 22, height: 22, color: '#64748b', '&:hover': { color: '#0284c7', bgcolor: 'rgba(2,132,199,0.1)' } }}
+                            sx={{ width: 24, height: 24, color: '#64748b', '&:hover': { color: '#0284c7', bgcolor: 'rgba(2,132,199,0.1)' } }}
                           >
-                            <EditIcon sx={{ fontSize: 13 }} />
+                            <EditIcon sx={{ fontSize: 15 }} />
                           </IconButton>
                         </Tooltip>
                         {!activeOrder && table.status !== 'OCUPADA' && (
@@ -1017,9 +1025,9 @@ export default function TablesScreen() {
                             <IconButton
                               size="small"
                               onClick={(e) => requestDeleteTable(table, e)}
-                              sx={{ width: 22, height: 22, color: '#64748b', '&:hover': { color: '#ef4444', bgcolor: 'rgba(239,68,68,0.1)' } }}
+                              sx={{ width: 24, height: 24, color: '#64748b', '&:hover': { color: '#ef4444', bgcolor: 'rgba(239,68,68,0.1)' } }}
                             >
-                              <DeleteIcon sx={{ fontSize: 14 }} />
+                              <DeleteIcon sx={{ fontSize: 15 }} />
                             </IconButton>
                           </Tooltip>
                         )}
@@ -1029,17 +1037,17 @@ export default function TablesScreen() {
                 </Box>
 
                 {/* Card Main Body */}
-                <Box sx={{ p: 1.8 }}>
+                <Box sx={{ p: 2 }}>
                   {activeOrder ? (
                     <>
                       {/* Order info + Timer */}
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
-                          <ReceiptIcon sx={{ fontSize: 15, color: '#0284c7' }} />
-                          <Typography variant="body2" sx={{ fontWeight: 800, color: '#0f172a' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                          <ReceiptIcon sx={{ fontSize: 18, color: '#0284c7' }} />
+                          <Typography variant="body1" sx={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem' }}>
                             #{activeOrder.orderNumber}
                           </Typography>
-                          <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+                          <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 700, fontSize: '0.82rem' }}>
                             ({totalItems} {totalItems === 1 ? 'ítem' : 'ítems'})
                           </Typography>
                         </Box>
@@ -1047,12 +1055,12 @@ export default function TablesScreen() {
                         {timeDetails && (
                           <Tooltip title={timeDetails.tooltip}>
                             <Chip
-                              icon={<TimeIcon sx={{ fontSize: '13px !important', color: `${timeDetails.color} !important` }} />}
+                              icon={<TimeIcon sx={{ fontSize: '14px !important', color: `${timeDetails.color} !important` }} />}
                               label={timeDetails.label}
                               size="small"
                               sx={{
-                                height: 22,
-                                fontSize: '0.72rem',
+                                height: 24,
+                                fontSize: '0.78rem',
                                 fontWeight: 900,
                                 bgcolor: timeDetails.bg,
                                 color: timeDetails.color,
@@ -1069,33 +1077,33 @@ export default function TablesScreen() {
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'baseline',
-                          p: 1.2,
+                          p: 1.4,
                           bgcolor: '#f8fafc',
-                          borderRadius: '12px',
-                          border: '1px solid #f1f5f9',
-                          mb: 1.5
+                          borderRadius: '14px',
+                          border: '1px solid #e2e8f0',
+                          mb: 1.6
                         }}
                       >
-                        <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                        <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', fontSize: '0.78rem' }}>
                           Total Cuenta:
                         </Typography>
-                        <Typography variant="h6" sx={{ fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>
+                        <Typography variant="h5" sx={{ fontWeight: 900, color: '#0f172a', lineHeight: 1, fontSize: '1.25rem' }}>
                           ${(activeOrder.total || 0).toLocaleString()}
                         </Typography>
                       </Box>
 
                       {/* Waiter in charge */}
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.6 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                          <Avatar sx={{ width: 22, height: 22, fontSize: '0.68rem', bgcolor: '#ea580c', fontWeight: 900 }}>
+                          <Avatar sx={{ width: 26, height: 26, fontSize: '0.75rem', bgcolor: '#ea580c', fontWeight: 900 }}>
                             {waiterName.charAt(0)}
                           </Avatar>
-                          <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 800, color: '#334155', fontSize: '0.85rem' }}>
                             Mesero: {waiterName.split(' ')[0]}
                           </Typography>
                         </Box>
-                        <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.7rem' }}>
-                          Ver comanda ➔
+                        <Typography variant="body2" sx={{ color: '#0284c7', fontSize: '0.82rem', fontWeight: 800 }}>
+                          Ver detalles ➔
                         </Typography>
                       </Box>
                     </>
@@ -1103,20 +1111,20 @@ export default function TablesScreen() {
                     /* Free table illustration and message */
                     <Box
                       sx={{
-                        py: 2,
-                        px: 1.5,
+                        py: 2.2,
+                        px: 1.8,
                         textAlign: 'center',
                         bgcolor: '#f0fdf4',
                         borderRadius: '14px',
-                        border: '1px dashed #bbf7d0',
+                        border: '1px dashed #86efac',
                         mb: 1.8
                       }}
                     >
-                      <Typography variant="body2" sx={{ fontWeight: 900, color: '#166534' }}>
-                        Mesa Lista y Libre
+                      <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#166534', fontSize: '1rem' }}>
+                        Mesa Libre & Lista
                       </Typography>
-                      <Typography variant="caption" sx={{ color: '#15803d', display: 'block', mt: 0.3 }}>
-                        A cargo: {waiterName.split(' ')[0]}
+                      <Typography variant="body2" sx={{ color: '#15803d', display: 'block', mt: 0.4, fontSize: '0.82rem', fontWeight: 600 }}>
+                        Sector: {table.location || 'Salón'} · Capacidad: {table.capacity}p
                       </Typography>
                     </Box>
                   )}
