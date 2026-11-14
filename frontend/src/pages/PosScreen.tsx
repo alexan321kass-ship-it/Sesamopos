@@ -80,6 +80,7 @@ export default function PosScreen() {
   const [tableSelectZone, setTableSelectZone] = useState<string>('ALL');
   const [pendingAction, setPendingAction] = useState<'KITCHEN' | 'BILLING' | null>(null);
   const [hasPromptedForBar, setHasPromptedForBar] = useState(false);
+  const [isSubmittingKitchen, setIsSubmittingKitchen] = useState(false);
 
   // Responsive Mobile/Tablet POS View
   const [mobileView, setMobileView] = useState<'catalog' | 'ticket'>('catalog');
@@ -303,7 +304,7 @@ export default function PosScreen() {
   };
 
   const handleSendToKitchen = async () => {
-    if (posStore.items.length === 0) return;
+    if (posStore.items.length === 0 || isSubmittingKitchen) return;
     if (!posStore.currentTableId && !posStore.editingOrderId) {
       setPendingAction('KITCHEN');
       setBarPromptOpen(true);
@@ -313,7 +314,8 @@ export default function PosScreen() {
   };
 
   const executeSendToKitchen = async (tableId: string | null) => {
-    if (posStore.items.length === 0) return;
+    if (posStore.items.length === 0 || isSubmittingKitchen) return;
+    setIsSubmittingKitchen(true);
     try {
       const isDelivery = tableId === 'DOMICILIO' || tableId === 'Domicilio';
       const isBarSale = tableId === 'BARRA' || tableId === 'Barra';
@@ -417,6 +419,8 @@ export default function PosScreen() {
     } catch (error) {
       console.error(error);
       alert('Error al guardar/enviar pedido');
+    } finally {
+      setIsSubmittingKitchen(false);
     }
   };
 
@@ -492,7 +496,7 @@ export default function PosScreen() {
     }
 
     const tempOrder: Order = {
-      id: posStore.editingOrderId || Date.now().toString(),
+      id: posStore.editingOrderId || `draft-${Date.now()}`,
       orderNumber: posStore.editingOrderNumber || Math.floor(1000 + Math.random() * 9000).toString(),
       createdAt: Date.now(),
       items: posStore.items,
@@ -507,16 +511,9 @@ export default function PosScreen() {
       waiterName: user?.name || 'Carlos Ruiz'
     };
 
-    if (!posStore.editingOrderId) {
-      try {
-        const created = await mockApi.orders.create(tempOrder);
-        setBillingOrder(created);
-      } catch (e) {
-        setBillingOrder(tempOrder);
-      }
-    } else {
-      setBillingOrder(tempOrder);
-    }
+    // No creamos la orden en base de datos al simplemente abrir el modal.
+    // Solo se creará/actualizará cuando el pago sea procesado efectivamente en BillingModal.
+    setBillingOrder(tempOrder);
     setBillingModalOpen(true);
   };
 
@@ -1365,7 +1362,7 @@ export default function PosScreen() {
                 variant={['ADMINISTRADOR', 'GERENTE', 'CAJERO'].includes(user?.role || '') ? "outlined" : "contained"}
                 startIcon={<KitchenIcon />}
                 onClick={handleSendToKitchen}
-                disabled={posStore.items.length === 0}
+                disabled={posStore.items.length === 0 || isSubmittingKitchen}
                 sx={{
                   bgcolor: !['ADMINISTRADOR', 'GERENTE', 'CAJERO'].includes(user?.role || '')
                     ? (posStore.editingOrderId ? '#ea580c' : '#1e290b')

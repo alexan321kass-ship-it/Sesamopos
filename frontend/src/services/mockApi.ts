@@ -452,25 +452,45 @@ const saveStoredTables = (tables: Table[]) => {
 
 let memoryOrdersCache: Order[] | null = null;
 
+const deduplicateOrders = (rawList: Order[]): Order[] => {
+  const seen = new Map<string, Order>();
+  const result: Order[] = [];
+  for (const ord of rawList) {
+    if (ord.status !== 'PAGADO' && ord.status !== 'CANCELADO') {
+      const itemsKey = (ord.items || []).map((i: any) => `${i.productId || i.productName}:${i.quantity}`).sort().join(',');
+      const dedupeKey = `${ord.tableId || 'notable'}_${ord.total}_${itemsKey}`;
+      const existing = seen.get(dedupeKey);
+      if (existing && Math.abs((Number(ord.createdAt) || 0) - (Number(existing.createdAt) || 0)) < 180000) {
+        // Accidental duplicate created within 3 minutes on the same table with identical items! Skip it.
+        continue;
+      }
+      seen.set(dedupeKey, ord);
+    }
+    result.push(ord);
+  }
+  return result;
+};
+
 const getStoredOrders = (): Order[] => {
-  if (memoryOrdersCache) return memoryOrdersCache;
+  if (memoryOrdersCache) return deduplicateOrders(memoryOrdersCache);
   const local = localStorage.getItem('sesamo_orders');
   if (local) {
     try {
       const parsed = JSON.parse(local);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        memoryOrdersCache = parsed.map(o => ({
+        const mapped = parsed.map(o => ({
           ...o,
           items: Array.isArray(o.items) ? o.items.map((it: any) => ({
             ...it,
             modifiers: Array.isArray(it.modifiers) ? it.modifiers : []
           })) : []
         }));
+        memoryOrdersCache = deduplicateOrders(mapped);
         return memoryOrdersCache;
       }
     } catch (e) {}
   }
-  memoryOrdersCache = [...mockOrders];
+  memoryOrdersCache = deduplicateOrders([...mockOrders]);
   try {
     localStorage.setItem('sesamo_orders', JSON.stringify(memoryOrdersCache));
   } catch (e) {}
@@ -1224,9 +1244,10 @@ export const mockApi = {
         if (response.ok) {
           const data = await response.json();
           if (Array.isArray(data)) {
-            memoryOrdersCache = data;
-            try { localStorage.setItem('sesamo_orders', JSON.stringify(data)); } catch (e) {}
-            return data;
+            const clean = deduplicateOrders(data);
+            memoryOrdersCache = clean;
+            try { localStorage.setItem('sesamo_orders', JSON.stringify(clean)); } catch (e) {}
+            return clean;
           }
         }
       } catch (e) {}

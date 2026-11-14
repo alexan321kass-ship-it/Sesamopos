@@ -199,9 +199,8 @@ export default function BillingModal({ open, onClose, order, table, onPaymentSuc
     };
 
     try {
-      // Update order status to PAGADO and attach payment details to the active cash shift
-      await mockApi.orders.updateOrder(order.id, {
-        status: 'PAGADO',
+      const paymentData = {
+        status: 'PAGADO' as const,
         paymentMethod,
         registerId: activeReg.id,
         paidAt: Date.now(),
@@ -220,7 +219,23 @@ export default function BillingModal({ open, onClose, order, table, onPaymentSuc
           { method: 'Efectivo', amount: cashPart },
           { method: 'Tarjeta / Digital', amount: cardPart }
         ] : undefined
-      });
+      };
+
+      // Si la orden ya existía en base de datos la actualizamos a PAGADO; si era un borrador de POS la creamos directamente como PAGADO
+      try {
+        if (order.id && !order.id.startsWith('draft-')) {
+          await mockApi.orders.updateOrder(order.id, paymentData);
+        } else {
+          throw new Error('Draft order');
+        }
+      } catch (errNotFound) {
+        const { id, createdAt, ...orderDataToCreate } = order;
+        await mockApi.orders.create({
+          ...orderDataToCreate,
+          ...paymentData,
+          orderNumber: order.orderNumber || Math.floor(1000 + Math.random() * 9000).toString(),
+        });
+      }
 
       // Synchronize with Customer CRM if customer document provided
       if (isCustomCustomer && customerDocument) {
