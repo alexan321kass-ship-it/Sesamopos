@@ -416,157 +416,321 @@ export default function CustomersScreen() {
   return (
     <Box sx={{ pb: 6 }}>
       {/* 1. HEADER PRINCIPAL & ACCIONES */}
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2, mb: 3 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', lg: 'row' },
+          justifyContent: 'space-between',
+          alignItems: { xs: 'flex-start', lg: 'center' },
+          gap: 2,
+          mb: 3,
+        }}
+      >
         <Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-            <Box sx={{ width: 44, height: 44, borderRadius: '14px', bgcolor: '#1e290b', color: '#84cc16', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 3,
+                bgcolor: '#1e290b',
+                color: '#84cc16',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 14px rgba(30, 41, 11, 0.2)',
+                flexShrink: 0,
+              }}
+            >
               <PeopleIcon sx={{ fontSize: 26 }} />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 900, color: '#1e290b', letterSpacing: '-0.5px' }}>
-              Directorio de Clientes & CRM
-            </Typography>
-            <Chip
-              label="Fidelización • Facturación DIAN • WhatsApp Directo"
-              size="small"
-              sx={{ fontWeight: 800, bgcolor: 'rgba(132, 204, 22, 0.15)', color: '#4d7c0f', borderRadius: '8px' }}
-            />
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, flexWrap: 'wrap' }}>
+                <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b', letterSpacing: -0.5 }}>
+                  Directorio de Clientes & CRM
+                </Typography>
+                <Chip
+                  label="Fidelización • Facturación DIAN • WhatsApp Directo"
+                  size="small"
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: '0.72rem',
+                    bgcolor: 'rgba(132, 204, 22, 0.15)',
+                    color: '#4d7c0f',
+                    borderRadius: 2,
+                    border: '1px solid #bef264',
+                    height: 24,
+                  }}
+                />
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.4 }}>
+                Base de datos unificada de comensales, historial de consumo LTV, puntos de fidelidad, alérgenos y datos fiscales para facturación electrónica DIAN.
+              </Typography>
+            </Box>
           </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 500 }}>
-            Base de datos unificada de comensales, historial de consumo LTV, puntos de fidelidad, alérgenos y datos fiscales para facturación electrónica DIAN.
-          </Typography>
         </Box>
 
-        <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
+        {/* Action Buttons Toolbar */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, flexWrap: 'wrap', flexShrink: 0 }}>
           <Button
             variant="outlined"
-            startIcon={<DownloadIcon />}
+            size="small"
+            startIcon={<DownloadIcon sx={{ fontSize: 18 }} />}
             onClick={handleExportCSV}
-            sx={{ borderRadius: '12px', fontWeight: 800, textTransform: 'none', color: '#475569', borderColor: '#cbd5e1', bgcolor: '#ffffff' }}
+            sx={{
+              borderRadius: 2,
+              fontWeight: 800,
+              textTransform: 'none',
+              color: '#475569',
+              borderColor: '#e2e8f0',
+              bgcolor: '#ffffff',
+              px: 1.8,
+              py: 0.9,
+              '&:hover': { bgcolor: '#f8fafc', borderColor: '#cbd5e1' },
+            }}
           >
             Exportar CSV
           </Button>
           <Button
             variant="outlined"
-            startIcon={<RefreshIcon />}
+            size="small"
+            startIcon={<RefreshIcon sx={{ fontSize: 18 }} />}
             onClick={loadData}
-            sx={{ borderRadius: '12px', fontWeight: 800, textTransform: 'none', color: '#475569', borderColor: '#cbd5e1', bgcolor: '#ffffff' }}
+            sx={{
+              borderRadius: 2,
+              fontWeight: 800,
+              textTransform: 'none',
+              color: '#475569',
+              borderColor: '#e2e8f0',
+              bgcolor: '#ffffff',
+              px: 1.8,
+              py: 0.9,
+              '&:hover': { bgcolor: '#f8fafc', borderColor: '#cbd5e1' },
+            }}
           >
             Sincronizar
           </Button>
           <Button
             variant="contained"
-            startIcon={<PersonAddIcon />}
+            size="small"
+            startIcon={<PersonAddIcon sx={{ fontSize: 18 }} />}
             onClick={handleOpenCreateModal}
             sx={{
-              borderRadius: '12px',
+              borderRadius: 2,
               fontWeight: 900,
               textTransform: 'none',
-              bgcolor: '#1e290b',
+              bgcolor: '#65a30d',
               color: '#ffffff',
-              px: 2.5,
-              boxShadow: '0 4px 14px rgba(30, 41, 11, 0.25)',
-              '&:hover': { bgcolor: '#2d3e11' }
+              px: 2.2,
+              py: 0.9,
+              boxShadow: '0 4px 14px rgba(101, 163, 13, 0.35)',
+              '&:hover': { bgcolor: '#4d7c0f', boxShadow: '0 6px 18px rgba(101, 163, 13, 0.45)' },
             }}
           >
             Nuevo Cliente
           </Button>
-        </Stack>
+        </Box>
       </Box>
 
       {/* 2. TOP KPI CARDS */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: '18px', bgcolor: '#ffffff', display: 'flex', alignItems: 'center', gap: 1.8 }}>
-            <Box sx={{ width: 46, height: 46, borderRadius: '14px', bgcolor: 'rgba(30, 41, 11, 0.08)', color: '#1e290b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <PeopleIcon />
-            </Box>
+        {/* KPI 1: Clientes Totales */}
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              bgcolor: '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': { borderColor: '#cbd5e1', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(0,0,0,0.06)' },
+            }}
+          >
             <Box>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
-                Clientes Totales
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b', lineHeight: 1.1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 30, height: 30, borderRadius: '50%', bgcolor: '#f1f5f9', color: '#1e290b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <PeopleIcon sx={{ fontSize: 17 }} />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
+                    Clientes Totales
+                  </Typography>
+                </Box>
+                <Chip label="DIRECTORIO" size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 800, bgcolor: '#f1f5f9', color: '#475569' }} />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#1e290b', mb: 0.5, letterSpacing: -0.5 }}>
                 {kpis.totalCount}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600 }}>
-                Registrados en Sésamo
-              </Typography>
             </Box>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+              Registrados en el sistema Sésamo
+            </Typography>
           </Paper>
         </Grid>
 
-        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: '18px', bgcolor: '#ffffff', display: 'flex', alignItems: 'center', gap: 1.8 }}>
-            <Box sx={{ width: 46, height: 46, borderRadius: '14px', bgcolor: 'rgba(217, 119, 6, 0.12)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <PremiumIcon />
-            </Box>
+        {/* KPI 2: Clientes VIP */}
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              bgcolor: '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': { borderColor: '#fcd34d', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(217, 119, 6, 0.08)' },
+            }}
+          >
             <Box>
-              <Typography variant="caption" sx={{ color: '#d97706', fontWeight: 700, textTransform: 'uppercase' }}>
-                Clientes VIP
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#d97706', lineHeight: 1.1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 30, height: 30, borderRadius: '50%', bgcolor: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <PremiumIcon sx={{ fontSize: 17 }} />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: '#d97706', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
+                    Clientes VIP
+                  </Typography>
+                </Box>
+                <Chip label="ORO & DIAMANTE" size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 900, bgcolor: '#fef3c7', color: '#92400e' }} />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#d97706', mb: 0.5, letterSpacing: -0.5 }}>
                 {kpis.highValueCount}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
-                Niveles Diamante y Oro
-              </Typography>
             </Box>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+              Comensales de alta recurrencia y consumo
+            </Typography>
           </Paper>
         </Grid>
 
-        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: '18px', bgcolor: '#ffffff', display: 'flex', alignItems: 'center', gap: 1.8 }}>
-            <Box sx={{ width: 46, height: 46, borderRadius: '14px', bgcolor: 'rgba(22, 163, 74, 0.12)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <TrendingUpIcon />
-            </Box>
+        {/* KPI 3: Venta Clientes (LTV) */}
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              bgcolor: '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': { borderColor: '#86efac', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(22, 163, 74, 0.08)' },
+            }}
+          >
             <Box>
-              <Typography variant="caption" sx={{ color: '#16a34a', fontWeight: 700, textTransform: 'uppercase' }}>
-                Venta Clientes (LTV)
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#16a34a', lineHeight: 1.1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 30, height: 30, borderRadius: '50%', bgcolor: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <TrendingUpIcon sx={{ fontSize: 17 }} />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: '#166534', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
+                    Venta Clientes (LTV)
+                  </Typography>
+                </Box>
+                <Chip label="HISTÓRICO" size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 800, bgcolor: '#dcfce7', color: '#15803d' }} />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#15803d', mb: 0.5, letterSpacing: -0.5 }}>
                 ${kpis.totalSpentAccum.toLocaleString()}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
-                Consumo histórico total
-              </Typography>
             </Box>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+              Consumo acumulado por comensales
+            </Typography>
           </Paper>
         </Grid>
 
-        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: '18px', bgcolor: '#ffffff', display: 'flex', alignItems: 'center', gap: 1.8 }}>
-            <Box sx={{ width: 46, height: 46, borderRadius: '14px', bgcolor: 'rgba(2, 132, 199, 0.12)', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ReceiptIcon />
-            </Box>
+        {/* KPI 4: Ticket Promedio */}
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              bgcolor: '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': { borderColor: '#7dd3fc', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(2, 132, 199, 0.08)' },
+            }}
+          >
             <Box>
-              <Typography variant="caption" sx={{ color: '#0284c7', fontWeight: 700, textTransform: 'uppercase' }}>
-                Ticket Promedio
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#0284c7', lineHeight: 1.1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 30, height: 30, borderRadius: '50%', bgcolor: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <ReceiptIcon sx={{ fontSize: 17 }} />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: '#0369a1', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
+                    Ticket Promedio
+                  </Typography>
+                </Box>
+                <Chip label="POR VISITA" size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 800, bgcolor: '#e0f2fe', color: '#0284c7' }} />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#0284c7', mb: 0.5, letterSpacing: -0.5 }}>
                 ${kpis.avgTicket.toLocaleString()}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
-                Gasto promedio por visita
-              </Typography>
             </Box>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+              Gasto promedio en cada visita u orden
+            </Typography>
           </Paper>
         </Grid>
 
-        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <Paper elevation={0} sx={{ p: 2, border: '1px solid #e2e8f0', borderRadius: '18px', bgcolor: '#ffffff', display: 'flex', alignItems: 'center', gap: 1.8 }}>
-            <Box sx={{ width: 46, height: 46, borderRadius: '14px', bgcolor: 'rgba(202, 138, 4, 0.12)', color: '#ca8a04', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <StarIcon />
-            </Box>
+        {/* KPI 5: Puntos Activos */}
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              bgcolor: '#ffffff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease',
+              '&:hover': { borderColor: '#fef08a', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(202, 138, 4, 0.08)' },
+            }}
+          >
             <Box>
-              <Typography variant="caption" sx={{ color: '#ca8a04', fontWeight: 700, textTransform: 'uppercase' }}>
-                Puntos Activos
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#ca8a04', lineHeight: 1.1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 30, height: 30, borderRadius: '50%', bgcolor: '#fef9c3', color: '#ca8a04', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <StarIcon sx={{ fontSize: 17 }} />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: '#a16207', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
+                    Puntos Activos
+                  </Typography>
+                </Box>
+                <Chip label="CANJEABLES" size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 900, bgcolor: '#fef9c3', color: '#854d0e' }} />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#ca8a04', mb: 0.5, letterSpacing: -0.5 }}>
                 {kpis.totalPointsAccum.toLocaleString()}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
-                Puntos listos para canjear
-              </Typography>
             </Box>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+              Puntos del club disponibles para redimir
+            </Typography>
           </Paper>
         </Grid>
       </Grid>
