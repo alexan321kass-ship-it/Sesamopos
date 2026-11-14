@@ -41,8 +41,6 @@ import {
   CartesianGrid,
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
 } from 'recharts';
 import { mockApi } from '../services/mockApi';
 import { subscribeRealtimeEvents } from '../services/eventBus';
@@ -542,10 +540,11 @@ export default function Dashboard() {
 
     const list = Object.values(counts);
     if (list.length === 0) {
-      return (products.slice(0, 5) || []).map((p) => ({
-        name: p.name.replace('Hamburguesa', 'Ham.').replace('Pizza', 'Piz.'),
-        cantidad: 12,
-        ingresos: p.price * 12,
+      return (products.slice(0, 5) || []).map((p, idx) => ({
+        name: p.name,
+        fullName: p.name,
+        cantidad: [9, 6, 6, 5, 2][idx] || 4,
+        ingresos: p.price * ([9, 6, 6, 5, 2][idx] || 4),
         margen: '68%',
       }));
     }
@@ -554,7 +553,8 @@ export default function Dashboard() {
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 5)
       .map((item) => ({
-        name: item.name.replace('Hamburguesa', 'Ham.').replace('Pizza', 'Piz.'),
+        name: item.name,
+        fullName: item.name,
         cantidad: item.quantity,
         ingresos: item.revenue,
         margen: '65-72%',
@@ -1143,21 +1143,100 @@ export default function Dashboard() {
                 </Button>
               </Box>
 
-              <Box sx={{ height: 210, width: '100%' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topProductsData} layout="vertical" margin={{ top: 5, right: 25, left: 10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                    <XAxis type="number" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={90} stroke="#475569" />
-                    <RechartsTooltip
-                      formatter={(value, name) => [
-                        name === 'cantidad' ? `${value} unidades` : `$${Number(value).toLocaleString()} COP`,
-                        name === 'cantidad' ? 'Vendidos' : 'Ingresos',
-                      ]}
-                    />
-                    <Bar dataKey="cantidad" fill="#84cc16" radius={[0, 6, 6, 0]} barSize={18} />
-                  </BarChart>
-                </ResponsiveContainer>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, my: 1 }}>
+                {topProductsData.map((item, idx) => {
+                  const maxQty = topProductsData[0]?.cantidad || 1;
+                  const pct = Math.min(100, Math.round((item.cantidad / maxQty) * 100));
+                  const rankColors = [
+                    { bg: '#fef9c3', text: '#854d0e', border: '#fde047', medal: '🥇' },
+                    { bg: '#f1f5f9', text: '#334155', border: '#cbd5e1', medal: '🥈' },
+                    { bg: '#ffedd5', text: '#9a3412', border: '#fdba74', medal: '🥉' },
+                    { bg: '#f8fafc', text: '#64748b', border: '#e2e8f0', medal: '4' },
+                    { bg: '#f8fafc', text: '#64748b', border: '#e2e8f0', medal: '5' },
+                  ];
+                  const rank = rankColors[idx] || rankColors[3];
+
+                  return (
+                    <Box key={idx} sx={{ width: '100%' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, flex: 1, pr: 1 }}>
+                          <Box
+                            sx={{
+                              width: 22,
+                              height: 22,
+                              borderRadius: '6px',
+                              bgcolor: rank.bg,
+                              color: rank.text,
+                              border: `1px solid ${rank.border}`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: idx < 3 ? '0.78rem' : '0.7rem',
+                              fontWeight: 900,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {rank.medal}
+                          </Box>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontWeight: 800,
+                              color: '#1e290b',
+                              fontSize: '0.83rem',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                            title={item.fullName || item.name}
+                          >
+                            {item.fullName || item.name}
+                          </Typography>
+                        </Box>
+
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, flexShrink: 0 }}>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              fontWeight: 900,
+                              color: '#166534',
+                              bgcolor: '#f0fdf4',
+                              px: 0.9,
+                              py: 0.2,
+                              borderRadius: '6px',
+                              border: '1px solid #bbf7d0',
+                              fontSize: '0.75rem',
+                            }}
+                          >
+                            {item.cantidad} {item.cantidad === 1 ? 'ud' : 'uds'}
+                          </Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', fontSize: '0.75rem', minWidth: 62, textAlign: 'right' }}>
+                            ${item.ingresos.toLocaleString()}
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      {/* Progress Bar with smooth branded gradient */}
+                      <LinearProgress
+                        variant="determinate"
+                        value={pct}
+                        sx={{
+                          height: 6.5,
+                          borderRadius: 4,
+                          bgcolor: '#f1f5f9',
+                          '& .MuiLinearProgress-bar': {
+                            borderRadius: 4,
+                            background: idx === 0
+                              ? 'linear-gradient(90deg, #84cc16 0%, #4d7c0f 100%)'
+                              : idx === 1
+                              ? 'linear-gradient(90deg, #a3e635 0%, #65a30d 100%)'
+                              : '#bef264',
+                          },
+                        }}
+                      />
+                    </Box>
+                  );
+                })}
               </Box>
             </Box>
 
