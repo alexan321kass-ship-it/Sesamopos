@@ -21,8 +21,6 @@ import {
   Paper,
   Divider,
   Stack,
-  Drawer,
-  Badge,
   FormControl,
   InputLabel,
   Select,
@@ -37,34 +35,20 @@ import {
   Star as StarIcon,
   LocationOn as LocationIcon,
   AccessTime as TimeIcon,
-  ShoppingBag as CartIcon,
-  Add as AddIcon,
-  Remove as RemoveIcon,
-  Delete as DeleteIcon,
   RoomService as WaiterIcon,
-  WhatsApp as WhatsAppIcon,
-  CheckCircle as CheckIcon,
+  Receipt as BillIcon,
   Spa as VeganIcon,
-  ArrowForward as ArrowForwardIcon,
   TableRestaurant as TableIcon,
-  DinnerDining as DiningIcon,
+  Dining as DiningIcon,
   Restaurant as RestaurantIcon,
-  Login as LoginIcon
+  Login as LoginIcon,
+  WineBar as WineIcon,
+  Info as InfoIcon,
+  LocalDining as ForkIcon
 } from '@mui/icons-material';
 import { mockApi } from '../services/mockApi';
-import { Product, Category, StoreSettings, Table, OrderItem, Order, ModifierOption, OrderType } from '../types';
-import { playKitchenBellSound } from '../utils/audioAlerts';
+import { Product, Category, StoreSettings, Table } from '../types';
 import { notifyRealtimeEvent } from '../services/eventBus';
-
-interface CartItem {
-  cartId: string;
-  product: Product;
-  quantity: number;
-  selectedModifiers: ModifierOption[];
-  notes: string;
-  unitPrice: number;
-  totalPrice: number;
-}
 
 export default function PublicMenu() {
   const [searchParams] = useSearchParams();
@@ -81,39 +65,17 @@ export default function PublicMenu() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedTag, setSelectedTag] = useState<string>('ALL');
 
-  // Interactive Cart State
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('sesamo_public_cart');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-  const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
-
-  // Order Details State
+  // Table Detection from QR (?mesa=4 or ?table=4)
   const initialTableParam = searchParams.get('mesa') || searchParams.get('table') || '';
-  const [orderType, setOrderType] = useState<OrderType>('MESA');
   const [selectedTableNumber, setSelectedTableNumber] = useState<string>(initialTableParam);
-  const [customerName, setCustomerName] = useState<string>('');
-  const [customerPhone, setCustomerPhone] = useState<string>('');
-  const [deliveryAddress, setDeliveryAddress] = useState<string>('');
-  const [tipPercent, setTipPercent] = useState<number>(10);
+  const [isTableModalOpen, setIsTableModalOpen] = useState<boolean>(false);
 
-  // Customization & Detail Modal
+  // Dish Detail & Experience Modal
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [modalQuantity, setModalQuantity] = useState<number>(1);
-  const [modalNotes, setModalNotes] = useState<string>('');
-  const [modalSelectedModifiers, setModalSelectedModifiers] = useState<ModifierOption[]>([]);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
 
-  // Order Placed Confirmation Modal
-  const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
-  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState<boolean>(false);
-
-  // Waiter Call Notification
-  const [waiterCallNotice, setWaiterCallNotice] = useState<string | null>(null);
+  // Waiter & Bill Alerts
+  const [serviceNotice, setServiceNotice] = useState<{ message: string; severity: 'success' | 'info' } | null>(null);
 
   // Load Data
   useEffect(() => {
@@ -126,15 +88,6 @@ export default function PublicMenu() {
       window.removeEventListener('sesamo_tables_updated', handleUpdate);
     };
   }, []);
-
-  // Save Cart to LocalStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('sesamo_public_cart', JSON.stringify(cart));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [cart]);
 
   const loadData = async () => {
     try {
@@ -153,13 +106,7 @@ export default function PublicMenu() {
     }
   };
 
-  // Cart Calculations
-  const cartItemCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
-  const cartSubtotal = useMemo(() => cart.reduce((sum, item) => sum + item.totalPrice, 0), [cart]);
-  const cartTipAmount = useMemo(() => Math.round((cartSubtotal * tipPercent) / 100), [cartSubtotal, tipPercent]);
-  const cartTotal = useMemo(() => cartSubtotal + cartTipAmount, [cartSubtotal, cartTipAmount]);
-
-  // Filtering products
+  // Filtered Products
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       const matchesCategory = selectedCategory === 'ALL' || product.categoryId === selectedCategory;
@@ -182,12 +129,9 @@ export default function PublicMenu() {
     });
   }, [products, selectedCategory, searchTerm, selectedTag]);
 
-  // Handlers for Cart
+  // Modal Handlers
   const handleOpenDetailModal = (product: Product) => {
     setSelectedProduct(product);
-    setModalQuantity(1);
-    setModalNotes('');
-    setModalSelectedModifiers([]);
     setIsDetailModalOpen(true);
   };
 
@@ -196,187 +140,27 @@ export default function PublicMenu() {
     setSelectedProduct(null);
   };
 
-  const handleQuickAddToCart = (product: Product) => {
-    // If product has required modifier groups, open customization modal
-    if (product.modifiers && product.modifiers.some(m => m.isRequired)) {
-      handleOpenDetailModal(product);
-      return;
-    }
-
-    const existingIndex = cart.findIndex(
-      item => item.product.id === product.id && item.selectedModifiers.length === 0 && !item.notes
-    );
-
-    if (existingIndex !== -1) {
-      const updated = [...cart];
-      updated[existingIndex].quantity += 1;
-      updated[existingIndex].totalPrice = updated[existingIndex].quantity * updated[existingIndex].unitPrice;
-      setCart(updated);
-    } else {
-      const newItem: CartItem = {
-        cartId: `${product.id}_${Date.now()}`,
-        product,
-        quantity: 1,
-        selectedModifiers: [],
-        notes: '',
-        unitPrice: product.price,
-        totalPrice: product.price
-      };
-      setCart([...cart, newItem]);
-    }
-  };
-
-  const handleModalAddToCart = () => {
-    if (!selectedProduct) return;
-
-    // Calculate item unit price with modifiers
-    const modifierSum = modalSelectedModifiers.reduce((sum, mod) => sum + (mod.price || 0), 0);
-    const unitPrice = selectedProduct.price + modifierSum;
-    const totalPrice = unitPrice * modalQuantity;
-
-    const newItem: CartItem = {
-      cartId: `${selectedProduct.id}_${Date.now()}`,
-      product: selectedProduct,
-      quantity: modalQuantity,
-      selectedModifiers: modalSelectedModifiers,
-      notes: modalNotes.trim(),
-      unitPrice,
-      totalPrice
-    };
-
-    setCart([...cart, newItem]);
-    handleCloseDetailModal();
-    setIsCartOpen(true);
-  };
-
-  const handleUpdateQuantity = (cartId: string, delta: number) => {
-    setCart(prev => {
-      return prev
-        .map(item => {
-          if (item.cartId === cartId) {
-            const newQty = item.quantity + delta;
-            if (newQty <= 0) return null;
-            return {
-              ...item,
-              quantity: newQty,
-              totalPrice: newQty * item.unitPrice
-            };
-          }
-          return item;
-        })
-        .filter(Boolean) as CartItem[];
-    });
-  };
-
-  const handleRemoveItem = (cartId: string) => {
-    setCart(prev => prev.filter(item => item.cartId !== cartId));
-  };
-
-  // Submit Order to Kitchen / POS
-  const handleSubmitOrderToKitchen = async () => {
-    if (cart.length === 0) return;
-
-    if (orderType === 'MESA' && !selectedTableNumber) {
-      alert('Por favor selecciona o ingresa el número de tu mesa para que el equipo te lleve la orden.');
-      return;
-    }
-
-    try {
-      const orderItems: OrderItem[] = cart.map(c => ({
-        id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        productId: c.product.id,
-        productName: c.product.name,
-        quantity: c.quantity,
-        unitPrice: c.unitPrice,
-        totalPrice: c.totalPrice,
-        modifiers: c.selectedModifiers.map(m => ({
-          modifierGroupId: 'custom',
-          modifierOptionId: m.id,
-          name: m.name,
-          price: m.price
-        })),
-        notes: c.notes || undefined,
-        isDelivered: false
-      }));
-
-      // Match table
-      const matchedTable = tables.find(t => String(t.number) === String(selectedTableNumber) || t.id === selectedTableNumber);
-
-      const newOrderPayload: Partial<Order> = {
-        id: Date.now().toString(),
-        orderNumber: `SES-${Math.floor(1000 + Math.random() * 9000)}`,
-        createdAt: Date.now(),
-        tableId: matchedTable?.id || (orderType === 'MESA' ? selectedTableNumber : undefined),
-        customerName: customerName.trim() || (orderType === 'MESA' ? `Mesa #${selectedTableNumber}` : 'Cliente Web'),
-        items: orderItems,
-        subtotal: cartSubtotal,
-        discount: 0,
-        tax: 0,
-        tip: cartTipAmount,
-        total: cartTotal,
-        status: 'CREADO',
-        type: orderType
-      };
-
-      const created = await mockApi.orders.create(newOrderPayload as any);
-      playKitchenBellSound();
-      notifyRealtimeEvent('sesamo_orders_updated');
-
-      setConfirmedOrder(created);
-      setIsSuccessModalOpen(true);
-      setCart([]);
-      setIsCartOpen(false);
-    } catch (err: any) {
-      console.error('Error al enviar orden:', err);
-      alert('Hubo un inconveniente al procesar tu orden. Por favor avisa a tu mesero.');
-    }
-  };
-
-  // WhatsApp Order
-  const handleOrderViaWhatsApp = () => {
-    if (cart.length === 0) return;
-    const phone = settings?.phone ? settings.phone.replace(/[^0-9]/g, '') : '573000000001';
-
-    let text = `🌿 *¡Hola Sésamo Alimentos! Quiero realizar este pedido desde el Menú Digital:*%0A%0A`;
-    cart.forEach(item => {
-      text += `• *${item.quantity}x ${item.product.name}* - $${item.totalPrice.toLocaleString()} COP%0A`;
-      if (item.selectedModifiers.length > 0) {
-        text += `   ↳ _Opciones: ${item.selectedModifiers.map(m => m.name).join(', ')}_%0A`;
-      }
-      if (item.notes) {
-        text += `   ↳ _Nota de cocina: ${item.notes}_%0A`;
-      }
-    });
-
-    text += `%0A💵 *Subtotal:* $${cartSubtotal.toLocaleString()} COP`;
-    if (cartTipAmount > 0) {
-      text += `%0A✨ *Propina (${tipPercent}%):* $${cartTipAmount.toLocaleString()} COP`;
-    }
-    text += `%0A💰 *TOTAL A PAGAR: $${cartTotal.toLocaleString()} COP*%0A%0A`;
-
-    if (orderType === 'MESA' && selectedTableNumber) {
-      text += `📍 *Ubicación:* En Restaurante • Mesa #${selectedTableNumber}%0A`;
-    } else if (orderType === 'DOMICILIO') {
-      text += `🛵 *Modalidad:* Domicilio%0A🏠 *Dirección:* ${deliveryAddress || 'Por confirmar'}%0A`;
-    } else {
-      text += `🛍️ *Modalidad:* Para Llevar (Take Away)%0A`;
-    }
-
-    if (customerName) text += `👤 *Cliente:* ${customerName}%0A`;
-    if (customerPhone) text += `📞 *Teléfono:* ${customerPhone}%0A`;
-
-    window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
-  };
-
-  // Call Waiter Action
+  // Waiter Actions
   const handleCallWaiter = () => {
     const tableStr = selectedTableNumber || 'Barra';
-    notifyRealtimeEvent('sesamo_waiter_called', { table: tableStr, timestamp: Date.now() });
-    setWaiterCallNotice(`🛎️ ¡Tu mesero ha sido llamado a la Mesa #${tableStr}! Ya se acerca a atenderte.`);
+    notifyRealtimeEvent('sesamo_waiter_called', { table: tableStr, timestamp: Date.now(), reason: 'ATENCION' });
+    setServiceNotice({
+      message: `🛎️ ¡Mesero notificado para la Mesa #${tableStr}! Un colaborador se acerca en un momento.`,
+      severity: 'success'
+    });
+  };
+
+  const handleRequestBill = () => {
+    const tableStr = selectedTableNumber || 'Barra';
+    notifyRealtimeEvent('sesamo_waiter_called', { table: tableStr, timestamp: Date.now(), reason: 'CUENTA' });
+    setServiceNotice({
+      message: `💵 ¡Cuenta solicitada para la Mesa #${tableStr}! Tu mesero te llevará el comprobante y datáfono.`,
+      severity: 'info'
+    });
   };
 
   return (
-    <Box sx={{ bgcolor: '#0b1307', minHeight: '100vh', color: '#f8fafc', pb: 12 }}>
+    <Box sx={{ bgcolor: '#0b1307', minHeight: '100vh', color: '#f8fafc', pb: 10 }}>
       {/* ============================================================ */}
       {/* TOP NAVIGATION BAR                                           */}
       {/* ============================================================ */}
@@ -384,15 +168,18 @@ export default function PublicMenu() {
         position="sticky"
         elevation={0}
         sx={{
-          bgcolor: 'rgba(11, 19, 7, 0.92)',
+          bgcolor: 'rgba(11, 19, 7, 0.94)',
           backdropFilter: 'blur(16px)',
-          borderBottom: '1px solid rgba(132, 204, 22, 0.18)'
+          borderBottom: '1px solid rgba(132, 204, 22, 0.2)'
         }}
       >
         <Container maxWidth="xl">
           <Toolbar sx={{ justifyContent: 'space-between', py: 1.2, px: { xs: 0, sm: 2 } }}>
             {/* Brand Logo & Name */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.8 }}>
+            <Box
+              sx={{ display: 'flex', alignItems: 'center', gap: 1.8, cursor: 'pointer' }}
+              onClick={() => { setSelectedCategory('ALL'); setSearchTerm(''); setSelectedTag('ALL'); }}
+            >
               <Box
                 component="img"
                 src="/logo.png"
@@ -400,10 +187,8 @@ export default function PublicMenu() {
                 sx={{
                   height: { xs: 44, sm: 50 },
                   width: 'auto',
-                  filter: 'drop-shadow(0 4px 12px rgba(132, 204, 22, 0.35))',
-                  cursor: 'pointer'
+                  filter: 'drop-shadow(0 4px 12px rgba(132, 204, 22, 0.35))'
                 }}
-                onClick={() => { setSelectedCategory('ALL'); setSearchTerm(''); }}
               />
               <Box>
                 <Typography
@@ -420,80 +205,81 @@ export default function PublicMenu() {
                   Sésamo
                 </Typography>
                 <Typography variant="caption" sx={{ color: '#84cc16', fontWeight: 700, display: 'block', fontSize: '0.72rem' }}>
-                  Cocina Consciente & Menú Interactivo
+                  Carta Digital & Experiencia Gastronómica
                 </Typography>
               </Box>
             </Box>
 
-            {/* Right Quick Actions */}
+            {/* Right Quick Actions (Waiter & Bill Service) */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
               {/* Table Selector Pill */}
               <Chip
                 icon={<TableIcon sx={{ color: '#84cc16 !important', fontSize: '18px !important' }} />}
-                label={selectedTableNumber ? `Mesa #${selectedTableNumber}` : 'Elige tu Mesa'}
+                label={selectedTableNumber ? `Mesa #${selectedTableNumber}` : 'Indicar Mesa'}
                 clickable
-                onClick={() => setIsCartOpen(true)}
+                onClick={() => setIsTableModalOpen(true)}
                 sx={{
                   bgcolor: selectedTableNumber ? 'rgba(132, 204, 22, 0.16)' : 'rgba(255, 255, 255, 0.08)',
                   color: selectedTableNumber ? '#bef264' : '#cbd5e1',
                   fontWeight: 800,
                   fontSize: '0.82rem',
-                  border: '1px solid rgba(132, 204, 22, 0.3)',
-                  height: 36
+                  border: '1px solid rgba(132, 204, 22, 0.35)',
+                  height: 38
                 }}
               />
 
               {/* Call Waiter Button */}
               <Button
-                variant="outlined"
+                variant="contained"
                 size="small"
                 startIcon={<WaiterIcon />}
                 onClick={handleCallWaiter}
                 sx={{
-                  display: { xs: 'none', sm: 'inline-flex' },
                   borderRadius: '12px',
-                  borderColor: 'rgba(234, 179, 8, 0.4)',
-                  color: '#facc15',
-                  fontWeight: 800,
-                  fontSize: '0.8rem',
+                  fontWeight: 900,
+                  fontSize: '0.82rem',
                   textTransform: 'none',
-                  px: 1.8,
-                  height: 36,
-                  bgcolor: 'rgba(234, 179, 8, 0.08)',
-                  '&:hover': {
-                    borderColor: '#facc15',
-                    bgcolor: 'rgba(234, 179, 8, 0.16)'
-                  }
+                  px: 2,
+                  height: 38,
+                  bgcolor: '#16a34a',
+                  background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                  boxShadow: '0 4px 14px rgba(22, 163, 74, 0.35)',
+                  '&:hover': { bgcolor: '#15803d' }
                 }}
               >
                 Llamar Mesero
               </Button>
 
-              {/* Cart Button */}
-              <IconButton
-                onClick={() => setIsCartOpen(true)}
+              {/* Request Bill Button */}
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<BillIcon />}
+                onClick={handleRequestBill}
                 sx={{
-                  bgcolor: cartItemCount > 0 ? '#16a34a' : 'rgba(255, 255, 255, 0.08)',
-                  color: '#ffffff',
-                  p: 1.1,
-                  borderRadius: '14px',
-                  boxShadow: cartItemCount > 0 ? '0 4px 16px rgba(22, 163, 74, 0.4)' : 'none',
-                  transition: 'all 0.2s ease',
+                  display: { xs: 'none', md: 'inline-flex' },
+                  borderRadius: '12px',
+                  borderColor: 'rgba(234, 179, 8, 0.45)',
+                  color: '#facc15',
+                  fontWeight: 800,
+                  fontSize: '0.82rem',
+                  textTransform: 'none',
+                  px: 1.8,
+                  height: 38,
+                  bgcolor: 'rgba(234, 179, 8, 0.08)',
                   '&:hover': {
-                    bgcolor: cartItemCount > 0 ? '#15803d' : 'rgba(255, 255, 255, 0.15)',
-                    transform: 'scale(1.05)'
+                    borderColor: '#facc15',
+                    bgcolor: 'rgba(234, 179, 8, 0.18)'
                   }
                 }}
               >
-                <Badge badgeContent={cartItemCount} color="error" overlap="circular">
-                  <CartIcon sx={{ fontSize: 22 }} />
-                </Badge>
-              </IconButton>
+                Pedir Cuenta
+              </Button>
 
               {/* Staff Portal Link */}
               <IconButton
                 onClick={() => navigate('/login')}
-                title="Acceso Personal / Colaboradores"
+                title="Acceso Personal / Meseros"
                 sx={{
                   bgcolor: 'rgba(255,255,255,0.05)',
                   color: '#94a3b8',
@@ -510,13 +296,13 @@ export default function PublicMenu() {
       </AppBar>
 
       {/* ============================================================ */}
-      {/* HERO BANNER SECTION                                          */}
+      {/* HERO BANNER SECTION (EXPERIENCIAL & SERVICIO)                */}
       {/* ============================================================ */}
       <Box
         sx={{
           position: 'relative',
           overflow: 'hidden',
-          background: 'linear-gradient(180deg, #121c0b 0%, #0b1307 100%)',
+          background: 'linear-gradient(180deg, #131e0c 0%, #0b1307 100%)',
           pt: { xs: 4, md: 5 },
           pb: { xs: 4, md: 5 },
           borderBottom: '1px solid rgba(132, 204, 22, 0.12)'
@@ -525,23 +311,23 @@ export default function PublicMenu() {
         <Container maxWidth="xl">
           <Grid container spacing={3} sx={{ alignItems: 'center' }}>
             <Grid size={{ xs: 12, md: 8 }}>
-              {/* Live Status Chip */}
+              {/* Badges */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 1.8, flexWrap: 'wrap' }}>
                 <Chip
-                  icon={<Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#4ade80', ml: 1 }} />}
-                  label="Cocina Abierta • Pedidos en Vivo"
+                  icon={<ForkIcon sx={{ color: '#84cc16 !important', fontSize: '15px !important' }} />}
+                  label="Servicio Exclusivo a la Mesa"
                   size="small"
                   sx={{
-                    bgcolor: 'rgba(74, 222, 128, 0.14)',
-                    color: '#86efac',
+                    bgcolor: 'rgba(132, 204, 22, 0.14)',
+                    color: '#bef264',
                     fontWeight: 800,
                     fontSize: '0.75rem',
-                    border: '1px solid rgba(74, 222, 128, 0.28)'
+                    border: '1px solid rgba(132, 204, 22, 0.3)'
                   }}
                 />
                 <Chip
                   icon={<StarIcon sx={{ color: '#facc15 !important', fontSize: '15px !important' }} />}
-                  label="Cocina de Origen & Ingredientes Frescos"
+                  label="Cocina de Autor & Sabores Conscientes"
                   size="small"
                   sx={{
                     bgcolor: 'rgba(250, 204, 21, 0.1)',
@@ -559,7 +345,7 @@ export default function PublicMenu() {
                 sx={{
                   fontWeight: 900,
                   fontSize: { xs: '2.1rem', sm: '2.8rem', md: '3.4rem' },
-                  lineHeight: 1.12,
+                  lineHeight: 1.15,
                   letterSpacing: '-0.03em',
                   mb: 1.5,
                   background: 'linear-gradient(135deg, #ffffff 0%, #e2e8f0 60%, #bef264 100%)',
@@ -567,7 +353,7 @@ export default function PublicMenu() {
                   WebkitTextFillColor: 'transparent'
                 }}
               >
-                Pide a tu ritmo directo a cocina
+                Nuestra Carta Digital en tu Mesa
               </Typography>
 
               <Typography
@@ -576,15 +362,15 @@ export default function PublicMenu() {
                   color: '#94a3b8',
                   fontSize: { xs: '0.98rem', md: '1.1rem' },
                   lineHeight: 1.6,
-                  maxWidth: 680,
+                  maxWidth: 700,
                   mb: 2.8
                 }}
               >
-                Elige tus platillos favoritos, personaliza tus términos y salsas, y envía tu orden en tiempo real para que los chefs comiencen a preparar tu mesa.
+                Explora cada platillo con fotos en alta resolución, ingredientes, maridajes sugeridos e información nutricional. Tu mesero asignado tomará tu orden directamente en tu mesa.
               </Typography>
 
               {/* Location & Time Info */}
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ color: '#cbd5e1' }}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2.5} sx={{ color: '#cbd5e1' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
                   <LocationIcon sx={{ color: '#84cc16', fontSize: 18 }} />
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -594,59 +380,77 @@ export default function PublicMenu() {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
                   <TimeIcon sx={{ color: '#84cc16', fontSize: 18 }} />
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    12:00 PM - 10:30 PM (Lunes a Domingo)
+                    Servicio de Sala: 12:00 PM - 10:30 PM
                   </Typography>
                 </Box>
               </Stack>
             </Grid>
 
-            {/* Chef Highlight Card */}
+            {/* Service Hospitality Info Card */}
             <Grid size={{ xs: 12, md: 4 }}>
               <Paper
                 elevation={0}
                 sx={{
-                  p: 2.5,
+                  p: 2.8,
                   borderRadius: '24px',
-                  bgcolor: 'rgba(23, 35, 17, 0.75)',
+                  bgcolor: 'rgba(23, 35, 17, 0.8)',
                   border: '1px solid rgba(132, 204, 22, 0.25)',
                   backdropFilter: 'blur(12px)',
                   boxShadow: '0 12px 30px rgba(0, 0, 0, 0.35)'
                 }}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-                  <DiningIcon sx={{ color: '#84cc16', fontSize: 28 }} />
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.8 }}>
+                  <DiningIcon sx={{ color: '#84cc16', fontSize: 32 }} />
                   <Box>
                     <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#ffffff', lineHeight: 1.2 }}>
-                      Menú QR Interactivo
+                      Atención Personalizada
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#a3e635', fontWeight: 600 }}>
-                      Sin filas • Sin esperas • Confirmación Inmediata
+                      {selectedTableNumber ? `Mesa #${selectedTableNumber} Seleccionada` : 'Selecciona tu mesa para atención'}
                     </Typography>
                   </Box>
                 </Box>
-                <Typography variant="body2" sx={{ color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1.5, mb: 2 }}>
-                  Tus platos van directamente a la pantalla de cocina. Puedes pagar al final con tu mesero o en la caja en efectivo, datáfono o transferencia.
+                <Typography variant="body2" sx={{ color: '#cbd5e1', fontSize: '0.86rem', lineHeight: 1.55, mb: 2.2 }}>
+                  Toca cualquier plato para ver su preparación y maridaje recomendado. Cuando decidas qué ordenar, presiona el botón para llamar a tu mesero.
                 </Typography>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  startIcon={<WaiterIcon />}
-                  onClick={handleCallWaiter}
-                  sx={{
-                    bgcolor: 'rgba(132, 204, 22, 0.18)',
-                    color: '#bef264',
-                    fontWeight: 800,
-                    textTransform: 'none',
-                    borderRadius: '14px',
-                    border: '1px solid rgba(132, 204, 22, 0.35)',
-                    '&:hover': {
+
+                <Stack direction="row" spacing={1.2}>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    startIcon={<WaiterIcon />}
+                    onClick={handleCallWaiter}
+                    sx={{
                       bgcolor: '#16a34a',
-                      color: '#ffffff'
-                    }
-                  }}
-                >
-                  Solicitar Atención a la Mesa
-                </Button>
+                      color: '#ffffff',
+                      fontWeight: 800,
+                      textTransform: 'none',
+                      borderRadius: '14px',
+                      py: 1.1,
+                      '&:hover': { bgcolor: '#15803d' }
+                    }}
+                  >
+                    Llamar Mesero
+                  </Button>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    startIcon={<BillIcon />}
+                    onClick={handleRequestBill}
+                    sx={{
+                      borderColor: 'rgba(234, 179, 8, 0.4)',
+                      color: '#facc15',
+                      fontWeight: 800,
+                      textTransform: 'none',
+                      borderRadius: '14px',
+                      py: 1.1,
+                      bgcolor: 'rgba(234, 179, 8, 0.08)',
+                      '&:hover': { bgcolor: 'rgba(234, 179, 8, 0.16)', borderColor: '#facc15' }
+                    }}
+                  >
+                    Pedir Cuenta
+                  </Button>
+                </Stack>
               </Paper>
             </Grid>
           </Grid>
@@ -661,7 +465,7 @@ export default function PublicMenu() {
         <Box sx={{ mb: 2.5 }}>
           <TextField
             fullWidth
-            placeholder="Buscar por plato, ingrediente, vino o antojo (ej. Solomito, Bowl, Mojito...)"
+            placeholder="Buscar por platillo, ingrediente, vino o término (ej. Solomito, Salmón, Risotto, Mojito...)"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             slotProps={{
@@ -705,7 +509,7 @@ export default function PublicMenu() {
             }}
           >
             <Chip
-              label={`⭐ Todos (${products.length})`}
+              label={`⭐ Toda la Carta (${products.length})`}
               clickable
               onClick={() => setSelectedCategory('ALL')}
               sx={{
@@ -750,7 +554,7 @@ export default function PublicMenu() {
         {/* Dietary / Preference Quick Filter Tabs */}
         <Box sx={{ display: 'flex', gap: 1, mb: 3.5, flexWrap: 'wrap' }}>
           <Chip
-            label="Todos"
+            label="Todos los Platillos"
             size="small"
             clickable
             onClick={() => setSelectedTag('ALL')}
@@ -801,7 +605,7 @@ export default function PublicMenu() {
         </Box>
 
         {/* ============================================================ */}
-        {/* PRODUCTS GRID SECTION                                        */}
+        {/* DISHES CARDS GRID                                            */}
         {/* ============================================================ */}
         {filteredProducts.length === 0 ? (
           <Paper
@@ -832,33 +636,31 @@ export default function PublicMenu() {
           <Grid container spacing={3}>
             {filteredProducts.map(product => {
               const category = categories.find(c => c.id === product.categoryId);
-              // Check if in cart
-              const inCartCount = cart
-                .filter(item => item.product.id === product.id)
-                .reduce((sum, item) => sum + item.quantity, 0);
 
               return (
                 <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={product.id}>
                   <Card
+                    onClick={() => handleOpenDetailModal(product)}
                     sx={{
                       height: '100%',
                       display: 'flex',
                       flexDirection: 'column',
                       bgcolor: 'rgba(20, 32, 15, 0.85)',
                       borderRadius: '22px',
-                      border: inCartCount > 0 ? '1.5px solid #84cc16' : '1px solid rgba(132, 204, 22, 0.15)',
-                      boxShadow: inCartCount > 0 ? '0 10px 24px rgba(132, 204, 22, 0.15)' : '0 8px 20px rgba(0,0,0,0.25)',
+                      border: '1px solid rgba(132, 204, 22, 0.16)',
+                      boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
                       transition: 'all 0.25s ease',
                       overflow: 'hidden',
+                      cursor: 'pointer',
                       '&:hover': {
-                        transform: 'translateY(-5px)',
-                        boxShadow: '0 16px 32px rgba(0,0,0,0.45)',
+                        transform: 'translateY(-6px)',
+                        boxShadow: '0 16px 36px rgba(0,0,0,0.45)',
                         borderColor: '#84cc16'
                       }
                     }}
                   >
-                    {/* Image & Badges Container */}
-                    <Box sx={{ position: 'relative', pt: '62%', overflow: 'hidden', cursor: 'pointer' }} onClick={() => handleOpenDetailModal(product)}>
+                    {/* Image & Visual Badges */}
+                    <Box sx={{ position: 'relative', pt: '62%', overflow: 'hidden' }}>
                       <CardMedia
                         component="img"
                         image={product.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80'}
@@ -871,7 +673,7 @@ export default function PublicMenu() {
                           height: '100%',
                           objectFit: 'cover',
                           transition: 'transform 0.4s ease',
-                          '&:hover': { transform: 'scale(1.05)' }
+                          '&:hover': { transform: 'scale(1.06)' }
                         }}
                       />
 
@@ -879,13 +681,13 @@ export default function PublicMenu() {
                       {product.videoUrl && (
                         <Chip
                           icon={<PlayIcon sx={{ color: '#ffffff !important', fontSize: '1.1rem' }} />}
-                          label="Ver Video"
+                          label="Video HD"
                           size="small"
                           sx={{
                             position: 'absolute',
                             top: 12,
                             right: 12,
-                            bgcolor: 'rgba(22, 163, 74, 0.9)',
+                            bgcolor: 'rgba(22, 163, 74, 0.92)',
                             color: '#ffffff',
                             fontWeight: 800,
                             fontSize: '0.72rem',
@@ -902,7 +704,7 @@ export default function PublicMenu() {
                           position: 'absolute',
                           bottom: 12,
                           left: 12,
-                          bgcolor: 'rgba(11, 19, 7, 0.85)',
+                          bgcolor: 'rgba(11, 19, 7, 0.88)',
                           color: '#bef264',
                           fontWeight: 800,
                           fontSize: '0.72rem',
@@ -912,18 +714,16 @@ export default function PublicMenu() {
                       />
                     </Box>
 
-                    {/* Card Content */}
+                    {/* Card Body */}
                     <CardContent sx={{ flexGrow: 1, p: 2.2 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.8 }}>
                         <Typography
                           variant="h6"
-                          onClick={() => handleOpenDetailModal(product)}
                           sx={{
                             fontWeight: 800,
                             color: '#ffffff',
-                            fontSize: '1.08rem',
+                            fontSize: '1.1rem',
                             lineHeight: 1.25,
-                            cursor: 'pointer',
                             '&:hover': { color: '#bef264' }
                           }}
                         >
@@ -931,7 +731,7 @@ export default function PublicMenu() {
                         </Typography>
                       </Box>
 
-                      {/* Rating & Calories Chips */}
+                      {/* Rating & Calories */}
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.2 }}>
                         {product.rating && (
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
@@ -964,7 +764,7 @@ export default function PublicMenu() {
                         sx={{
                           color: '#94a3b8',
                           fontSize: '0.86rem',
-                          mb: 1.5,
+                          mb: 1.6,
                           display: '-webkit-box',
                           WebkitLineClamp: 2,
                           WebkitBoxOrient: 'vertical',
@@ -998,7 +798,7 @@ export default function PublicMenu() {
 
                     <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)' }} />
 
-                    {/* Price & Interactive Add Action */}
+                    {/* Card Price & Details CTA */}
                     <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: 'rgba(11, 19, 7, 0.5)' }}>
                       <Box>
                         <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.68rem', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>
@@ -1009,51 +809,27 @@ export default function PublicMenu() {
                         </Typography>
                       </Box>
 
-                      {/* Action Button: Add or Quantity Counter */}
-                      {inCartCount === 0 ? (
-                        <Button
-                          variant="contained"
-                          size="small"
-                          startIcon={<AddIcon />}
-                          onClick={() => handleQuickAddToCart(product)}
-                          sx={{
-                            bgcolor: '#16a34a',
-                            color: '#ffffff',
-                            fontWeight: 800,
-                            borderRadius: '12px',
-                            textTransform: 'none',
-                            px: 2,
-                            py: 0.8,
-                            boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
-                            '&:hover': { bgcolor: '#15803d' }
-                          }}
-                        >
-                          Agregar
-                        </Button>
-                      ) : (
-                        <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: 'rgba(22, 163, 74, 0.15)', borderRadius: '12px', border: '1px solid #16a34a', p: 0.4 }}>
-                          <IconButton
-                            size="small"
-                            onClick={() => {
-                              const item = cart.find(i => i.product.id === product.id);
-                              if (item) handleUpdateQuantity(item.cartId, -1);
-                            }}
-                            sx={{ color: '#4ade80', p: 0.4 }}
-                          >
-                            <RemoveIcon fontSize="small" />
-                          </IconButton>
-                          <Typography sx={{ px: 1.2, fontWeight: 900, color: '#ffffff', fontSize: '0.9rem' }}>
-                            {inCartCount}
-                          </Typography>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleQuickAddToCart(product)}
-                            sx={{ color: '#4ade80', p: 0.4 }}
-                          >
-                            <AddIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      )}
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        endIcon={<InfoIcon />}
+                        sx={{
+                          borderRadius: '12px',
+                          borderColor: 'rgba(132, 204, 22, 0.4)',
+                          color: '#bef264',
+                          fontWeight: 800,
+                          fontSize: '0.78rem',
+                          textTransform: 'none',
+                          px: 1.8,
+                          py: 0.6,
+                          '&:hover': {
+                            borderColor: '#84cc16',
+                            bgcolor: 'rgba(132, 204, 22, 0.12)'
+                          }
+                        }}
+                      >
+                        Ver Ficha
+                      </Button>
                     </Box>
                   </Card>
                 </Grid>
@@ -1064,81 +840,7 @@ export default function PublicMenu() {
       </Container>
 
       {/* ============================================================ */}
-      {/* FLOATING STICKY CART PILL (VISIBLE WHEN ITEMS IN CART)       */}
-      {/* ============================================================ */}
-      {cartItemCount > 0 && (
-        <Box
-          sx={{
-            position: 'fixed',
-            bottom: 24,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 1000,
-            width: 'calc(100% - 32px)',
-            maxWidth: 580
-          }}
-        >
-          <Paper
-            elevation={8}
-            onClick={() => setIsCartOpen(true)}
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              p: 1.6,
-              px: 2.5,
-              borderRadius: '24px',
-              bgcolor: '#16a34a',
-              background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-              color: '#ffffff',
-              cursor: 'pointer',
-              boxShadow: '0 12px 32px rgba(22, 163, 74, 0.45)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              transition: 'transform 0.2s ease',
-              '&:hover': { transform: 'scale(1.02)' }
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Badge badgeContent={cartItemCount} color="warning">
-                <CartIcon sx={{ fontSize: 28 }} />
-              </Badge>
-              <Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 900, lineHeight: 1.1 }}>
-                  {cartItemCount} {cartItemCount === 1 ? 'platillo' : 'platillos'} en orden
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#dcfce7', fontWeight: 600 }}>
-                  {selectedTableNumber ? `Para Mesa #${selectedTableNumber}` : 'Toca para elegir mesa y enviar'}
-                </Typography>
-              </Box>
-            </Box>
-
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Typography variant="h6" sx={{ fontWeight: 900, letterSpacing: '-0.02em' }}>
-                ${cartTotal.toLocaleString()} COP
-              </Typography>
-              <Button
-                variant="contained"
-                size="small"
-                endIcon={<ArrowForwardIcon />}
-                sx={{
-                  bgcolor: '#ffffff',
-                  color: '#15803d',
-                  fontWeight: 900,
-                  borderRadius: '12px',
-                  textTransform: 'none',
-                  px: 1.8,
-                  '&:hover': { bgcolor: '#f0fdf4' }
-                }}
-              >
-                Ver Pedido
-              </Button>
-            </Box>
-          </Paper>
-        </Box>
-      )}
-
-      {/* ============================================================ */}
-      {/* DISH CUSTOMIZATION & DETAIL MODAL                           */}
+      {/* DISH DETAIL & SENSORY TASTING MODAL                          */}
       {/* ============================================================ */}
       <Dialog
         open={isDetailModalOpen}
@@ -1152,7 +854,7 @@ export default function PublicMenu() {
               color: '#ffffff',
               borderRadius: '26px',
               border: '1px solid rgba(132, 204, 22, 0.25)',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.8)',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.85)',
               overflow: 'hidden'
             }
           }
@@ -1160,8 +862,8 @@ export default function PublicMenu() {
       >
         {selectedProduct && (
           <>
-            {/* Media Banner */}
-            <Box sx={{ position: 'relative', bgcolor: '#000000', maxHeight: 300, overflow: 'hidden' }}>
+            {/* Visual Media Header */}
+            <Box sx={{ position: 'relative', bgcolor: '#000000', maxHeight: 320, overflow: 'hidden' }}>
               <IconButton
                 onClick={handleCloseDetailModal}
                 sx={{
@@ -1186,498 +888,127 @@ export default function PublicMenu() {
                   muted
                   playsInline
                   src={selectedProduct.videoUrl}
-                  sx={{ width: '100%', height: 280, objectFit: 'cover', display: 'block' }}
+                  sx={{ width: '100%', height: 300, objectFit: 'cover', display: 'block' }}
                 />
               ) : (
                 <Box
                   component="img"
                   src={selectedProduct.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c'}
                   alt={selectedProduct.name}
-                  sx={{ width: '100%', height: 260, objectFit: 'cover', display: 'block' }}
+                  sx={{ width: '100%', height: 280, objectFit: 'cover', display: 'block' }}
                 />
               )}
             </Box>
 
             <DialogContent sx={{ p: 3 }}>
-              {/* Dish Title & Price */}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+              {/* Title & Price */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.2 }}>
                 <Box>
-                  <Typography variant="h5" sx={{ fontWeight: 900, color: '#ffffff' }}>
+                  <Typography variant="h5" sx={{ fontWeight: 900, color: '#ffffff', lineHeight: 1.2 }}>
                     {selectedProduct.name}
                   </Typography>
                   {selectedProduct.rating && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, mt: 0.4 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, mt: 0.5 }}>
                       <Rating value={selectedProduct.rating} readOnly precision={0.1} size="small" sx={{ color: '#facc15' }} />
                       <Typography variant="caption" sx={{ color: '#facc15', fontWeight: 800 }}>
-                        {selectedProduct.rating.toFixed(1)} / 5.0
+                        {selectedProduct.rating.toFixed(1)} / 5.0 (Valoración comensales)
                       </Typography>
                     </Box>
                   )}
                 </Box>
-                <Typography variant="h5" sx={{ fontWeight: 900, color: '#4ade80' }}>
-                  ${selectedProduct.price.toLocaleString()} COP
-                </Typography>
+                <Box sx={{ textAlign: 'right' }}>
+                  <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.68rem', textTransform: 'uppercase', fontWeight: 800, display: 'block' }}>
+                    Precio
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 900, color: '#4ade80' }}>
+                    ${selectedProduct.price.toLocaleString()} COP
+                  </Typography>
+                </Box>
               </Box>
 
-              <Typography variant="body2" sx={{ color: '#cbd5e1', lineHeight: 1.6, mb: 2.5 }}>
+              <Typography variant="body2" sx={{ color: '#cbd5e1', lineHeight: 1.65, mb: 2.5, fontSize: '0.92rem' }}>
                 {selectedProduct.description}
               </Typography>
 
-              {/* Modifiers / Addons Selection */}
+              {/* Modifiers & Customization Options (Read-only culinary preview) */}
               {selectedProduct.modifiers && selectedProduct.modifiers.length > 0 && (
-                <Box sx={{ mb: 2.5 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#bef264', mb: 1, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.75rem' }}>
-                    Personalización y Opciones:
+                <Box sx={{ mb: 2.5, p: 2, bgcolor: 'rgba(255,255,255,0.04)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#84cc16', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 1 }}>
+                    Opciones y Acompañamientos Disponibles:
                   </Typography>
-                  <Stack spacing={1}>
-                    {selectedProduct.modifiers.map(group => (
-                      <Box key={group.id} sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.04)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <Typography variant="caption" sx={{ fontWeight: 800, color: '#f8fafc', display: 'block', mb: 0.8 }}>
-                          {group.name} {group.isRequired ? '*(Requerido)' : '(Opcional)'}
-                        </Typography>
-                        <Grid container spacing={1}>
-                          {group.options.map(opt => {
-                            const isSelected = modalSelectedModifiers.some(m => m.id === opt.id);
-                            return (
-                              <Grid size={{ xs: 12, sm: 6 }} key={opt.id}>
-                                <Button
-                                  fullWidth
-                                  size="small"
-                                  variant={isSelected ? 'contained' : 'outlined'}
-                                  onClick={() => {
-                                    if (isSelected) {
-                                      setModalSelectedModifiers(modalSelectedModifiers.filter(m => m.id !== opt.id));
-                                    } else {
-                                      setModalSelectedModifiers([...modalSelectedModifiers, opt]);
-                                    }
-                                  }}
-                                  sx={{
-                                    justifyContent: 'space-between',
-                                    borderRadius: '10px',
-                                    textTransform: 'none',
-                                    fontWeight: 700,
-                                    fontSize: '0.78rem',
-                                    bgcolor: isSelected ? '#16a34a' : 'transparent',
-                                    borderColor: isSelected ? '#16a34a' : 'rgba(255,255,255,0.15)',
-                                    color: isSelected ? '#ffffff' : '#cbd5e1'
-                                  }}
-                                >
-                                  <span>{opt.name}</span>
-                                  <span>{opt.price > 0 ? `+$${opt.price.toLocaleString()}` : 'Gratis'}</span>
-                                </Button>
-                              </Grid>
-                            );
-                          })}
-                        </Grid>
+                  {selectedProduct.modifiers.map(group => (
+                    <Box key={group.id} sx={{ mb: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#ffffff', fontSize: '0.85rem' }}>
+                        • {group.name}:
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8, mt: 0.5 }}>
+                        {group.options.map(opt => (
+                          <Chip
+                            key={opt.id}
+                            label={`${opt.name} ${opt.price > 0 ? `(+$${opt.price.toLocaleString()})` : ''}`}
+                            size="small"
+                            sx={{
+                              bgcolor: 'rgba(132, 204, 22, 0.1)',
+                              color: '#bef264',
+                              fontWeight: 600,
+                              fontSize: '0.74rem'
+                            }}
+                          />
+                        ))}
                       </Box>
-                    ))}
-                  </Stack>
+                    </Box>
+                  ))}
                 </Box>
               )}
 
-              {/* Kitchen Special Notes */}
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="caption" sx={{ fontWeight: 800, color: '#94a3b8', display: 'block', mb: 0.5 }}>
-                  Notas especiales para la cocina (Opcional):
-                </Typography>
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder="Ej. Término medio, salsa al lado, sin cebolla..."
-                  value={modalNotes}
-                  onChange={e => setModalNotes(e.target.value)}
-                  slotProps={{
-                    input: {
-                      sx: {
-                        bgcolor: 'rgba(255,255,255,0.05)',
-                        color: '#ffffff',
-                        borderRadius: '12px',
-                        fontSize: '0.88rem'
-                      }
-                    }
-                  }}
-                />
-              </Box>
-
-              {/* Quantity Controller & Add Button */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, pt: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: 'rgba(255,255,255,0.08)', borderRadius: '12px', p: 0.5 }}>
-                  <IconButton
-                    size="small"
-                    onClick={() => setModalQuantity(Math.max(1, modalQuantity - 1))}
-                    sx={{ color: '#ffffff' }}
-                  >
-                    <RemoveIcon />
-                  </IconButton>
-                  <Typography sx={{ px: 2, fontWeight: 900, fontSize: '1.1rem' }}>
-                    {modalQuantity}
+              {/* Pairing / Maridaje Sugerido */}
+              <Box sx={{ p: 2, bgcolor: 'rgba(234, 179, 8, 0.08)', borderRadius: '16px', border: '1px solid rgba(234, 179, 8, 0.25)', mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <WineIcon sx={{ color: '#facc15', fontSize: 20 }} />
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#fef08a' }}>
+                    Maridaje & Sugerencia del Sommelier
                   </Typography>
-                  <IconButton
-                    size="small"
-                    onClick={() => setModalQuantity(modalQuantity + 1)}
-                    sx={{ color: '#ffffff' }}
-                  >
-                    <AddIcon />
-                  </IconButton>
                 </Box>
-
-                <Button
-                  fullWidth
-                  variant="contained"
-                  onClick={handleModalAddToCart}
-                  sx={{
-                    py: 1.3,
-                    borderRadius: '14px',
-                    fontWeight: 900,
-                    fontSize: '0.98rem',
-                    bgcolor: '#16a34a',
-                    boxShadow: '0 6px 18px rgba(22, 163, 74, 0.4)',
-                    textTransform: 'none',
-                    '&:hover': { bgcolor: '#15803d' }
-                  }}
-                >
-                  Agregar • ${((selectedProduct.price + modalSelectedModifiers.reduce((s, m) => s + (m.price || 0), 0)) * modalQuantity).toLocaleString()} COP
-                </Button>
+                <Typography variant="caption" sx={{ color: '#cbd5e1', lineHeight: 1.5, display: 'block' }}>
+                  Ideal acompañado de una copa de vino tinto joven o nuestra refrescante limonada de coco artesanal.
+                </Typography>
               </Box>
+
+              {/* Call Waiter CTA */}
+              <Button
+                fullWidth
+                variant="contained"
+                size="large"
+                startIcon={<WaiterIcon />}
+                onClick={() => {
+                  handleCallWaiter();
+                  handleCloseDetailModal();
+                }}
+                sx={{
+                  py: 1.3,
+                  borderRadius: '14px',
+                  fontWeight: 900,
+                  fontSize: '0.95rem',
+                  bgcolor: '#16a34a',
+                  background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                  boxShadow: '0 6px 20px rgba(22, 163, 74, 0.4)',
+                  textTransform: 'none',
+                  '&:hover': { bgcolor: '#15803d' }
+                }}
+              >
+                Pedir este platillo a mi mesero 🛎️
+              </Button>
             </DialogContent>
           </>
         )}
       </Dialog>
 
       {/* ============================================================ */}
-      {/* CART & CHECKOUT SLIDE-OVER DRAWER                            */}
-      {/* ============================================================ */}
-      <Drawer
-        anchor="right"
-        open={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
-        slotProps={{
-          paper: {
-            sx: {
-              width: { xs: '100%', sm: 460 },
-              bgcolor: '#0f170b',
-              color: '#ffffff',
-              p: 3,
-              display: 'flex',
-              flexDirection: 'column'
-            }
-          }
-        }}
-      >
-        {/* Drawer Header */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-            <CartIcon sx={{ color: '#84cc16', fontSize: 26 }} />
-            <Typography variant="h6" sx={{ fontWeight: 900 }}>
-              Tu Pedido ({cartItemCount})
-            </Typography>
-          </Box>
-          <IconButton onClick={() => setIsCartOpen(false)} sx={{ color: '#94a3b8' }}>
-            <CloseIcon />
-          </IconButton>
-        </Box>
-
-        {/* Dining Type Selector */}
-        <Box sx={{ mb: 2.5 }}>
-          <Typography variant="caption" sx={{ fontWeight: 800, color: '#84cc16', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 1 }}>
-            ¿Dónde vas a disfrutar?
-          </Typography>
-          <Stack direction="row" spacing={1}>
-            <Button
-              fullWidth
-              size="small"
-              variant={orderType === 'MESA' ? 'contained' : 'outlined'}
-              onClick={() => setOrderType('MESA')}
-              startIcon={<TableIcon />}
-              sx={{
-                borderRadius: '12px',
-                fontWeight: 800,
-                textTransform: 'none',
-                bgcolor: orderType === 'MESA' ? '#16a34a' : 'transparent',
-                borderColor: orderType === 'MESA' ? '#16a34a' : 'rgba(255,255,255,0.15)',
-                color: orderType === 'MESA' ? '#ffffff' : '#cbd5e1'
-              }}
-            >
-              En Mesa
-            </Button>
-            <Button
-              fullWidth
-              size="small"
-              variant={orderType === 'PARA_LLEVAR' ? 'contained' : 'outlined'}
-              onClick={() => setOrderType('PARA_LLEVAR')}
-              sx={{
-                borderRadius: '12px',
-                fontWeight: 800,
-                textTransform: 'none',
-                bgcolor: orderType === 'PARA_LLEVAR' ? '#16a34a' : 'transparent',
-                borderColor: orderType === 'PARA_LLEVAR' ? '#16a34a' : 'rgba(255,255,255,0.15)',
-                color: orderType === 'PARA_LLEVAR' ? '#ffffff' : '#cbd5e1'
-              }}
-            >
-              Para Llevar
-            </Button>
-            <Button
-              fullWidth
-              size="small"
-              variant={orderType === 'DOMICILIO' ? 'contained' : 'outlined'}
-              onClick={() => setOrderType('DOMICILIO')}
-              sx={{
-                borderRadius: '12px',
-                fontWeight: 800,
-                textTransform: 'none',
-                bgcolor: orderType === 'DOMICILIO' ? '#16a34a' : 'transparent',
-                borderColor: orderType === 'DOMICILIO' ? '#16a34a' : 'rgba(255,255,255,0.15)',
-                color: orderType === 'DOMICILIO' ? '#ffffff' : '#cbd5e1'
-              }}
-            >
-              Domicilio
-            </Button>
-          </Stack>
-        </Box>
-
-        {/* Location Inputs (Table number or Delivery address) */}
-        {orderType === 'MESA' && (
-          <Box sx={{ mb: 2 }}>
-            <FormControl fullWidth size="small">
-              <InputLabel sx={{ color: '#84cc16', fontWeight: 700 }}>Número de Mesa *</InputLabel>
-              <Select
-                value={selectedTableNumber}
-                label="Número de Mesa *"
-                onChange={e => setSelectedTableNumber(e.target.value)}
-                sx={{
-                  color: '#ffffff',
-                  bgcolor: 'rgba(255,255,255,0.06)',
-                  borderRadius: '12px',
-                  fontWeight: 800,
-                  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(132, 204, 22, 0.4)' }
-                }}
-              >
-                {tables.length > 0 ? (
-                  tables.map(t => (
-                    <MenuItem key={t.id} value={String(t.number)}>
-                      Mesa #{t.number} — {t.location} ({t.capacity} puestos)
-                    </MenuItem>
-                  ))
-                ) : (
-                  [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
-                    <MenuItem key={n} value={String(n)}>
-                      Mesa #{n}
-                    </MenuItem>
-                  ))
-                )}
-              </Select>
-            </FormControl>
-          </Box>
-        )}
-
-        {orderType === 'DOMICILIO' && (
-          <Box sx={{ mb: 2 }}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Dirección de entrega"
-              value={deliveryAddress}
-              onChange={e => setDeliveryAddress(e.target.value)}
-              slotProps={{ input: { sx: { bgcolor: 'rgba(255,255,255,0.06)', color: '#ffffff', borderRadius: '12px' } } }}
-              sx={{ '& label': { color: '#84cc16' } }}
-            />
-          </Box>
-        )}
-
-        {/* Customer Name & Phone */}
-        <Box sx={{ mb: 2 }}>
-          <TextField
-            fullWidth
-            size="small"
-            label="Tu Nombre (Opcional)"
-            placeholder="¿A nombre de quién registramos la comanda?"
-            value={customerName}
-            onChange={e => setCustomerName(e.target.value)}
-            slotProps={{ input: { sx: { bgcolor: 'rgba(255,255,255,0.06)', color: '#ffffff', borderRadius: '12px' } } }}
-            sx={{ '& label': { color: '#94a3b8' }, mb: orderType !== 'MESA' ? 1.5 : 0 }}
-          />
-          {orderType !== 'MESA' && (
-            <TextField
-              fullWidth
-              size="small"
-              label="Teléfono Celular"
-              placeholder="Para confirmar tu pedido"
-              value={customerPhone}
-              onChange={e => setCustomerPhone(e.target.value)}
-              slotProps={{ input: { sx: { bgcolor: 'rgba(255,255,255,0.06)', color: '#ffffff', borderRadius: '12px' } } }}
-              sx={{ '& label': { color: '#94a3b8' } }}
-            />
-          )}
-        </Box>
-
-        <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)', mb: 2 }} />
-
-        {/* Cart Item List */}
-        <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 0.5 }}>
-          {cart.length === 0 ? (
-            <Box sx={{ textAlign: 'center', py: 6, color: '#94a3b8' }}>
-              <CartIcon sx={{ fontSize: 50, color: '#64748b', mb: 1.5 }} />
-              <Typography variant="body1" sx={{ fontWeight: 700, color: '#ffffff' }}>
-                Tu orden está vacía
-              </Typography>
-              <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
-                Explora el menú y agrega tus platos favoritos.
-              </Typography>
-            </Box>
-          ) : (
-            <Stack spacing={1.5}>
-              {cart.map(item => (
-                <Paper
-                  key={item.cartId}
-                  elevation={0}
-                  sx={{
-                    p: 1.8,
-                    bgcolor: 'rgba(255,255,255,0.04)',
-                    borderRadius: '16px',
-                    border: '1px solid rgba(255,255,255,0.08)'
-                  }}
-                >
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <Box sx={{ flexGrow: 1 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#ffffff', fontSize: '0.95rem' }}>
-                        {item.product.name}
-                      </Typography>
-                      {item.selectedModifiers.length > 0 && (
-                        <Typography variant="caption" sx={{ color: '#84cc16', display: 'block', fontWeight: 600 }}>
-                          + {item.selectedModifiers.map(m => m.name).join(', ')}
-                        </Typography>
-                      )}
-                      {item.notes && (
-                        <Typography variant="caption" sx={{ color: '#fbbf24', fontStyle: 'italic', display: 'block' }}>
-                          Nota: {item.notes}
-                        </Typography>
-                      )}
-                      <Typography variant="caption" sx={{ color: '#4ade80', fontWeight: 800, display: 'block', mt: 0.4 }}>
-                        ${item.totalPrice.toLocaleString()} COP
-                      </Typography>
-                    </Box>
-
-                    {/* Quantity Controls & Delete */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: 'rgba(255,255,255,0.08)', borderRadius: '10px' }}>
-                        <IconButton size="small" onClick={() => handleUpdateQuantity(item.cartId, -1)} sx={{ color: '#ffffff', p: 0.3 }}>
-                          <RemoveIcon fontSize="small" />
-                        </IconButton>
-                        <Typography sx={{ px: 1, fontWeight: 800, fontSize: '0.85rem' }}>
-                          {item.quantity}
-                        </Typography>
-                        <IconButton size="small" onClick={() => handleUpdateQuantity(item.cartId, 1)} sx={{ color: '#ffffff', p: 0.3 }}>
-                          <AddIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                      <IconButton size="small" onClick={() => handleRemoveItem(item.cartId)} sx={{ color: '#64748b', p: 0.3, '&:hover': { color: '#ef4444' } }}>
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  </Box>
-                </Paper>
-              ))}
-            </Stack>
-          )}
-        </Box>
-
-        {/* Footer Summary & Action Buttons */}
-        {cart.length > 0 && (
-          <Box sx={{ pt: 2, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-            {/* Tip Percentage Selector */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-              <Typography variant="caption" sx={{ color: '#cbd5e1', fontWeight: 600 }}>
-                Propina voluntaria para el equipo de sala:
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 0.6 }}>
-                {[0, 5, 10, 15].map(p => (
-                  <Chip
-                    key={p}
-                    label={`${p}%`}
-                    size="small"
-                    clickable
-                    onClick={() => setTipPercent(p)}
-                    sx={{
-                      fontWeight: 800,
-                      fontSize: '0.72rem',
-                      height: 24,
-                      bgcolor: tipPercent === p ? '#84cc16' : 'rgba(255,255,255,0.08)',
-                      color: tipPercent === p ? '#0f170b' : '#ffffff'
-                    }}
-                  />
-                ))}
-              </Box>
-            </Box>
-
-            {/* Totals */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-              <Typography variant="body2" sx={{ color: '#94a3b8' }}>Subtotal:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>${cartSubtotal.toLocaleString()} COP</Typography>
-            </Box>
-            {cartTipAmount > 0 && (
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                <Typography variant="body2" sx={{ color: '#84cc16' }}>Propina ({tipPercent}%):</Typography>
-                <Typography variant="body2" sx={{ color: '#84cc16', fontWeight: 700 }}>${cartTipAmount.toLocaleString()} COP</Typography>
-              </Box>
-            )}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2.5 }}>
-              <Typography variant="h6" sx={{ fontWeight: 900 }}>Total a Pagar:</Typography>
-              <Typography variant="h6" sx={{ fontWeight: 900, color: '#4ade80' }}>${cartTotal.toLocaleString()} COP</Typography>
-            </Box>
-
-            {/* Action Buttons */}
-            <Stack spacing={1.2}>
-              <Button
-                fullWidth
-                variant="contained"
-                size="large"
-                startIcon={<CheckIcon />}
-                onClick={handleSubmitOrderToKitchen}
-                sx={{
-                  py: 1.4,
-                  borderRadius: '16px',
-                  fontWeight: 900,
-                  fontSize: '1rem',
-                  bgcolor: '#16a34a',
-                  background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                  boxShadow: '0 8px 24px rgba(22, 163, 74, 0.4)',
-                  textTransform: 'none',
-                  '&:hover': { bgcolor: '#15803d' }
-                }}
-              >
-                Enviar Pedido a Cocina ⚡
-              </Button>
-
-              <Button
-                fullWidth
-                variant="outlined"
-                size="medium"
-                startIcon={<WhatsAppIcon sx={{ color: '#22c55e' }} />}
-                onClick={handleOrderViaWhatsApp}
-                sx={{
-                  py: 1.1,
-                  borderRadius: '14px',
-                  fontWeight: 800,
-                  fontSize: '0.88rem',
-                  borderColor: 'rgba(34, 197, 94, 0.4)',
-                  color: '#4ade80',
-                  textTransform: 'none',
-                  '&:hover': { borderColor: '#22c55e', bgcolor: 'rgba(34, 197, 94, 0.1)' }
-                }}
-              >
-                O pedir vía WhatsApp
-              </Button>
-            </Stack>
-          </Box>
-        )}
-      </Drawer>
-
-      {/* ============================================================ */}
-      {/* ORDER CONFIRMED MODAL                                        */}
+      {/* TABLE SELECTION DIALOG                                       */}
       {/* ============================================================ */}
       <Dialog
-        open={isSuccessModalOpen}
-        onClose={() => setIsSuccessModalOpen(false)}
+        open={isTableModalOpen}
+        onClose={() => setIsTableModalOpen(false)}
         maxWidth="xs"
         fullWidth
         slotProps={{
@@ -1685,77 +1016,58 @@ export default function PublicMenu() {
             sx: {
               bgcolor: '#14200f',
               color: '#ffffff',
-              borderRadius: '26px',
-              border: '1px solid rgba(132, 204, 22, 0.4)',
-              p: 2,
-              textAlign: 'center'
+              borderRadius: '24px',
+              border: '1px solid rgba(132, 204, 22, 0.3)',
+              p: 2.5
             }
           }
         }}
       >
-        <DialogContent sx={{ pt: 3 }}>
-          <Box
-            sx={{
-              width: 72,
-              height: 72,
-              borderRadius: '50%',
-              bgcolor: 'rgba(74, 222, 128, 0.18)',
-              color: '#4ade80',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px auto',
-              boxShadow: '0 0 24px rgba(74, 222, 128, 0.3)'
-            }}
-          >
-            <CheckIcon sx={{ fontSize: 44 }} />
+        <DialogContent sx={{ p: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 1.5 }}>
+            <TableIcon sx={{ color: '#84cc16', fontSize: 28 }} />
+            <Typography variant="h6" sx={{ fontWeight: 900 }}>
+              ¿En qué mesa te encuentras?
+            </Typography>
           </Box>
-
-          <Typography variant="h5" sx={{ fontWeight: 900, color: '#ffffff', mb: 1 }}>
-            ¡Tu orden ha sido enviada! 🎉
+          <Typography variant="body2" sx={{ color: '#94a3b8', mb: 2.5, fontSize: '0.88rem' }}>
+            Indica el número de tu mesa para que el personal de servicio acuda rápidamente cuando los llames.
           </Typography>
 
-          <Typography variant="body2" sx={{ color: '#cbd5e1', mb: 2.5, lineHeight: 1.5 }}>
-            La campana sonó en la cocina y nuestros chefs han recibido tu comanda.
-          </Typography>
-
-          {confirmedOrder && (
-            <Paper
-              elevation={0}
+          <FormControl fullWidth size="small" sx={{ mb: 2.5 }}>
+            <InputLabel sx={{ color: '#84cc16', fontWeight: 700 }}>Número de Mesa</InputLabel>
+            <Select
+              value={selectedTableNumber}
+              label="Número de Mesa"
+              onChange={e => setSelectedTableNumber(e.target.value)}
               sx={{
-                p: 2,
-                bgcolor: 'rgba(255,255,255,0.05)',
-                borderRadius: '16px',
-                border: '1px solid rgba(255,255,255,0.08)',
-                mb: 2.5,
-                textAlign: 'left'
+                color: '#ffffff',
+                bgcolor: 'rgba(255,255,255,0.06)',
+                borderRadius: '12px',
+                fontWeight: 800,
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(132, 204, 22, 0.4)' }
               }}
             >
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.6 }}>
-                <Typography variant="caption" sx={{ color: '#94a3b8' }}>Orden:</Typography>
-                <Typography variant="caption" sx={{ fontWeight: 800, color: '#84cc16' }}>#{confirmedOrder.orderNumber}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.6 }}>
-                <Typography variant="caption" sx={{ color: '#94a3b8' }}>Ubicación:</Typography>
-                <Typography variant="caption" sx={{ fontWeight: 800 }}>
-                  {confirmedOrder.tableId ? `Mesa #${confirmedOrder.tableId}` : confirmedOrder.type === 'DOMICILIO' ? 'A Domicilio' : 'Para Llevar'}
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.6 }}>
-                <Typography variant="caption" sx={{ color: '#94a3b8' }}>Total:</Typography>
-                <Typography variant="caption" sx={{ fontWeight: 900, color: '#4ade80' }}>${confirmedOrder.total.toLocaleString()} COP</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="caption" sx={{ color: '#94a3b8' }}>Tiempo aprox:</Typography>
-                <Typography variant="caption" sx={{ fontWeight: 800, color: '#facc15' }}>15 a 20 minutos</Typography>
-              </Box>
-            </Paper>
-          )}
+              {tables.length > 0 ? (
+                tables.map(t => (
+                  <MenuItem key={t.id} value={String(t.number)}>
+                    Mesa #{t.number} — {t.location} ({t.capacity} puestos)
+                  </MenuItem>
+                ))
+              ) : (
+                [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
+                  <MenuItem key={n} value={String(n)}>
+                    Mesa #{n}
+                  </MenuItem>
+                ))
+              )}
+            </Select>
+          </FormControl>
 
           <Button
             fullWidth
             variant="contained"
-            onClick={() => setIsSuccessModalOpen(false)}
+            onClick={() => setIsTableModalOpen(false)}
             sx={{
               py: 1.2,
               borderRadius: '14px',
@@ -1765,34 +1077,34 @@ export default function PublicMenu() {
               '&:hover': { bgcolor: '#15803d' }
             }}
           >
-            Entendido, ¡gracias!
+            Confirmar Mesa
           </Button>
         </DialogContent>
       </Dialog>
 
       {/* ============================================================ */}
-      {/* WAITER CALL NOTIFICATION SNACKBAR                            */}
+      {/* SERVICE NOTIFICATION SNACKBAR                                */}
       {/* ============================================================ */}
       <Snackbar
-        open={Boolean(waiterCallNotice)}
+        open={Boolean(serviceNotice)}
         autoHideDuration={6000}
-        onClose={() => setWaiterCallNotice(null)}
+        onClose={() => setServiceNotice(null)}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
         <Alert
-          onClose={() => setWaiterCallNotice(null)}
-          severity="success"
+          onClose={() => setServiceNotice(null)}
+          severity={serviceNotice?.severity || 'success'}
           sx={{
             width: '100%',
             fontWeight: 800,
-            bgcolor: '#16a34a',
+            bgcolor: serviceNotice?.severity === 'info' ? '#0284c7' : '#16a34a',
             color: '#ffffff',
             borderRadius: '16px',
-            boxShadow: '0 8px 24px rgba(22, 163, 74, 0.4)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
             '& .MuiAlert-icon': { color: '#ffffff' }
           }}
         >
-          {waiterCallNotice}
+          {serviceNotice?.message}
         </Alert>
       </Snackbar>
     </Box>
