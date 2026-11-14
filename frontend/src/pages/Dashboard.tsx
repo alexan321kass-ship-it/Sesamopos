@@ -288,21 +288,68 @@ export default function Dashboard() {
     return 'Buenas noches';
   }, []);
 
-  // Aggregated Executive KPIs & Food Cost
+  // Aggregated Executive KPIs & Food Cost (Sincronizado directamente con la Caja y Turno Activo)
   const kpis = useMemo(() => {
-    const tableSales = orders
-      .filter((o) => o.status !== 'CANCELADO')
-      .reduce((sum, o) => sum + (o.total || 0), 0);
+    const isShiftActive = Boolean(cashRegister && cashRegister.isOpen);
+    const shiftStart = cashRegister?.openedAt || 0;
 
-    const deliverySales = deliveries
-      .filter((d) => d.deliveryStatus !== 'CANCELADO' && (d as any).status !== 'CANCELADO')
-      .reduce((sum, d) => sum + (d.total || 0), 0);
+    // Solo órdenes efectivamente PAGADAS durante el turno activo (o del día de hoy si la caja está cerrada)
+    const paidSalonOrders = orders.filter((o) => {
+      if (o.status !== 'PAGADO') return false;
+      if (isShiftActive) {
+        return (
+          o.registerId === cashRegister?.id ||
+          (o.paidAt && o.paidAt >= shiftStart) ||
+          (!o.paidAt && o.createdAt >= shiftStart)
+        );
+      }
+      const orderDate = new Date(o.paidAt || o.createdAt);
+      const today = new Date();
+      return orderDate.toDateString() === today.toDateString();
+    });
 
+    const completedDeliveries = deliveries.filter((d) => {
+      if (d.status === 'CANCELADO' || d.deliveryStatus === 'CANCELADO') return false;
+      const isDeliveredOrPaid = d.deliveryStatus === 'ENTREGADO' || d.status === 'ENTREGADO' || d.status === 'PAGADO';
+      if (!isDeliveredOrPaid) return false;
+      if (isShiftActive) {
+        return (
+          (d.deliveredAt && d.deliveredAt >= shiftStart) ||
+          (!d.deliveredAt && d.createdAt >= shiftStart)
+        );
+      }
+      const delivDate = new Date(d.deliveredAt || d.createdAt);
+      const today = new Date();
+      return delivDate.toDateString() === today.toDateString();
+    });
+
+    const tableSales = paidSalonOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+    const deliverySales = completedDeliveries.reduce((sum, d) => sum + (d.total || 0), 0);
     const totalSales = tableSales + deliverySales;
-    const totalOrdersCount = orders.length + deliveries.length;
+    const totalOrdersCount = paidSalonOrders.length + completedDeliveries.length;
     const avgTicket = totalOrdersCount > 0 ? Math.round(totalSales / totalOrdersCount) : 0;
-    const avgSalonTicket = orders.length > 0 ? Math.round(tableSales / orders.length) : 0;
-    const avgDeliveryTicket = deliveries.length > 0 ? Math.round(deliverySales / deliveries.length) : 0;
+    const avgSalonTicket = paidSalonOrders.length > 0 ? Math.round(tableSales / paidSalonOrders.length) : 0;
+    const avgDeliveryTicket = completedDeliveries.length > 0 ? Math.round(deliverySales / completedDeliveries.length) : 0;
+
+    // Cuentas y mesas en consumo pendientes de cobrar
+    const pendingOrders = orders.filter((o) => o.status !== 'PAGADO' && o.status !== 'CANCELADO');
+    const pendingVolume = pendingOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+
+    // Fondo inicial de caja y efectivo físico esperado en gaveta
+    const initialFloat = isShiftActive ? (cashRegister?.initialAmount || 0) : 0;
+    const cashSalonSales = paidSalonOrders.reduce((sum, o) => {
+      if (!o.paymentMethod || o.paymentMethod === 'EFECTIVO') return sum + (o.total || 0);
+      if (o.paymentMethod === 'MIXTO' && o.mixedPayments) {
+        return sum + (o.mixedPayments.find((m) => m.method.toLowerCase().includes('efectivo'))?.amount || 0);
+      }
+      return sum;
+    }, 0);
+    const cashDeliverySales = completedDeliveries.reduce((sum, d) => {
+      if (!d.paymentMethod || d.paymentMethod === 'EFECTIVO') return sum + (d.total || 0);
+      return sum;
+    }, 0);
+    const totalCashSales = cashSalonSales + cashDeliverySales;
+    const expectedCashInDrawer = initialFloat + totalCashSales;
 
     // Daily Sales Goal (e.g. $3,500,000 COP)
     const dailyGoal = 3500000;
@@ -325,16 +372,14 @@ export default function Dashboard() {
     });
 
     // Sum theoretical cost from order items
-    orders.forEach((o) => {
-      if (o.status === 'CANCELADO') return;
+    paidSalonOrders.forEach((o) => {
       (o.items || []).forEach((item) => {
         const itemCost = recipeMap.get(item.productId) || (item.unitPrice ? item.unitPrice * 0.32 : 5000);
         totalTheoreticalCost += itemCost * (item.quantity || 1);
       });
     });
 
-    deliveries.forEach((d) => {
-      if (d.deliveryStatus === 'CANCELADO' || (d as any).status === 'CANCELADO') return;
+    completedDeliveries.forEach((d) => {
       (d.items || []).forEach((item) => {
         const itemCost = recipeMap.get(item.productId) || (item.unitPrice ? item.unitPrice * 0.32 : 5000);
         totalTheoreticalCost += itemCost * (item.quantity || 1);
@@ -372,11 +417,16 @@ export default function Dashboard() {
       grossMargin,
       grossMarginPercentage,
       totalOrdersCount,
-      tableOrdersCount: orders.length,
-      deliveryOrdersCount: deliveries.length,
+      tableOrdersCount: paidSalonOrders.length,
+      deliveryOrdersCount: completedDeliveries.length,
       avgTicket,
       avgSalonTicket,
       avgDeliveryTicket,
+      pendingVolume,
+      pendingOrdersCount: pendingOrders.length,
+      initialFloat,
+      totalCashSales,
+      expectedCashInDrawer,
       occupiedTables: tableMetrics.occupiedTotal,
       reservedTables: tableMetrics.reserved,
       availableTables: tableMetrics.available,
@@ -387,7 +437,7 @@ export default function Dashboard() {
       criticalStockList: criticalStock,
       delayedOrdersCount: delayedOrders.length,
     };
-  }, [orders, deliveries, tables, inventory, reservations, staff, tableMetrics, recipes]);
+  }, [orders, deliveries, tables, inventory, reservations, staff, tableMetrics, recipes, cashRegister]);
 
   // Hourly sales distribution dynamically computed
   const hourlySalesData = useMemo(() => {
@@ -420,8 +470,12 @@ export default function Dashboard() {
       return 12;
     };
 
+    const isShiftActive = Boolean(cashRegister && cashRegister.isOpen);
+    const shiftStart = cashRegister?.openedAt || 0;
+
     orders.forEach((o) => {
-      if (o.status === 'CANCELADO') return;
+      if (o.status !== 'PAGADO') return;
+      if (isShiftActive && ((o.paidAt && o.paidAt < shiftStart) || (!o.paidAt && o.createdAt < shiftStart))) return;
       const ts = Number(o.paidAt || o.createdAt) || Date.now();
       const h = new Date(ts).getHours();
       const slot = mapHourToSlot(h);
@@ -434,7 +488,9 @@ export default function Dashboard() {
     });
 
     deliveries.forEach((d) => {
-      if (d.deliveryStatus === 'CANCELADO' || (d as any).status === 'CANCELADO') return;
+      const isDeliveredOrPaid = d.deliveryStatus === 'ENTREGADO' || d.status === 'ENTREGADO' || d.status === 'PAGADO';
+      if (!isDeliveredOrPaid) return;
+      if (isShiftActive && ((d.deliveredAt && d.deliveredAt < shiftStart) || (!d.deliveredAt && d.createdAt < shiftStart))) return;
       const ts = Number(d.deliveredAt || d.dispatchedAt || d.createdAt) || Date.now();
       const h = new Date(ts).getHours();
       const slot = mapHourToSlot(h);
@@ -453,7 +509,7 @@ export default function Dashboard() {
       salon: salesBySlot[s.key].salon,
       domicilios: salesBySlot[s.key].domicilios,
     }));
-  }, [orders, deliveries]);
+  }, [orders, deliveries, cashRegister]);
 
   // Top selling products with profit margin
   const topProductsData = useMemo(() => {
@@ -740,7 +796,7 @@ export default function Dashboard() {
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                 <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.8rem' }}>
-                  Ventas de Hoy
+                  {isShiftOpen ? 'Ventas del Turno' : 'Ventas de Hoy'}
                 </Typography>
                 <Avatar sx={{ width: 32, height: 32, bgcolor: '#ecfccb', color: '#65a30d' }}>
                   <MoneyIcon sx={{ fontSize: 20 }} />
@@ -750,14 +806,16 @@ export default function Dashboard() {
                 ${kpis.totalSales.toLocaleString()}
               </Typography>
               <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.5, fontSize: '0.78rem' }}>
-                Meta diaria: ${(kpis.dailyGoal / 1000000).toFixed(1)}M COP
+                {isShiftOpen
+                  ? `Base: $${kpis.initialFloat.toLocaleString()} • Gaveta: $${kpis.expectedCashInDrawer.toLocaleString()}`
+                  : `Meta diaria: $${(kpis.dailyGoal / 1000000).toFixed(1)}M COP`}
               </Typography>
             </Box>
 
             <Box sx={{ mt: 2 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.8 }}>
                 <Typography variant="caption" sx={{ fontWeight: 800, color: '#65a30d', fontSize: '0.78rem' }}>
-                  {kpis.goalPercentage}% cumplido
+                  {kpis.goalPercentage}% cumplido {kpis.pendingVolume > 0 ? `(+$${kpis.pendingVolume.toLocaleString()} en mesas)` : ''}
                 </Typography>
                 <TrendingUpIcon sx={{ fontSize: 16, color: '#65a30d' }} />
               </Box>
