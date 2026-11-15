@@ -150,17 +150,21 @@ export default function ReservationsScreen() {
     };
   }, []);
 
-  // Helper date matchers
-  const isToday = (timestamp: number) => {
-    const d = new Date(timestamp);
+  // Helper date matchers (safe with timestamp number, string and timezone)
+  const isToday = (val: number | string | undefined) => {
+    if (!val) return false;
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return false;
     const today = new Date();
     return d.getDate() === today.getDate() &&
       d.getMonth() === today.getMonth() &&
       d.getFullYear() === today.getFullYear();
   };
 
-  const isTomorrow = (timestamp: number) => {
-    const d = new Date(timestamp);
+  const isTomorrow = (val: number | string | undefined) => {
+    if (!val) return false;
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return false;
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     return d.getDate() === tomorrow.getDate() &&
@@ -198,13 +202,14 @@ export default function ReservationsScreen() {
   const filteredReservations = useMemo(() => {
     return reservations.filter(r => {
       // Search
-      const query = searchQuery.toLowerCase();
-      const matchesSearch =
-        r.customerName.toLowerCase().includes(query) ||
-        r.customerPhone.includes(query) ||
+      const query = searchQuery.toLowerCase().trim();
+      const matchesSearch = !query || (
+        (r.customerName || '').toLowerCase().includes(query) ||
+        (r.customerPhone || '').includes(query) ||
         (r.tableName && r.tableName.toLowerCase().includes(query)) ||
         (r.specialRequests && r.specialRequests.toLowerCase().includes(query)) ||
-        (r.notes && r.notes.toLowerCase().includes(query));
+        (r.notes && r.notes.toLowerCase().includes(query))
+      );
 
       if (!matchesSearch) return false;
 
@@ -275,10 +280,21 @@ export default function ReservationsScreen() {
 
     try {
       const assignedTable = tables.find(t => t.id === editingReservation.tableId);
-      const dataToSave = {
-        ...editingReservation,
-        tableName: assignedTable ? `Mesa ${assignedTable.number} (Salón)` : 'Sin Asignar',
-        guestCount: Number(editingReservation.guestCount) || 2,
+      const dataToSave: Omit<Reservation, 'id'> = {
+        customerName: editingReservation.customerName.trim(),
+        customerPhone: editingReservation.customerPhone.trim(),
+        customerEmail: editingReservation.customerEmail?.trim() || '',
+        customerId: editingReservation.customerId || undefined,
+        date: editingReservation.date || Date.now(),
+        timeSlot: editingReservation.timeSlot || '19:30',
+        tableId: editingReservation.tableId || undefined,
+        tableName: assignedTable ? `Mesa ${assignedTable.number} (Salón)` : (editingReservation.tableName || 'Sin Asignar'),
+        guestCount: Math.max(1, Number(editingReservation.guestCount) || 2),
+        status: (editingReservation.status as ReservationStatus) || 'CONFIRMADA',
+        occasion: editingReservation.occasion || 'OTRO',
+        specialRequests: editingReservation.specialRequests?.trim() || '',
+        notes: editingReservation.notes?.trim() || '',
+        durationMinutes: Number(editingReservation.durationMinutes) || 120,
         depositAmount: Number(editingReservation.depositAmount) || 0,
       };
 
@@ -286,13 +302,13 @@ export default function ReservationsScreen() {
         await mockApi.reservations.update(editingReservation.id, dataToSave);
         setSnackbar({ open: true, message: `Reserva de ${dataToSave.customerName} actualizada con éxito.`, severity: 'success' });
       } else {
-        await mockApi.reservations.create(dataToSave as Omit<Reservation, 'id'>);
+        await mockApi.reservations.create(dataToSave);
         setSnackbar({ open: true, message: `Nueva reserva para ${dataToSave.customerName} agendada exitosamente.`, severity: 'success' });
       }
 
       setIsEditModalOpen(false);
       setEditingReservation(null);
-      loadData();
+      await loadData();
     } catch (err) {
       console.error(err);
       setSnackbar({ open: true, message: 'Error al guardar la reserva.', severity: 'error' });
@@ -1875,10 +1891,18 @@ export default function ReservationsScreen() {
                       fullWidth
                       type="date"
                       label="Fecha de la Reserva"
-                      value={new Date(editingReservation.date || Date.now()).toISOString().slice(0, 10)}
+                      value={(() => {
+                        const d = new Date(editingReservation.date || Date.now());
+                        const y = d.getFullYear();
+                        const m = String(d.getMonth() + 1).padStart(2, '0');
+                        const day = String(d.getDate()).padStart(2, '0');
+                        return `${y}-${m}-${day}`;
+                      })()}
                       onChange={(e) => {
-                        const parsed = new Date(e.target.value);
-                        setEditingReservation({ ...editingReservation, date: parsed.getTime() });
+                        if (!e.target.value) return;
+                        const [y, m, day] = e.target.value.split('-').map(Number);
+                        const localD = new Date(y, m - 1, day, 12, 0, 0, 0);
+                        setEditingReservation({ ...editingReservation, date: localD.getTime() });
                       }}
                       slotProps={{ inputLabel: { shrink: true } }}
                     />

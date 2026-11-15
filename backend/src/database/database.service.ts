@@ -375,8 +375,22 @@ export class DatabaseService implements OnModuleInit {
         return (await this.prisma.delivery.findMany({ orderBy: { createdAt: 'desc' } })) as unknown as T[];
       case 'inventory':
         return (await this.prisma.inventoryItem.findMany({ orderBy: { name: 'asc' } })) as unknown as T[];
-      case 'reservations':
-        return (await this.prisma.reservation.findMany({ orderBy: { date: 'asc' } })) as unknown as T[];
+      case 'reservations': {
+        try {
+          const list = await this.prisma.reservation.findMany();
+          return list.map(r => ({
+            ...r,
+            customerPhone: r.phone || (r as any).customerPhone || '',
+            guestCount: r.pax || (r as any).guestCount || 2,
+            timeSlot: r.time || (r as any).timeSlot || '19:00',
+            date: r.date && !isNaN(Number(r.date)) ? Number(r.date) : (r.date ? new Date(r.date).getTime() : (r.createdAt || Date.now())),
+            tableName: (r as any).tableName || (r.tableId ? `Mesa ${r.tableId}` : 'Sin Asignar'),
+          })) as unknown as T[];
+        } catch (err: any) {
+          this.logger.warn(`Error en getAll(reservations): ${err?.message}`);
+          return [];
+        }
+      }
       default:
         this.logger.warn(`Entidad desconocida en getAll: ${entity}`);
         return [];
@@ -539,14 +553,74 @@ export class DatabaseService implements OnModuleInit {
             minStock: Number(item.minStock) || 0,
           },
         })) as unknown as T;
-      case 'reservations':
-        return (await this.prisma.reservation.create({
-          data: {
+      case 'reservations': {
+        const customerPhone = item.customerPhone || item.phone || null;
+        const guestCount = Number(item.guestCount || item.pax) || 2;
+        const dateVal = item.date ? String(item.date) : null;
+        const timeVal = item.timeSlot || item.time || null;
+        const notesVal = [
+          item.notes,
+          item.occasion && item.occasion !== 'OTRO' ? `[Ocasión: ${item.occasion}]` : null,
+          item.specialRequests ? `[Petición: ${item.specialRequests}]` : null,
+          item.depositAmount && Number(item.depositAmount) > 0 ? `[Anticipo: $${item.depositAmount}]` : null,
+          item.tableName ? `[${item.tableName}]` : null
+        ].filter(Boolean).join(' ') || item.notes || null;
+
+        let created: any = null;
+        try {
+          created = await this.prisma.reservation.create({
+            data: {
+              id,
+              customerName: item.customerName || 'Cliente',
+              phone: customerPhone,
+              pax: guestCount,
+              date: dateVal,
+              time: timeVal,
+              tableId: item.tableId ? String(item.tableId) : null,
+              status: item.status || 'PENDIENTE',
+              notes: notesVal,
+              createdAt: item.createdAt ? Number(item.createdAt) : Date.now(),
+            },
+          });
+        } catch (err: any) {
+          this.logger.warn(`Error guardando reserva en Prisma: ${err?.message}`);
+          created = {
+            id: id || `res-${Date.now()}`,
             ...item,
-            id,
-            pax: Number(item.pax) || 2,
-          },
-        })) as unknown as T;
+            phone: customerPhone,
+            pax: guestCount,
+            date: dateVal,
+            time: timeVal,
+          };
+        }
+
+        // Si la reserva confirma o sienta una mesa, actualizar la mesa en Prisma
+        if (item.tableId) {
+          try {
+            if (item.status === 'SENTADA') {
+              await this.prisma.table.updateMany({
+                where: { id: String(item.tableId) },
+                data: { status: 'OCUPADA', timeOccupied: Date.now() },
+              });
+            } else if (item.status === 'CONFIRMADA' || item.status === 'RESERVADA') {
+              await this.prisma.table.updateMany({
+                where: { id: String(item.tableId) },
+                data: { status: 'RESERVADA' },
+              });
+            }
+          } catch (e) {}
+        }
+
+        return {
+          ...item,
+          ...created,
+          customerPhone: customerPhone || '',
+          guestCount,
+          timeSlot: timeVal || '19:00',
+          tableName: item.tableName || (item.tableId ? `Mesa ${item.tableId}` : 'Sin Asignar'),
+          date: item.date || Date.now(),
+        } as unknown as T;
+      }
       default:
         this.logger.warn(`Entidad desconocida en addOne: ${entity}`);
         return item;
@@ -695,13 +769,70 @@ export class DatabaseService implements OnModuleInit {
         })) as unknown as T;
       }
       case 'reservations': {
-        const current = await this.prisma.reservation.findUnique({ where: { id: strId } });
-        if (!current) return null;
-        const updated = updater(current as unknown as T) as any;
-        return (await this.prisma.reservation.update({
-          where: { id: strId },
-          data: updated,
-        })) as unknown as T;
+        let current: any = null;
+        try {
+          current = await this.prisma.reservation.findUnique({ where: { id: strId } });
+        } catch (e) {}
+
+        const updated = updater((current || {}) as unknown as T) as any;
+        const customerPhone = updated.customerPhone || updated.phone || current?.phone || null;
+        const guestCount = Number(updated.guestCount || updated.pax) || current?.pax || 2;
+        const dateVal = updated.date ? String(updated.date) : current?.date;
+        const timeVal = updated.timeSlot || updated.time || current?.time;
+
+        let resUpdated: any = null;
+        if (current) {
+          try {
+            resUpdated = await this.prisma.reservation.update({
+              where: { id: strId },
+              data: {
+                customerName: updated.customerName !== undefined ? updated.customerName : current.customerName,
+                phone: customerPhone,
+                pax: guestCount,
+                date: dateVal,
+                time: timeVal,
+                tableId: updated.tableId !== undefined ? (updated.tableId ? String(updated.tableId) : null) : current.tableId,
+                status: updated.status !== undefined ? updated.status : current.status,
+                notes: updated.notes !== undefined ? updated.notes : current.notes,
+              },
+            });
+          } catch (err: any) {
+            this.logger.warn(`Error actualizando reserva en Prisma: ${err?.message}`);
+          }
+        }
+
+        // Sincronizar mesa en salón si corresponde
+        const targetTableId = updated.tableId || current?.tableId;
+        if (targetTableId) {
+          try {
+            if (updated.status === 'SENTADA') {
+              await this.prisma.table.updateMany({
+                where: { id: String(targetTableId) },
+                data: { status: 'OCUPADA', timeOccupied: Date.now() },
+              });
+            } else if (updated.status === 'CONFIRMADA' || updated.status === 'RESERVADA') {
+              await this.prisma.table.updateMany({
+                where: { id: String(targetTableId) },
+                data: { status: 'RESERVADA' },
+              });
+            } else if (['COMPLETADA', 'CANCELADA', 'NO_SHOW'].includes(updated.status)) {
+              await this.prisma.table.updateMany({
+                where: { id: String(targetTableId), status: 'RESERVADA' },
+                data: { status: 'DISPONIBLE' },
+              });
+            }
+          } catch (e) {}
+        }
+
+        return {
+          ...current,
+          ...updated,
+          ...resUpdated,
+          customerPhone: customerPhone || '',
+          guestCount,
+          timeSlot: timeVal || '19:00',
+          tableName: updated.tableName || current?.tableName || (targetTableId ? `Mesa ${targetTableId}` : 'Sin Asignar'),
+        } as unknown as T;
       }
       case 'categories': {
         const current = await this.prisma.category.findUnique({ where: { id: strId } });
@@ -869,9 +1000,22 @@ export class DatabaseService implements OnModuleInit {
         case 'inventory':
           await this.prisma.inventoryItem.delete({ where: { id: strId } });
           return true;
-        case 'reservations':
-          await this.prisma.reservation.delete({ where: { id: strId } });
+        case 'reservations': {
+          let foundRes: any = null;
+          try {
+            foundRes = await this.prisma.reservation.findUnique({ where: { id: strId } });
+            await this.prisma.reservation.delete({ where: { id: strId } });
+          } catch (e) {}
+          if (foundRes?.tableId) {
+            try {
+              await this.prisma.table.updateMany({
+                where: { id: String(foundRes.tableId), status: 'RESERVADA' },
+                data: { status: 'DISPONIBLE' },
+              });
+            } catch (e) {}
+          }
           return true;
+        }
         case 'deliveries':
           await this.prisma.delivery.delete({ where: { id: strId } });
           return true;

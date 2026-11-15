@@ -2072,18 +2072,48 @@ export const mockApi = {
   },
   reservations: {
     getAll: async (): Promise<Reservation[]> => {
+      let backendData: Reservation[] | null = null;
       try {
         const response = await fetchWithTimeout(`${getApiUrl()}/reservations`);
         if (response.ok) {
-          const data = await response.json();
-          if (Array.isArray(data)) {
-            memoryReservationsCache = data;
-            try { localStorage.setItem('sesamo_reservations', JSON.stringify(data)); } catch (e) {}
-            return data;
+          const raw = await response.json();
+          if (Array.isArray(raw)) {
+            backendData = raw.map((r: any) => ({
+              ...r,
+              id: String(r.id),
+              customerName: r.customerName || 'Cliente',
+              customerPhone: r.customerPhone || r.phone || '',
+              guestCount: Number(r.guestCount || r.pax) || 2,
+              timeSlot: r.timeSlot || r.time || '19:00',
+              date: r.date && !isNaN(Number(r.date)) ? Number(r.date) : (r.date ? new Date(r.date).getTime() : (r.createdAt || Date.now())),
+              tableId: r.tableId ? String(r.tableId) : undefined,
+              tableName: r.tableName || (r.tableId ? `Mesa ${r.tableId} (Salón)` : 'Sin Asignar'),
+              status: r.status || 'PENDIENTE',
+              occasion: r.occasion || 'OTRO',
+              depositAmount: Number(r.depositAmount) || 0,
+              specialRequests: r.specialRequests || '',
+              notes: r.notes || '',
+            }));
           }
         }
       } catch (e) {}
-      return getStoredReservations();
+
+      const localList = getStoredReservations();
+
+      if (backendData && backendData.length > 0) {
+        // Combinar datos del servidor con los almacenados localmente para nunca perder reservas recién creadas
+        const merged = [...backendData];
+        for (const loc of localList) {
+          if (!merged.some(b => b.id === loc.id)) {
+            merged.push(loc);
+          }
+        }
+        memoryReservationsCache = merged;
+        try { localStorage.setItem('sesamo_reservations', JSON.stringify(merged)); } catch (e) {}
+        return merged;
+      }
+
+      return localList;
     },
     getById: async (id: string): Promise<Reservation | null> => {
       await delay(0);
@@ -2093,47 +2123,69 @@ export const mockApi = {
       const newReservation: Reservation = {
         ...data,
         id: `res-${Date.now()}`,
-        status: data.status || 'PENDIENTE',
+        status: data.status || 'CONFIRMADA',
+        guestCount: Number(data.guestCount) || 2,
+        depositAmount: Number(data.depositAmount) || 0,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
 
-      let created: any = null;
+      // 1. Guardar de inmediato en almacenamiento local para persistencia instantánea
+      const list = getStoredReservations();
+      const existingIdx = list.findIndex(r => r.id === newReservation.id);
+      if (existingIdx >= 0) {
+        list[existingIdx] = newReservation;
+      } else {
+        list.unshift(newReservation);
+      }
+      saveStoredReservations(list);
+
+      // 2. Sincronizar mesa en Salón si fue asignada
+      if (newReservation.tableId && newReservation.status === 'CONFIRMADA') {
+        try {
+          await mockApi.tables.updateStatus(newReservation.tableId, 'RESERVADA');
+        } catch (e) {
+          const tables = getStoredTables();
+          const tIdx = tables.findIndex(t => t.id === newReservation.tableId);
+          if (tIdx >= 0) {
+            tables[tIdx].status = 'RESERVADA';
+            saveStoredTables(tables);
+          }
+        }
+      }
+
+      // 3. Persistir en backend
       try {
         const res = await fetchWithTimeout(`${getApiUrl()}/reservations`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newReservation),
         });
-        if (res.ok) created = await res.json();
+        if (res.ok) {
+          const serverRes = await res.json();
+          if (serverRes && serverRes.id) {
+            const normalized: Reservation = {
+              ...newReservation,
+              ...serverRes,
+              id: String(serverRes.id || newReservation.id),
+              customerPhone: serverRes.customerPhone || serverRes.phone || newReservation.customerPhone,
+              guestCount: Number(serverRes.guestCount || serverRes.pax) || newReservation.guestCount,
+              timeSlot: serverRes.timeSlot || serverRes.time || newReservation.timeSlot,
+            };
+            const currentList = getStoredReservations();
+            const idx = currentList.findIndex(r => r.id === newReservation.id);
+            if (idx >= 0) {
+              currentList[idx] = normalized;
+              saveStoredReservations(currentList);
+            }
+            return normalized;
+          }
+        }
       } catch (e) {}
 
-      const finalRes = created || newReservation;
-      const list = getStoredReservations();
-      list.unshift(finalRes);
-      saveStoredReservations(list);
-
-      // Sincronizar estado de mesa en Salón si fue asignada
-      if (finalRes.tableId && finalRes.status === 'CONFIRMADA') {
-        const tables = getStoredTables();
-        const tIdx = tables.findIndex(t => t.id === finalRes.tableId);
-        if (tIdx >= 0) {
-          tables[tIdx].status = 'RESERVADA';
-          saveStoredTables(tables);
-        }
-      }
-
-      return finalRes;
+      return newReservation;
     },
     update: async (id: string, data: Partial<Reservation>): Promise<Reservation> => {
-      try {
-        await fetchWithTimeout(`${getApiUrl()}/reservations/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-      } catch (e) {}
-
       const list = getStoredReservations();
       const idx = list.findIndex(r => r.id === id);
       if (idx === -1) throw new Error('Reserva no encontrada');
@@ -2144,44 +2196,60 @@ export const mockApi = {
 
       // Sincronizar estado de mesa en Salón
       if (updatedRes.tableId) {
-        const tables = getStoredTables();
-        const tIdx = tables.findIndex(t => t.id === updatedRes.tableId);
-        if (tIdx >= 0) {
+        try {
           if (updatedRes.status === 'SENTADA') {
-            tables[tIdx].status = 'OCUPADA';
-            tables[tIdx].timeOccupied = Date.now();
+            await mockApi.tables.updateStatus(updatedRes.tableId, 'OCUPADA');
           } else if (updatedRes.status === 'CONFIRMADA') {
-            tables[tIdx].status = 'RESERVADA';
-          } else if (updatedRes.status === 'COMPLETADA' || updatedRes.status === 'CANCELADA' || updatedRes.status === 'NO_SHOW') {
-            if (tables[tIdx].status === 'RESERVADA') {
-              tables[tIdx].status = 'DISPONIBLE';
-            }
+            await mockApi.tables.updateStatus(updatedRes.tableId, 'RESERVADA');
+          } else if (['COMPLETADA', 'CANCELADA', 'NO_SHOW'].includes(updatedRes.status)) {
+            await mockApi.tables.updateStatus(updatedRes.tableId, 'DISPONIBLE');
           }
-          saveStoredTables(tables);
+        } catch (e) {
+          const tables = getStoredTables();
+          const tIdx = tables.findIndex(t => t.id === updatedRes.tableId);
+          if (tIdx >= 0) {
+            if (updatedRes.status === 'SENTADA') tables[tIdx].status = 'OCUPADA';
+            else if (updatedRes.status === 'CONFIRMADA') tables[tIdx].status = 'RESERVADA';
+            else if (['COMPLETADA', 'CANCELADA', 'NO_SHOW'].includes(updatedRes.status)) tables[tIdx].status = 'DISPONIBLE';
+            saveStoredTables(tables);
+          }
         }
       }
+
+      try {
+        await fetchWithTimeout(`${getApiUrl()}/reservations/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+      } catch (e) {}
 
       return updatedRes;
     },
     delete: async (id: string): Promise<boolean> => {
+      const list = getStoredReservations();
+      const res = list.find(r => r.id === id);
+      if (res && res.tableId) {
+        try {
+          await mockApi.tables.updateStatus(res.tableId, 'DISPONIBLE');
+        } catch (e) {
+          const tables = getStoredTables();
+          const tIdx = tables.findIndex(t => t.id === res.tableId);
+          if (tIdx >= 0 && tables[tIdx].status === 'RESERVADA') {
+            tables[tIdx].status = 'DISPONIBLE';
+            saveStoredTables(tables);
+          }
+        }
+      }
+      const filtered = list.filter(r => r.id !== id);
+      saveStoredReservations(filtered);
+
       try {
         await fetchWithTimeout(`${getApiUrl()}/reservations/${id}`, {
           method: 'DELETE',
         });
       } catch (e) {}
 
-      const list = getStoredReservations();
-      const res = list.find(r => r.id === id);
-      if (res && res.tableId) {
-        const tables = getStoredTables();
-        const tIdx = tables.findIndex(t => t.id === res.tableId);
-        if (tIdx >= 0 && tables[tIdx].status === 'RESERVADA') {
-          tables[tIdx].status = 'DISPONIBLE';
-          saveStoredTables(tables);
-        }
-      }
-      const filtered = list.filter(r => r.id !== id);
-      saveStoredReservations(filtered);
       return true;
     },
     seatReservation: async (id: string): Promise<Reservation> => {

@@ -1631,27 +1631,110 @@ export default function TablesScreen() {
                   )}
                 </Stack>
               ) : (
-                /* Available Table Action */
-                <Stack spacing={1.2}>
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    size="large"
-                    startIcon={<AddPosIcon />}
-                    onClick={() => handleOpenOrder(selectedTable)}
-                    sx={{
-                      bgcolor: '#65a30d',
-                      color: '#ffffff',
-                      borderRadius: '14px',
-                      fontWeight: 900,
-                      py: 1.5,
-                      fontSize: '1rem',
-                      boxShadow: '0 4px 14px rgba(101, 163, 13, 0.3)',
-                      '&:hover': { bgcolor: '#4d7c0f' }
-                    }}
-                  >
-                    Abrir Mesa y Tomar Pedido en POS
-                  </Button>
+                /* Available or Reserved Table Action */
+                <Stack spacing={1.5}>
+                  {selectedTable.status === 'RESERVADA' && (
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2,
+                        bgcolor: '#fefce8',
+                        border: '1.5px solid #fef08a',
+                        borderRadius: '14px',
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                        <ReserveIcon sx={{ color: '#a16207', fontSize: 20 }} />
+                        <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#a16207' }}>
+                          Mesa con Reserva Confirmada
+                        </Typography>
+                      </Box>
+                      <Typography variant="caption" sx={{ color: '#854d0e', display: 'block', mb: 1.5 }}>
+                        Esta mesa está reservada en la agenda del salón.
+                      </Typography>
+                      <Stack direction="row" spacing={1}>
+                        <Button
+                          fullWidth
+                          size="small"
+                          variant="contained"
+                          startIcon={<AddPosIcon />}
+                          onClick={() => handleOpenOrder(selectedTable)}
+                          sx={{
+                            bgcolor: '#ca8a04',
+                            color: '#ffffff',
+                            fontWeight: 800,
+                            borderRadius: '10px',
+                            py: 0.8,
+                            textTransform: 'none',
+                            '&:hover': { bgcolor: '#a16207' }
+                          }}
+                        >
+                          Sentar y Abrir POS
+                        </Button>
+                        <Button
+                          fullWidth
+                          size="small"
+                          variant="outlined"
+                          onClick={() => handleUpdateStatus(selectedTable.id, 'DISPONIBLE')}
+                          sx={{
+                            borderColor: '#eab308',
+                            color: '#a16207',
+                            fontWeight: 800,
+                            borderRadius: '10px',
+                            py: 0.8,
+                            textTransform: 'none',
+                            '&:hover': { bgcolor: '#fef9c3', borderColor: '#ca8a04' }
+                          }}
+                        >
+                          Liberar Mesa
+                        </Button>
+                      </Stack>
+                    </Paper>
+                  )}
+
+                  {selectedTable.status !== 'RESERVADA' && (
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      size="large"
+                      startIcon={<AddPosIcon />}
+                      onClick={() => handleOpenOrder(selectedTable)}
+                      sx={{
+                        bgcolor: '#65a30d',
+                        color: '#ffffff',
+                        borderRadius: '14px',
+                        fontWeight: 900,
+                        py: 1.5,
+                        fontSize: '1rem',
+                        boxShadow: '0 4px 14px rgba(101, 163, 13, 0.3)',
+                        '&:hover': { bgcolor: '#4d7c0f' }
+                      }}
+                    >
+                      Abrir Mesa y Tomar Pedido en POS
+                    </Button>
+                  )}
+
+                  {selectedTable.status === 'DISPONIBLE' && (
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      startIcon={<ReserveIcon />}
+                      onClick={() => handleUpdateStatus(selectedTable.id, 'RESERVADA')}
+                      sx={{
+                        borderRadius: '14px',
+                        fontWeight: 800,
+                        py: 1.2,
+                        borderColor: '#fde047',
+                        color: '#a16207',
+                        bgcolor: '#fefce8',
+                        textTransform: 'none',
+                        '&:hover': { bgcolor: '#fef9c3', borderColor: '#eab308' }
+                      }}
+                    >
+                      Marcar como Reservada
+                    </Button>
+                  )}
+
                   {isAdmin && (
                     <Button
                       fullWidth
