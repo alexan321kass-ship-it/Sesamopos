@@ -2563,9 +2563,15 @@ export const mockApi = {
       return member;
     },
     clockOut: async (id: string): Promise<StaffMember> => {
+      const storedRole = getStoredUserRole();
       try {
         const response = await fetchWithTimeout(`${getApiUrl()}/staff/${id}/clock-out`, {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(storedRole ? { 'x-user-role': storedRole } : {}),
+            'x-user-id': String(id),
+          }
         });
         if (response.ok) {
           const updated = await response.json();
@@ -2599,9 +2605,15 @@ export const mockApi = {
       return member;
     },
     setBreak: async (id: string): Promise<StaffMember> => {
+      const storedRole = getStoredUserRole();
       try {
         const response = await fetchWithTimeout(`${getApiUrl()}/staff/${id}/break`, {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(storedRole ? { 'x-user-role': storedRole } : {}),
+            'x-user-id': String(id),
+          }
         });
         if (response.ok) {
           const updated = await response.json();

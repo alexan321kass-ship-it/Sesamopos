@@ -26,7 +26,15 @@ import {
   Tooltip,
   Paper,
   Stack,
-  LinearProgress
+  LinearProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Snackbar,
+  Alert,
+  CircularProgress
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -49,6 +57,9 @@ import {
   CheckCircle as CheckCircleIcon,
   ArrowForward as ArrowForwardIcon,
   ShoppingCartCheckout as OrderMoreIcon,
+  Pause as PauseIcon,
+  PlayArrow as PlayArrowIcon,
+  StopCircle as StopCircleIcon,
 } from '@mui/icons-material';
 import { useAuthStore } from '../store/authStore';
 import { mockApi } from '../services/mockApi';
@@ -107,7 +118,69 @@ export default function MainLayout() {
   
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuthStore();
+  const { user, logout, updateUser } = useAuthStore();
+
+  // Gestión de turno personal (Pausa y Finalizar)
+  const [clockOutDialogOpen, setClockOutDialogOpen] = useState(false);
+  const [shiftActionLoading, setShiftActionLoading] = useState(false);
+  const [shiftSnackbar, setShiftSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'info' | 'warning' | 'error';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
+
+  const isBreak = user?.shiftStatus === 'DESCANSO';
+
+  const handleToggleBreak = async () => {
+    if (!user?.id) return;
+    setShiftActionLoading(true);
+    try {
+      const updated = await mockApi.staff.setBreak(user.id);
+      const newStatus = updated.shiftStatus || (isBreak ? 'EN_TURNO' : 'DESCANSO');
+      updateUser({ shiftStatus: newStatus });
+      setShiftSnackbar({
+        open: true,
+        message: newStatus === 'DESCANSO'
+          ? '☕ Tu turno está en PAUSA (Descanso). Recuerda reanudarlo al retomar labores.'
+          : '🟢 Turno REANUDADO con éxito. ¡A dar el mejor servicio!',
+        severity: newStatus === 'DESCANSO' ? 'warning' : 'success',
+      });
+    } catch (err: any) {
+      setShiftSnackbar({
+        open: true,
+        message: err.message || 'Error al cambiar estado de pausa',
+        severity: 'error',
+      });
+    } finally {
+      setShiftActionLoading(false);
+      handleClose();
+    }
+  };
+
+  const handleConfirmClockOut = async () => {
+    if (!user?.id) return;
+    setShiftActionLoading(true);
+    try {
+      await mockApi.staff.clockOut(user.id);
+      updateUser({ shiftStatus: 'FUERA_DE_TURNO' });
+      setClockOutDialogOpen(false);
+      handleClose();
+      // Cerrar sesión del colaborador
+      logout();
+      navigate('/login');
+    } catch (err: any) {
+      setShiftSnackbar({
+        open: true,
+        message: err.message || 'Error al finalizar turno',
+        severity: 'error',
+      });
+      setShiftActionLoading(false);
+    }
+  };
 
   // Load and listen to live inventory changes
   useEffect(() => {
@@ -454,6 +527,106 @@ export default function MainLayout() {
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            {/* Control de Turno Personal (Pausar y Finalizar) */}
+            {user && (
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: { xs: 0.5, sm: 1 },
+                  p: 0.5,
+                  pl: { xs: 1, sm: 1.5 },
+                  pr: { xs: 0.6, sm: 0.8 },
+                  borderRadius: '14px',
+                  bgcolor: isBreak ? '#fff7ed' : '#f0fdf4',
+                  border: isBreak ? '1px solid #fdba74' : '1px solid #bbf7d0',
+                }}
+              >
+                {/* Indicador de estado */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                  <Box
+                    sx={{
+                      width: 9,
+                      height: 9,
+                      borderRadius: '50%',
+                      bgcolor: isBreak ? '#f97316' : '#22c55e',
+                      boxShadow: isBreak ? '0 0 0 2px #ffedd5' : '0 0 0 2px #dcfce7',
+                    }}
+                  />
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontWeight: 800,
+                      color: isBreak ? '#c2410c' : '#15803d',
+                      fontSize: '0.75rem',
+                      display: { xs: 'none', md: 'inline' },
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {isBreak ? 'En Pausa' : 'En Turno'}
+                  </Typography>
+                </Box>
+
+                {/* Botón Pausar / Reanudar */}
+                <Tooltip title={isBreak ? 'Reanudar tu turno de trabajo' : 'Pausar turno para descanso / break'}>
+                  <span>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={shiftActionLoading}
+                      startIcon={isBreak ? <PlayArrowIcon sx={{ fontSize: 16 }} /> : <PauseIcon sx={{ fontSize: 16 }} />}
+                      onClick={handleToggleBreak}
+                      sx={{
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        textTransform: 'none',
+                        py: 0.3,
+                        px: { xs: 0.8, sm: 1 },
+                        borderRadius: '8px',
+                        color: isBreak ? '#15803d' : '#ea580c',
+                        borderColor: isBreak ? '#86efac' : '#fdba74',
+                        bgcolor: isBreak ? '#f0fdf4' : '#fff7ed',
+                        minWidth: { xs: 'auto', sm: 64 },
+                        '&:hover': {
+                          bgcolor: isBreak ? '#dcfce7' : '#ffedd5',
+                          borderColor: isBreak ? '#22c55e' : '#f97316',
+                        }
+                      }}
+                    >
+                      {isBreak ? 'Reanudar' : 'Pausar'}
+                    </Button>
+                  </span>
+                </Tooltip>
+
+                {/* Botón Finalizar Turno */}
+                <Tooltip title="Finalizar tu turno de trabajo de hoy">
+                  <span>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      disabled={shiftActionLoading}
+                      startIcon={<StopCircleIcon sx={{ fontSize: 16 }} />}
+                      onClick={() => setClockOutDialogOpen(true)}
+                      sx={{
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        textTransform: 'none',
+                        py: 0.3,
+                        px: { xs: 0.8, sm: 1 },
+                        borderRadius: '8px',
+                        color: '#ffffff',
+                        bgcolor: '#dc2626',
+                        minWidth: { xs: 'auto', sm: 64 },
+                        '&:hover': { bgcolor: '#b91c1c' }
+                      }}
+                    >
+                      Finalizar
+                    </Button>
+                  </span>
+                </Tooltip>
+              </Box>
+            )}
+
             {!isAppInstalled && (
               <Button
                 variant="outlined"
@@ -791,6 +964,68 @@ export default function MainLayout() {
                 <MenuItem disabled>
                   <Typography variant="body2">{user?.name} ({user?.role})</Typography>
                 </MenuItem>
+                
+                {/* Control de Turno Personal en el Menú */}
+                <Box sx={{ px: 2, py: 1.2, bgcolor: isBreak ? '#fff7ed' : '#f0fdf4', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', minWidth: 230 }}>
+                  <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block' }}>
+                    Mi Turno Actual
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, my: 0.6 }}>
+                    <Box
+                      sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        bgcolor: isBreak ? '#f97316' : '#22c55e',
+                      }}
+                    />
+                    <Typography variant="body2" sx={{ fontWeight: 800, color: isBreak ? '#c2410c' : '#15803d' }}>
+                      {isBreak ? 'Turno en Pausa (Descanso)' : 'Laborando en Turno'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      fullWidth
+                      disabled={shiftActionLoading}
+                      startIcon={isBreak ? <PlayArrowIcon sx={{ fontSize: 15 }} /> : <PauseIcon sx={{ fontSize: 15 }} />}
+                      onClick={handleToggleBreak}
+                      sx={{
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        textTransform: 'none',
+                        borderRadius: '8px',
+                        color: isBreak ? '#15803d' : '#ea580c',
+                        borderColor: isBreak ? '#86efac' : '#fdba74',
+                        bgcolor: '#ffffff',
+                      }}
+                    >
+                      {isBreak ? 'Reanudar' : 'Pausar'}
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      fullWidth
+                      disabled={shiftActionLoading}
+                      startIcon={<StopCircleIcon sx={{ fontSize: 15 }} />}
+                      onClick={() => {
+                        handleClose();
+                        setClockOutDialogOpen(true);
+                      }}
+                      sx={{
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        textTransform: 'none',
+                        borderRadius: '8px',
+                        bgcolor: '#dc2626',
+                        '&:hover': { bgcolor: '#b91c1c' }
+                      }}
+                    >
+                      Finalizar
+                    </Button>
+                  </Box>
+                </Box>
                 {!isAppInstalled && (
                   <MenuItem onClick={() => { handleClose(); handleInstallClick(); }}>
                     <ListItemIcon>
@@ -856,6 +1091,76 @@ export default function MainLayout() {
       >
         <Outlet />
       </Box>
+
+      {/* Diálogo de Confirmación para Finalizar Turno */}
+      <Dialog
+        open={clockOutDialogOpen}
+        onClose={() => !shiftActionLoading && setClockOutDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: { borderRadius: '20px', p: 1 }
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 1.2 }}>
+          <Box sx={{ width: 40, height: 40, borderRadius: '12px', bgcolor: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
+            <StopCircleIcon />
+          </Box>
+          Finalizar Turno de Trabajo
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ color: '#475569', fontSize: '0.92rem', mb: 1 }}>
+            Hola <b>{user?.name}</b>, ¿estás seguro de que deseas finalizar tu turno de trabajo de hoy?
+          </DialogContentText>
+          <Box sx={{ p: 1.5, bgcolor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', mt: 1 }}>
+            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontWeight: 600 }}>
+              ⏱️ <b>Hora de salida:</b> {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontWeight: 600, mt: 0.5 }}>
+              🔒 <b>Cierre de sesión:</b> Tu salida quedará registrada en el sistema y se cerrará tu sesión de manera segura.
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button
+            variant="outlined"
+            onClick={() => setClockOutDialogOpen(false)}
+            disabled={shiftActionLoading}
+            sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 700, color: '#64748b', borderColor: '#cbd5e1' }}
+          >
+            Continuar en Turno
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleConfirmClockOut}
+            disabled={shiftActionLoading}
+            startIcon={shiftActionLoading ? <CircularProgress size={16} color="inherit" /> : <StopCircleIcon />}
+            sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 800, bgcolor: '#dc2626', '&:hover': { bgcolor: '#b91c1c' } }}
+          >
+            {shiftActionLoading ? 'Finalizando...' : 'Sí, Finalizar mi Turno'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Notificaciones Snackbar de Estado de Turno */}
+      <Snackbar
+        open={shiftSnackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setShiftSnackbar(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setShiftSnackbar(prev => ({ ...prev, open: false }))}
+          severity={shiftSnackbar.severity}
+          variant="filled"
+          sx={{ borderRadius: '12px', fontWeight: 700, boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}
+        >
+          {shiftSnackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

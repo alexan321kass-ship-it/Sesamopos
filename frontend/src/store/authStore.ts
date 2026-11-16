@@ -6,6 +6,7 @@ interface AuthState {
   isAuthenticated: boolean;
   login: (user: User) => void;
   logout: () => void;
+  updateUser: (updates: Partial<User>) => void;
 }
 
 const getStoredAuthUser = (): User | null => {
@@ -37,6 +38,16 @@ export const useAuthStore = create<AuthState>((set) => ({
       localStorage.removeItem('sesamo_last_activity');
     } catch (e) {}
     set({ user: null, isAuthenticated: false });
+  },
+  updateUser: (updates) => {
+    set((state) => {
+      if (!state.user) return state;
+      const updated = { ...state.user, ...updates };
+      try {
+        localStorage.setItem('sesamo_auth_user', JSON.stringify(updated));
+      } catch (e) {}
+      return { user: updated };
+    });
   },
 }));
 

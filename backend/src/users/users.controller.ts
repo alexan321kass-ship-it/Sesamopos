@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Patch, Delete, Param, Body, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Headers, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { UsersService } from './users.service.js';
 
 @Controller('staff')
@@ -16,7 +16,10 @@ export class StaffController {
   }
 
   @Post('shifts')
-  async addShift(@Body() body: any) {
+  async addShift(@Body() body: any, @Headers('x-user-role') role?: string) {
+    if (role && !['ADMINISTRADOR', 'GERENTE'].includes(role)) {
+      throw new ForbiddenException('Solo el administrador o gerente puede crear registros de turnos manuales');
+    }
     return this.usersService.addShift(body);
   }
 
@@ -28,22 +31,34 @@ export class StaffController {
   }
 
   @Post()
-  async create(@Body() body: any) {
+  async create(@Body() body: any, @Headers('x-user-role') role?: string) {
+    if (role && !['ADMINISTRADOR', 'GERENTE'].includes(role)) {
+      throw new ForbiddenException('Solo el administrador o gerente puede agregar colaboradores');
+    }
     return this.usersService.addUser(body);
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() body: any) {
+  async update(@Param('id') id: string, @Body() body: any, @Headers('x-user-role') role?: string) {
+    if (role && !['ADMINISTRADOR', 'GERENTE'].includes(role)) {
+      throw new ForbiddenException('Solo el administrador o gerente puede modificar datos del personal');
+    }
     return this.usersService.updateUser(id, body);
   }
 
   @Patch(':id')
-  async patch(@Param('id') id: string, @Body() body: any) {
+  async patch(@Param('id') id: string, @Body() body: any, @Headers('x-user-role') role?: string) {
+    if (role && !['ADMINISTRADOR', 'GERENTE'].includes(role)) {
+      throw new ForbiddenException('Solo el administrador o gerente puede modificar datos del personal');
+    }
     return this.usersService.updateUser(id, body);
   }
 
   @Delete(':id')
-  async delete(@Param('id') id: string) {
+  async delete(@Param('id') id: string, @Headers('x-user-role') role?: string) {
+    if (role && !['ADMINISTRADOR', 'GERENTE'].includes(role)) {
+      throw new ForbiddenException('Solo el administrador o gerente puede eliminar colaboradores');
+    }
     return { success: await this.usersService.deleteUser(id) };
   }
 
@@ -53,12 +68,28 @@ export class StaffController {
   }
 
   @Post(':id/clock-out')
-  async clockOut(@Param('id') id: string) {
+  async clockOut(
+    @Param('id') id: string,
+    @Headers('x-user-id') userId?: string,
+    @Headers('x-user-role') role?: string,
+  ) {
+    const isAdmin = role === 'ADMINISTRADOR' || role === 'ADMIN' || role === 'GERENTE';
+    if (!isAdmin && userId && String(userId) !== String(id)) {
+      throw new ForbiddenException('Solo tienes autorización para finalizar tu respectivo turno');
+    }
     return this.usersService.clockOut(id);
   }
 
   @Post(':id/break')
-  async setBreak(@Param('id') id: string) {
+  async setBreak(
+    @Param('id') id: string,
+    @Headers('x-user-id') userId?: string,
+    @Headers('x-user-role') role?: string,
+  ) {
+    const isAdmin = role === 'ADMINISTRADOR' || role === 'ADMIN' || role === 'GERENTE';
+    if (!isAdmin && userId && String(userId) !== String(id)) {
+      throw new ForbiddenException('Solo tienes autorización para pausar o reanudar tu respectivo turno');
+    }
     return this.usersService.setBreak(id);
   }
 }
@@ -80,22 +111,34 @@ export class UsersController {
   }
 
   @Post()
-  async create(@Body() body: any) {
+  async create(@Body() body: any, @Headers('x-user-role') role?: string) {
+    if (role && !['ADMINISTRADOR', 'GERENTE'].includes(role)) {
+      throw new ForbiddenException('Solo el administrador o gerente puede crear usuarios');
+    }
     return this.usersService.addUser(body);
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() body: any) {
+  async update(@Param('id') id: string, @Body() body: any, @Headers('x-user-role') role?: string) {
+    if (role && !['ADMINISTRADOR', 'GERENTE'].includes(role)) {
+      throw new ForbiddenException('Solo el administrador o gerente puede modificar usuarios');
+    }
     return this.usersService.updateUser(id, body);
   }
 
   @Patch(':id')
-  async patch(@Param('id') id: string, @Body() body: any) {
+  async patch(@Param('id') id: string, @Body() body: any, @Headers('x-user-role') role?: string) {
+    if (role && !['ADMINISTRADOR', 'GERENTE'].includes(role)) {
+      throw new ForbiddenException('Solo el administrador o gerente puede modificar usuarios');
+    }
     return this.usersService.updateUser(id, body);
   }
 
   @Delete(':id')
-  async delete(@Param('id') id: string) {
+  async delete(@Param('id') id: string, @Headers('x-user-role') role?: string) {
+    if (role && !['ADMINISTRADOR', 'GERENTE'].includes(role)) {
+      throw new ForbiddenException('Solo el administrador o gerente puede eliminar usuarios');
+    }
     return { success: await this.usersService.deleteUser(id) };
   }
 }
