@@ -1,4 +1,4 @@
-import { mockUsers, mockStaffMembers, mockStaffShifts, mockCategories, mockProducts, mockOrders, mockTables, mockInventory, mockSuppliers, mockPurchaseOrders, mockCashRegisters, mockCustomers, mockDeliveries, mockSettings, mockReservations, mockRecipes } from '../mocks/db';
+import { mockUsers, mockStaffMembers, mockStaffShifts, mockCategories, mockProducts, mockTables, mockInventory, mockSuppliers, mockCashRegisters, mockCustomers, mockSettings, mockRecipes } from '../mocks/db';
 import { User, StaffMember, StaffShiftRecord, Category, Product, Table, Order, InventoryItem, MeasurementUnit, Supplier, PurchaseOrder, PurchaseOrderStatus, CashRegister, Customer, DeliveryOrder, StoreSettings, Reservation, Recipe } from '../types';
 import { playKitchenBellSound } from '../utils/audioAlerts';
 import { notifyRealtimeEvent } from './eventBus';
@@ -115,7 +115,7 @@ export const saveStoredSuppliers = (suppliers: Supplier[]) => {
 let memoryPurchasesCache: PurchaseOrder[] | null = null;
 export const getStoredPurchases = (): PurchaseOrder[] => {
   if (memoryPurchasesCache) return memoryPurchasesCache;
-  memoryPurchasesCache = [...mockPurchaseOrders];
+  memoryPurchasesCache = [];
   return memoryPurchasesCache;
 };
 
@@ -127,12 +127,7 @@ export const saveStoredPurchases = (orders: PurchaseOrder[]) => {
 let memoryMovementsCache: any[] | null = null;
 export const getStoredInventoryMovements = (): any[] => {
   if (memoryMovementsCache) return memoryMovementsCache;
-  memoryMovementsCache = [
-    { id: 'mov-1', itemId: '1', itemName: 'Carne de Res Molida (Angus)', type: 'ENTRADA', quantity: 25, reason: 'Compra PO-0001', responsibleName: 'Mateo Díaz', date: Date.now() - 86400000 * 2 },
-    { id: 'mov-2', itemId: '6', itemName: 'Pepperoni Italiano Tajado', type: 'ENTRADA', quantity: 4, reason: 'Compra PO-0001', responsibleName: 'Mateo Díaz', date: Date.now() - 86400000 * 2 },
-    { id: 'mov-3', itemId: '3', itemName: 'Queso Cheddar Tajado', type: 'MERMA', quantity: -1.5, reason: 'Fecha de vencimiento en frío', responsibleName: 'Juan Chef', date: Date.now() - 86400000 },
-    { id: 'mov-4', itemId: '9', itemName: 'Coca-Cola Zero 400ml', type: 'AJUSTE', quantity: -2, reason: 'Avería de transporte', responsibleName: 'Mateo Díaz', date: Date.now() - 43200000 },
-  ];
+  memoryMovementsCache = [];
   return memoryMovementsCache;
 };
 
@@ -180,7 +175,7 @@ export const saveStoredSettings = (settings: StoreSettings) => {
 let memoryReservationsCache: Reservation[] | null = null;
 export const getStoredReservations = (): Reservation[] => {
   if (memoryReservationsCache) return memoryReservationsCache;
-  memoryReservationsCache = [...mockReservations];
+  memoryReservationsCache = [];
   return memoryReservationsCache;
 };
 
@@ -192,7 +187,7 @@ export const saveStoredReservations = (reservations: Reservation[]) => {
 let memoryDeliveriesCache: DeliveryOrder[] | null = null;
 export const getStoredDeliveries = (): DeliveryOrder[] => {
   if (memoryDeliveriesCache) return memoryDeliveriesCache;
-  memoryDeliveriesCache = [...mockDeliveries];
+  memoryDeliveriesCache = [];
   return memoryDeliveriesCache;
 };
 
@@ -282,7 +277,7 @@ const deduplicateOrders = (rawList: Order[]): Order[] => {
 
 const getStoredOrders = (): Order[] => {
   if (memoryOrdersCache) return deduplicateOrders(memoryOrdersCache);
-  memoryOrdersCache = deduplicateOrders([...mockOrders]);
+  memoryOrdersCache = [];
   return memoryOrdersCache;
 };
 
@@ -1700,7 +1695,7 @@ export const mockApi = {
       if (memoryActiveCashRegister !== undefined) {
         return memoryActiveCashRegister && memoryActiveCashRegister.isOpen ? memoryActiveCashRegister : undefined;
       }
-      return mockCashRegisters.find(c => c.isOpen);
+      return undefined;
     },
     openRegister: async (initialAmount: number, openedBy: string): Promise<CashRegister> => {
       let newReg: CashRegister | null = null;
@@ -1815,30 +1810,7 @@ export const mockApi = {
         return memoryCashRegistersHistory;
       }
 
-      return [
-        {
-          id: 'closure-mock-1',
-          registerId: 'reg-prev-1',
-          name: 'Caja Principal (POS)',
-          openedBy: 'Laura Gómez (Cajera)',
-          openedAt: Date.now() - 3600000 * 26,
-          closedAt: Date.now() - 3600000 * 18,
-          closedBy: 'Laura Gómez (Cajera)',
-          initialAmount: 200000,
-          countedCash: 1250000,
-          notes: 'Turno tarde cerrado con cuadre exacto.',
-          snapshot: {
-            totalTurnoSales: 1350000,
-            cashSales: 1050000,
-            cardDigitalSales: 300000,
-            totalTips: 65000,
-            manualIngresos: 0,
-            manualGastos: 0,
-            expectedCashInBox: 1250000,
-            difference: 0,
-          }
-        }
-      ];
+      return [];
     }
   },
   deliveries: {
