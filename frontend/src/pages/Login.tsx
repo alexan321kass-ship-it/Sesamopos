@@ -57,22 +57,31 @@ export default function Login() {
     }
   }, [isAuthenticated, user, navigate]);
 
-  const isAdmin = email.toLowerCase().trim() === 'admin@sesamo.com';
+  const checkIsAdminEmail = (val: string) => {
+    const clean = (val || '').toLowerCase().trim();
+    if (!clean) return false;
+    return clean === 'admin@sesamo.com' || clean.includes('admin') || clean.includes('gerente');
+  };
+
+  const isAdmin = checkIsAdminEmail(email);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!isAdmin && (!pin || pin.trim().length < 4)) {
-      setError('Debes ingresar tu código privado (PIN de 4 dígitos) para indicar que inicias tu turno.');
+    const cleanEmail = email.toLowerCase().trim();
+    const isKnownAdmin = checkIsAdminEmail(cleanEmail);
+
+    if (!isKnownAdmin && cleanEmail && (!pin || pin.trim().length < 4)) {
+      setError('Debes ingresar tu código privado (PIN de 4 dígitos) para registrar el inicio de tu turno.');
       return;
     }
 
     setLoading(true);
     
     try {
-      // Usar API con código privado para iniciar turno (excepto Admin)
-      const loggedUser = await mockApi.auth.login(email, password, pin.trim());
+      // El admin nunca requiere PIN para iniciar sesión
+      const loggedUser = await mockApi.auth.login(cleanEmail, password, isKnownAdmin ? '' : pin.trim());
       login(loggedUser);
       navigate(getRolePath(loggedUser.role));
     } catch (err: any) {
@@ -176,8 +185,30 @@ export default function Login() {
               slotProps={{ input: { sx: { borderRadius: '12px' } } }}
             />
 
-            {/* Código Privado / PIN de Turno (Obligatorio para todo el personal excepto el Administrador) */}
-            {isAdmin ? (
+            {/* Información si aún no se ha escrito el correo */}
+            {!email.trim() && (
+              <Box
+                sx={{
+                  mt: 2,
+                  mb: 1,
+                  p: 1.5,
+                  bgcolor: '#f8fafc',
+                  borderRadius: '12px',
+                  border: '1px dashed #cbd5e1',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.2,
+                }}
+              >
+                <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600 }}>
+                  👑 <b>Administrador:</b> Acceso directo con correo y contraseña (sin PIN).<br />
+                  👤 <b>Personal:</b> Ingresa con correo, contraseña y PIN de turno de 4 dígitos.
+                </Typography>
+              </Box>
+            )}
+
+            {/* Acceso de Administrador: 100% libre de PIN */}
+            {email.trim() && isAdmin && (
               <Box
                 sx={{
                   mt: 2,
@@ -214,7 +245,10 @@ export default function Login() {
                   </Typography>
                 </Box>
               </Box>
-            ) : (
+            )}
+
+            {/* Código Privado / PIN de Turno (Obligatorio únicamente para el personal operativo) */}
+            {email.trim() && !isAdmin && (
               <Box
                 sx={{
                   mt: 2,
@@ -246,7 +280,6 @@ export default function Login() {
                     const val = e.target.value.replace(/\D/g, '').slice(0, 4);
                     setPin(val);
                   }}
-                  required
                   placeholder="••••"
                   slotProps={{
                     htmlInput: {
@@ -287,7 +320,11 @@ export default function Login() {
               }}
               disabled={loading}
             >
-              {loading ? <CircularProgress size={24} color="inherit" /> : (isAdmin ? 'Iniciar Sesión (Admin)' : 'Iniciar Turno & Acceder')}
+              {loading ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : (
+                isAdmin || !email.trim() ? 'Iniciar Sesión' : 'Iniciar Turno & Acceder'
+              )}
             </Button>
             
             <Button
@@ -307,19 +344,19 @@ export default function Login() {
                 <Button size="small" variant="outlined" onClick={() => { setEmail('admin@sesamo.com'); setPassword('password123'); setPin(''); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 800, color: '#16a34a', borderColor: '#bbf7d0', bgcolor: '#f0fdf4' }}>
                   👑 Admin (Sin PIN)
                 </Button>
-                <Button size="small" variant="outlined" onClick={() => { setEmail('cocina@sesamo.com'); setPassword('password123'); setPin(''); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#ea580c', borderColor: '#fdba74' }}>
+                <Button size="small" variant="outlined" onClick={() => { setEmail('cocina@sesamo.com'); setPassword('password123'); setPin('1234'); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#ea580c', borderColor: '#fdba74' }}>
                   👨‍🍳 Cocina
                 </Button>
-                <Button size="small" variant="outlined" onClick={() => { setEmail('carlos@sesamo.com'); setPassword('password123'); setPin(''); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#65a30d', borderColor: '#bef264' }}>
+                <Button size="small" variant="outlined" onClick={() => { setEmail('carlos@sesamo.com'); setPassword('password123'); setPin('1234'); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#65a30d', borderColor: '#bef264' }}>
                   🛎️ Mesero
                 </Button>
-                <Button size="small" variant="outlined" onClick={() => { setEmail('laura@sesamo.com'); setPassword('password123'); setPin(''); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#0284c7', borderColor: '#bae6fd' }}>
+                <Button size="small" variant="outlined" onClick={() => { setEmail('laura@sesamo.com'); setPassword('password123'); setPin('1234'); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#0284c7', borderColor: '#bae6fd' }}>
                   💵 Cajero
                 </Button>
-                <Button size="small" variant="outlined" onClick={() => { setEmail('kevin@sesamo.com'); setPassword('password123'); setPin(''); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#d97706', borderColor: '#fde68a' }}>
+                <Button size="small" variant="outlined" onClick={() => { setEmail('kevin@sesamo.com'); setPassword('password123'); setPin('1234'); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#d97706', borderColor: '#fde68a' }}>
                   🛵 Repartidor
                 </Button>
-                <Button size="small" variant="outlined" onClick={() => { setEmail('mateo@sesamo.com'); setPassword('password123'); setPin(''); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#7c3aed', borderColor: '#ddd6fe' }}>
+                <Button size="small" variant="outlined" onClick={() => { setEmail('mateo@sesamo.com'); setPassword('password123'); setPin('1234'); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#7c3aed', borderColor: '#ddd6fe' }}>
                   📦 Inventario
                 </Button>
               </Box>

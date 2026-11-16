@@ -22,8 +22,14 @@ export class AuthService {
       throw new UnauthorizedException('Usuario inactivo');
     }
 
-    // El Administrador es el único que no necesita código PIN de turno para entrar
-    const isAdmin = user.role === 'ADMINISTRADOR' || user.role === 'ADMIN' || user.email.toLowerCase().trim() === 'admin@sesamo.com';
+    // El Administrador o Gerente es el único que no necesita código PIN de turno para entrar
+    const cleanEmail = (email || '').toLowerCase().trim();
+    const isAdmin =
+      user.role === 'ADMINISTRADOR' ||
+      user.role === 'ADMIN' ||
+      user.role === 'GERENTE' ||
+      cleanEmail === 'admin@sesamo.com' ||
+      cleanEmail.includes('admin');
 
     if (!isAdmin) {
       // Validación obligatoria del código privado / PIN para iniciar turno en el resto del personal

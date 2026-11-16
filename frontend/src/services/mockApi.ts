@@ -673,18 +673,18 @@ let memoryCashMovements: any[] | null = null;
 export const mockApi = {
   auth: {
     login: async (email: string, password?: string, pin?: string): Promise<User> => {
+      const cleanEmail = (email || '').toLowerCase().trim();
       const cleanPin = String(pin || '').trim();
-      const isAdminEmail = email.toLowerCase().trim() === 'admin@sesamo.com';
-
-      if (!isAdminEmail && !cleanPin) {
-        throw new Error('Debes ingresar tu código privado (PIN de 4 dígitos) para indicar que inicias tu turno.');
-      }
+      const isAdminEmail =
+        cleanEmail === 'admin@sesamo.com' ||
+        cleanEmail.includes('admin') ||
+        cleanEmail.includes('gerente');
 
       try {
         const response = await fetchWithTimeout(`${getApiUrl()}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password: password || '', pin: cleanPin })
+          body: JSON.stringify({ email: cleanEmail, password: password || '', pin: cleanPin })
         });
         
         if (!response.ok) {
@@ -695,8 +695,14 @@ export const mockApi = {
         const data = await response.json();
         const loggedUser = data.user;
 
+        const isLoggedUserAdmin =
+          loggedUser.role === 'ADMINISTRADOR' ||
+          (loggedUser.role as any) === 'ADMIN' ||
+          (loggedUser.role as any) === 'GERENTE' ||
+          isAdminEmail;
+
         // Iniciar turno en memoria frontend si no es admin
-        if (loggedUser.role !== 'ADMINISTRADOR') {
+        if (!isLoggedUserAdmin) {
           try {
             await mockApi.staff.clockIn(loggedUser.id);
           } catch (e) {}
@@ -704,13 +710,13 @@ export const mockApi = {
 
         return loggedUser;
       } catch (err: any) {
-        if (err.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError') && !err.message.includes('timeout')) {
+        if (err.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError') && !err.message.includes('timeout') && !err.message.includes('abort')) {
           throw err;
         }
 
         const allStaff = getStoredStaff();
-        const user = allStaff.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim()) ||
-                     mockUsers.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim());
+        const user = allStaff.find(u => u.email.toLowerCase().trim() === cleanEmail) ||
+                     mockUsers.find(u => u.email.toLowerCase().trim() === cleanEmail);
         if (!user) {
           throw new Error('Usuario o correo no encontrado');
         }
@@ -724,8 +730,16 @@ export const mockApi = {
           throw new Error('El usuario se encuentra inactivo.');
         }
 
-        const isUserAdmin = user.role === 'ADMINISTRADOR' || isAdminEmail;
+        const isUserAdmin =
+          user.role === 'ADMINISTRADOR' ||
+          (user.role as any) === 'ADMIN' ||
+          (user.role as any) === 'GERENTE' ||
+          isAdminEmail;
+
         if (!isUserAdmin) {
+          if (!cleanPin) {
+            throw new Error('Debes ingresar tu código privado (PIN de 4 dígitos) para indicar que inicias tu turno.');
+          }
           const expectedPin = String(user.pin || '1234').trim();
           if (cleanPin !== expectedPin) {
             throw new Error('Código privado incorrecto. Debes ingresar tu PIN de 4 dígitos para iniciar tu turno.');
