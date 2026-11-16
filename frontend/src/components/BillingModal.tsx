@@ -203,6 +203,7 @@ export default function BillingModal({ open, onClose, order, table, onPaymentSuc
       const paymentData = {
         status: 'PAGADO' as const,
         paymentMethod,
+        items: order.items || [],
         registerId: activeReg.id,
         paidAt: Date.now(),
         paidBy: user?.name || 'Laura Gómez (Cajera)',

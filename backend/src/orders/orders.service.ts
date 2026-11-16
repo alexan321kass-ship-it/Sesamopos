@@ -18,6 +18,11 @@ export class OrdersService {
     };
     await this.db.addOne('orders', newOrder);
 
+    // Auto-descargue de inventario en backend para productos y recetas
+    if (Array.isArray(newOrder.items) && newOrder.items.length > 0) {
+      await this.deductInventoryForOrder(newOrder.items);
+    }
+
     // If order has tableId, update table status in database.json
     if (newOrder.tableId) {
       const tables = await this.db.getAll<any>('tables');
@@ -33,6 +38,38 @@ export class OrdersService {
     }
 
     return newOrder;
+  }
+
+  private async deductInventoryForOrder(items: any[]): Promise<void> {
+    if (!Array.isArray(items) || items.length === 0) return;
+    try {
+      const inventory = await this.db.getAll<any>('inventory');
+      if (!Array.isArray(inventory) || inventory.length === 0) return;
+
+      for (const item of items) {
+        const itemQty = Number(item.quantity) || 1;
+        const pName = (item.productName || item.name || '').toLowerCase().trim();
+        const pId = String(item.productId || item.id || '');
+
+        const invItem = inventory.find(inv =>
+          String(inv.id) === pId ||
+          (inv.name && inv.name.toLowerCase().trim() === pName) ||
+          (inv.code && item.sku && inv.code.toLowerCase() === item.sku.toLowerCase()) ||
+          (pName && inv.name && pName.includes(inv.name.toLowerCase().trim())) ||
+          (pName && inv.name && inv.name.toLowerCase().trim().includes(pName))
+        );
+
+        if (invItem) {
+          const newStock = Math.max(0, parseFloat(((Number(invItem.currentStock) || 0) - itemQty).toFixed(3)));
+          await this.db.updateOne('inventory', String(invItem.id), (curr: any) => ({
+            ...curr,
+            currentStock: newStock,
+          }));
+        }
+      }
+    } catch (err) {
+      // Non-blocking log
+    }
   }
 
   async updateStatus(id: string, status: string) {

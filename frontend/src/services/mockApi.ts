@@ -543,6 +543,7 @@ export const deductInventoryByRecipeAndExtras = (
   const recipes = getStoredRecipes();
   const movs = [...getStoredInventoryMovements()];
   const summary: string[] = [];
+  const itemsToSync: { id: string; currentStock: number }[] = [];
   let deductedCount = 0;
 
   // Mapeo canónico de extras y modificadores
@@ -564,15 +565,19 @@ export const deductInventoryByRecipeAndExtras = (
 
     if (recipe && recipe.ingredients && recipe.ingredients.length > 0) {
       recipe.ingredients.forEach(ing => {
-        const invIndex = inventory.findIndex(inv => inv.id === ing.inventoryItemId || inv.id === `inv-${ing.inventoryItemId}`);
+        const invIndex = inventory.findIndex(inv => 
+          String(inv.id) === String(ing.inventoryItemId) || 
+          String(inv.id) === `inv-${ing.inventoryItemId}`
+        );
         if (invIndex !== -1) {
           const invItem = inventory[invIndex];
           const deductAmount = parseFloat(((Number(ing.quantity) || 0) * itemQty).toFixed(3));
           if (deductAmount > 0) {
-            invItem.currentStock = parseFloat((invItem.currentStock - deductAmount).toFixed(3));
+            invItem.currentStock = Math.max(0, parseFloat((invItem.currentStock - deductAmount).toFixed(3)));
             deductedCount++;
             baseDeducted = true;
             summary.push(`-${deductAmount} ${invItem.unit || ''} de ${invItem.name} (${itemQty}x ${item.productName})`);
+            itemsToSync.push({ id: invItem.id, currentStock: invItem.currentStock });
 
             movs.unshift({
               id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -593,7 +598,7 @@ export const deductInventoryByRecipeAndExtras = (
     if (!baseDeducted) {
       const pNameLower = (item.productName || '').toLowerCase().trim();
       const directIndex = inventory.findIndex(inv =>
-        inv.id === item.productId ||
+        String(inv.id) === String(item.productId) ||
         (inv.code && item.sku && inv.code.toLowerCase() === item.sku.toLowerCase()) ||
         inv.name.toLowerCase().trim() === pNameLower ||
         pNameLower.includes(inv.name.toLowerCase().trim()) ||
@@ -602,9 +607,10 @@ export const deductInventoryByRecipeAndExtras = (
 
       if (directIndex !== -1) {
         const invItem = inventory[directIndex];
-        invItem.currentStock = parseFloat((invItem.currentStock - itemQty).toFixed(3));
+        invItem.currentStock = Math.max(0, parseFloat((invItem.currentStock - itemQty).toFixed(3)));
         deductedCount++;
         summary.push(`-${itemQty} ${invItem.unit || 'Unidad'} de ${invItem.name} (${itemQty}x ${item.productName})`);
+        itemsToSync.push({ id: invItem.id, currentStock: invItem.currentStock });
 
         movs.unshift({
           id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -643,13 +649,14 @@ export const deductInventoryByRecipeAndExtras = (
         }
 
         if (targetInvId && deductQtyPerUnit > 0) {
-          const invIndex = inventory.findIndex(inv => inv.id === targetInvId || inv.id === `inv-${targetInvId}`);
+          const invIndex = inventory.findIndex(inv => String(inv.id) === String(targetInvId) || String(inv.id) === `inv-${targetInvId}`);
           if (invIndex !== -1) {
             const invItem = inventory[invIndex];
             const totalDeduct = parseFloat((deductQtyPerUnit * itemQty).toFixed(3));
-            invItem.currentStock = parseFloat((invItem.currentStock - totalDeduct).toFixed(3));
+            invItem.currentStock = Math.max(0, parseFloat((invItem.currentStock - totalDeduct).toFixed(3)));
             deductedCount++;
             summary.push(`-${totalDeduct} ${invItem.unit || ''} de ${invItem.name} (Extra: ${mod.name} en ${item.productName})`);
+            itemsToSync.push({ id: invItem.id, currentStock: invItem.currentStock });
 
             movs.unshift({
               id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -670,6 +677,17 @@ export const deductInventoryByRecipeAndExtras = (
   if (deductedCount > 0) {
     saveStoredInventory(inventory);
     saveStoredInventoryMovements(movs);
+
+    // Sync all deducted items to backend API in real time
+    itemsToSync.forEach(it => {
+      fetchWithTimeout(`${getApiUrl()}/inventory/${it.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentStock: it.currentStock })
+      }).catch(err => {
+        console.warn(`[Sync Inventory] Error al sincronizar insumo ${it.id} al servidor:`, err);
+      });
+    });
   }
 
   return { deductedCount, summary };
@@ -762,6 +780,7 @@ export const revertInventoryByRecipeAndExtras = (
   const inventory = [...getStoredInventory()];
   const recipes = getStoredRecipes();
   const movs = [...getStoredInventoryMovements()];
+  const itemsToSync: { id: string; currentStock: number }[] = [];
   let revertedCount = 0;
 
   const EXTRA_MAPPINGS: Record<string, { inventoryItemId: string; quantity: number }> = {
@@ -781,7 +800,10 @@ export const revertInventoryByRecipeAndExtras = (
 
     if (recipe && recipe.ingredients && recipe.ingredients.length > 0) {
       recipe.ingredients.forEach(ing => {
-        const invIndex = inventory.findIndex(inv => inv.id === ing.inventoryItemId || inv.id === `inv-${ing.inventoryItemId}`);
+        const invIndex = inventory.findIndex(inv => 
+          String(inv.id) === String(ing.inventoryItemId) || 
+          String(inv.id) === `inv-${ing.inventoryItemId}`
+        );
         if (invIndex !== -1) {
           const invItem = inventory[invIndex];
           const restoreAmount = parseFloat(((Number(ing.quantity) || 0) * itemQty).toFixed(3));
@@ -789,6 +811,7 @@ export const revertInventoryByRecipeAndExtras = (
             invItem.currentStock = parseFloat((invItem.currentStock + restoreAmount).toFixed(3));
             revertedCount++;
             baseReverted = true;
+            itemsToSync.push({ id: invItem.id, currentStock: invItem.currentStock });
             movs.unshift({
               id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
               itemId: invItem.id,
@@ -807,7 +830,7 @@ export const revertInventoryByRecipeAndExtras = (
     if (!baseReverted) {
       const pNameLower = (item.productName || '').toLowerCase().trim();
       const directIndex = inventory.findIndex(inv =>
-        inv.id === item.productId ||
+        String(inv.id) === String(item.productId) ||
         (inv.code && item.sku && inv.code.toLowerCase() === item.sku.toLowerCase()) ||
         inv.name.toLowerCase().trim() === pNameLower ||
         pNameLower.includes(inv.name.toLowerCase().trim()) ||
@@ -818,6 +841,7 @@ export const revertInventoryByRecipeAndExtras = (
         const invItem = inventory[directIndex];
         invItem.currentStock = parseFloat((invItem.currentStock + itemQty).toFixed(3));
         revertedCount++;
+        itemsToSync.push({ id: invItem.id, currentStock: invItem.currentStock });
         movs.unshift({
           id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
           itemId: invItem.id,
@@ -846,12 +870,13 @@ export const revertInventoryByRecipeAndExtras = (
         }
 
         if (targetInvId && restoreQtyPerUnit > 0) {
-          const invIndex = inventory.findIndex(inv => inv.id === targetInvId || inv.id === `inv-${targetInvId}`);
+          const invIndex = inventory.findIndex(inv => String(inv.id) === String(targetInvId) || String(inv.id) === `inv-${targetInvId}`);
           if (invIndex !== -1) {
             const invItem = inventory[invIndex];
             const totalRestore = parseFloat((restoreQtyPerUnit * itemQty).toFixed(3));
             invItem.currentStock = parseFloat((invItem.currentStock + totalRestore).toFixed(3));
             revertedCount++;
+            itemsToSync.push({ id: invItem.id, currentStock: invItem.currentStock });
             movs.unshift({
               id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
               itemId: invItem.id,
@@ -871,6 +896,17 @@ export const revertInventoryByRecipeAndExtras = (
   if (revertedCount > 0) {
     saveStoredInventory(inventory);
     saveStoredInventoryMovements(movs);
+
+    // Sync all reverted items to backend API in real time
+    itemsToSync.forEach(it => {
+      fetchWithTimeout(`${getApiUrl()}/inventory/${it.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentStock: it.currentStock })
+      }).catch(err => {
+        console.warn(`[Sync Inventory] Error al sincronizar reversión de insumo ${it.id} al servidor:`, err);
+      });
+    });
   }
 
   return { revertedCount };
@@ -1549,13 +1585,25 @@ export const mockApi = {
       const index = orders.findIndex(o => o.id === id || o.orderNumber === id);
       if (index === -1) throw new Error('Pedido no encontrado');
 
-      // Descontar inventario para adiciones nuevas (validando stock disponible)
-      if (updatedData.items) {
+      // Descontar inventario para adiciones nuevas o incrementos de cantidad (validando stock disponible)
+      if (updatedData.items && Array.isArray(updatedData.items)) {
         const oldItems = orders[index].items || [];
-        const oldItemIds = new Set(oldItems.map(it => it.id));
-        const newlyAdded = updatedData.items.filter(it => !oldItemIds.has(it.id));
-        if (newlyAdded.length > 0) {
-          const stockCheck = checkStockAvailability(newlyAdded);
+        const newlyDeductedItems: any[] = [];
+
+        for (const newItem of updatedData.items) {
+          const oldItem = oldItems.find((o: any) => o.id === newItem.id || (o.productId && o.productId === newItem.productId));
+          const oldQty = oldItem ? (Number(oldItem.quantity) || 0) : 0;
+          const newQty = Number(newItem.quantity) || 0;
+          if (newQty > oldQty) {
+            newlyDeductedItems.push({
+              ...newItem,
+              quantity: newQty - oldQty
+            });
+          }
+        }
+
+        if (newlyDeductedItems.length > 0) {
+          const stockCheck = checkStockAvailability(newlyDeductedItems);
           if (!stockCheck.valid) {
             const details = stockCheck.errors
               .map(e => `• ${e.productName}: pides ${e.requested}, disponible ${e.available} (${e.missingIngredient || 'Stock'})`)
@@ -1563,7 +1611,7 @@ export const mockApi = {
             throw new Error(`Stock insuficiente en inventario para adición:\n${details}`);
           }
           try {
-            deductInventoryByRecipeAndExtras(newlyAdded, orders[index].orderNumber);
+            deductInventoryByRecipeAndExtras(newlyDeductedItems, orders[index].orderNumber || id);
           } catch (e) {}
         }
       }
@@ -1613,9 +1661,31 @@ export const mockApi = {
           const data = await response.json();
           if (Array.isArray(data) && data.length > 0) {
             const normalized = data.map((item: any, idx: number) => normalizeInventoryItem(item, idx));
-            memoryInventoryCache = normalized;
-            try { localStorage.setItem('sesamo_inventory', JSON.stringify(normalized)); } catch (e) {}
-            return normalized;
+            
+            // Reconciliación bidireccional inteligente:
+            // Si en localStorage/memoria local el stock fue descargado por una orden reciente y el servidor aún tiene el stock anterior (mayor),
+            // conservamos el stock descargado y actualizamos al servidor en segundo plano.
+            const localItems = getStoredInventory();
+            const merged = normalized.map(srvItem => {
+              const locItem = localItems.find(l => 
+                String(l.id) === String(srvItem.id) || 
+                (l.code && srvItem.code && l.code.toLowerCase() === srvItem.code.toLowerCase()) ||
+                (l.name && srvItem.name && l.name.toLowerCase().trim() === srvItem.name.toLowerCase().trim())
+              );
+              if (locItem && typeof locItem.currentStock === 'number' && locItem.currentStock < srvItem.currentStock) {
+                srvItem.currentStock = locItem.currentStock;
+                fetchWithTimeout(`${getApiUrl()}/inventory/${srvItem.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ currentStock: locItem.currentStock })
+                }).catch(() => {});
+              }
+              return srvItem;
+            });
+
+            memoryInventoryCache = merged;
+            try { localStorage.setItem('sesamo_inventory', JSON.stringify(merged)); } catch (e) {}
+            return merged;
           }
         }
       } catch (e) {}

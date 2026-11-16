@@ -744,7 +744,7 @@ export const mockInventory: InventoryItem[] = [
   { id: '6', code: 'INS-06', name: 'Pepperoni Italiano Tajado', category: 'Embutidos', unit: 'Kg', currentStock: 4.2, minStock: 5, maxStock: 20, unitCost: 45000, isActive: true }, // Stock bajo
   { id: '7', code: 'INS-07', name: 'Papas Criollas para Freír', category: 'Verduras', unit: 'Kg', currentStock: 50.0, minStock: 20, maxStock: 100, unitCost: 4000, isActive: true },
   { id: '8', code: 'INS-08', name: 'Salsa BBQ Ahumada', category: 'Salsas', unit: 'Litro', currentStock: 8.5, minStock: 4, maxStock: 20, unitCost: 12000, isActive: true },
-  { id: '9', code: 'INS-09', name: 'Coca-Cola Zero 400ml', category: 'Bebidas', unit: 'Unidad', currentStock: 18, minStock: 48, maxStock: 200, unitCost: 2200, isActive: true }, // Stock crítico
+  { id: '9', code: 'INS-09', name: 'Coca-Cola Zero 400ml', category: 'Bebidas', unit: 'Unidad', currentStock: 47, minStock: 20, maxStock: 200, unitCost: 2200, isActive: true },
   { id: '10', code: 'INS-10', name: 'Huevos Tipo AA de Campo', category: 'Huevos & Granja', unit: 'Unidad', currentStock: 80, minStock: 30, maxStock: 180, unitCost: 750, isActive: true },
   { id: '11', code: 'INS-11', name: 'Tocineta Ahumada en Tiras', category: 'Carnes', unit: 'Kg', currentStock: 9.5, minStock: 4, maxStock: 25, unitCost: 32000, isActive: true },
   { id: '12', code: 'INS-12', name: 'Jugo Natural Mango & Maracuyá', category: 'Bebidas', unit: 'Unidad', currentStock: 35, minStock: 10, maxStock: 60, unitCost: 2800, isActive: true },
