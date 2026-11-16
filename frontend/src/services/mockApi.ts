@@ -674,7 +674,9 @@ export const mockApi = {
   auth: {
     login: async (email: string, password?: string, pin?: string): Promise<User> => {
       const cleanPin = String(pin || '').trim();
-      if (!cleanPin) {
+      const isAdminEmail = email.toLowerCase().trim() === 'admin@sesamo.com';
+
+      if (!isAdminEmail && !cleanPin) {
         throw new Error('Debes ingresar tu código privado (PIN de 4 dígitos) para indicar que inicias tu turno.');
       }
 
@@ -693,10 +695,12 @@ export const mockApi = {
         const data = await response.json();
         const loggedUser = data.user;
 
-        // Iniciar turno en memoria frontend
-        try {
-          await mockApi.staff.clockIn(loggedUser.id);
-        } catch (e) {}
+        // Iniciar turno en memoria frontend si no es admin
+        if (loggedUser.role !== 'ADMINISTRADOR') {
+          try {
+            await mockApi.staff.clockIn(loggedUser.id);
+          } catch (e) {}
+        }
 
         return loggedUser;
       } catch (err: any) {
@@ -720,18 +724,23 @@ export const mockApi = {
           throw new Error('El usuario se encuentra inactivo.');
         }
 
-        const expectedPin = String(user.pin || '1234').trim();
-        if (cleanPin !== expectedPin) {
-          throw new Error('Código privado incorrecto. Debes ingresar tu PIN de 4 dígitos para iniciar tu turno.');
+        const isUserAdmin = user.role === 'ADMINISTRADOR' || isAdminEmail;
+        if (!isUserAdmin) {
+          const expectedPin = String(user.pin || '1234').trim();
+          if (cleanPin !== expectedPin) {
+            throw new Error('Código privado incorrecto. Debes ingresar tu PIN de 4 dígitos para iniciar tu turno.');
+          }
+
+          // Marcar turno iniciado (clockIn)
+          try {
+            await mockApi.staff.clockIn(user.id);
+          } catch (e) {}
         }
 
-        // Marcar turno iniciado (clockIn)
-        try {
-          await mockApi.staff.clockIn(user.id);
-        } catch (e) {}
-
         const { password: _, ...cleanUser } = user;
-        cleanUser.shiftStatus = 'EN_TURNO';
+        if (!isUserAdmin) {
+          cleanUser.shiftStatus = 'EN_TURNO';
+        }
         return cleanUser;
       }
     },

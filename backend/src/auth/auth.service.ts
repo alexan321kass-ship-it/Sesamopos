@@ -22,14 +22,19 @@ export class AuthService {
       throw new UnauthorizedException('Usuario inactivo');
     }
 
-    // Validación obligatoria del código privado / PIN para iniciar turno
-    const expectedPin = String(user.pin || '1234').trim();
-    if (!pin || String(pin).trim() !== expectedPin) {
-      throw new UnauthorizedException('Código privado incorrecto. Debes ingresar tu PIN de 4 dígitos para iniciar tu turno y acceder al sistema.');
-    }
+    // El Administrador es el único que no necesita código PIN de turno para entrar
+    const isAdmin = user.role === 'ADMINISTRADOR' || user.role === 'ADMIN' || user.email.toLowerCase().trim() === 'admin@sesamo.com';
 
-    // Iniciar turno automáticamente en la base de datos al autenticar con el código privado
-    await this.usersService.clockIn(user.id).catch(() => {});
+    if (!isAdmin) {
+      // Validación obligatoria del código privado / PIN para iniciar turno en el resto del personal
+      const expectedPin = String(user.pin || '1234').trim();
+      if (!pin || String(pin).trim() !== expectedPin) {
+        throw new UnauthorizedException('Código privado incorrecto. Debes ingresar tu PIN de 4 dígitos para iniciar tu turno y acceder al sistema.');
+      }
+
+      // Iniciar turno automáticamente en la base de datos al autenticar con el código privado
+      await this.usersService.clockIn(user.id).catch(() => {});
+    }
 
     // Si la contraseña era texto plano, actualizamos automáticamente a bcrypt en la BD
     if (user.password === pass) {

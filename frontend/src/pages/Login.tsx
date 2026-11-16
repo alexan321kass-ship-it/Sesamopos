@@ -57,11 +57,13 @@ export default function Login() {
     }
   }, [isAuthenticated, user, navigate]);
 
+  const isAdmin = email.toLowerCase().trim() === 'admin@sesamo.com';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!pin || pin.trim().length < 4) {
+    if (!isAdmin && (!pin || pin.trim().length < 4)) {
       setError('Debes ingresar tu código privado (PIN de 4 dígitos) para indicar que inicias tu turno.');
       return;
     }
@@ -69,7 +71,7 @@ export default function Login() {
     setLoading(true);
     
     try {
-      // Usar API con código privado para iniciar turno
+      // Usar API con código privado para iniciar turno (excepto Admin)
       const loggedUser = await mockApi.auth.login(email, password, pin.trim());
       login(loggedUser);
       navigate(getRolePath(loggedUser.role));
@@ -174,60 +176,99 @@ export default function Login() {
               slotProps={{ input: { sx: { borderRadius: '12px' } } }}
             />
 
-            {/* Código Privado / PIN de Turno */}
-            <Box
-              sx={{
-                mt: 2,
-                mb: 1,
-                p: 2,
-                bgcolor: '#f8fafc',
-                borderRadius: '16px',
-                border: '1px solid #e2e8f0',
-                transition: 'all 0.2s ease',
-                '&:hover': { borderColor: '#16a34a' }
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                <LockClockIcon sx={{ color: '#16a34a', fontSize: 20 }} />
-                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a' }}>
-                  Código Privado de Turno
-                </Typography>
+            {/* Código Privado / PIN de Turno (Obligatorio para todo el personal excepto el Administrador) */}
+            {isAdmin ? (
+              <Box
+                sx={{
+                  mt: 2,
+                  mb: 1,
+                  p: 2,
+                  bgcolor: '#f0fdf4',
+                  borderRadius: '16px',
+                  border: '1px solid #bbf7d0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '10px',
+                    bgcolor: '#dcfce7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.2rem',
+                  }}
+                >
+                  👑
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#15803d' }}>
+                    Acceso de Administrador General
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#166534', fontWeight: 600 }}>
+                    El administrador no requiere código privado de turno para entrar.
+                  </Typography>
+                </Box>
               </Box>
-              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 1.5, fontWeight: 500 }}>
-                Ingresa tu PIN de 4 dígitos para registrar inicio de turno y acceder.
-              </Typography>
-              <TextField
-                fullWidth
-                label="PIN Táctil (4 Dígitos)"
-                type={showPin ? 'text' : 'password'}
-                variant="outlined"
-                value={pin}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '').slice(0, 4);
-                  setPin(val);
+            ) : (
+              <Box
+                sx={{
+                  mt: 2,
+                  mb: 1,
+                  p: 2,
+                  bgcolor: '#f8fafc',
+                  borderRadius: '16px',
+                  border: '1px solid #e2e8f0',
+                  transition: 'all 0.2s ease',
+                  '&:hover': { borderColor: '#16a34a' }
                 }}
-                required
-                placeholder="••••"
-                slotProps={{
-                  htmlInput: {
-                    maxLength: 4,
-                    inputMode: 'numeric',
-                    pattern: '[0-9]*',
-                    style: { textAlign: 'center', fontSize: '1.4rem', letterSpacing: '0.4em', fontWeight: 900 }
-                  },
-                  input: {
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton size="small" onClick={() => setShowPin(!showPin)} edge="end">
-                          {showPin ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                    sx: { borderRadius: '12px', bgcolor: '#ffffff', fontWeight: 800 }
-                  }
-                }}
-              />
-            </Box>
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <LockClockIcon sx={{ color: '#16a34a', fontSize: 20 }} />
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a' }}>
+                    Código Privado de Turno
+                  </Typography>
+                </Box>
+                <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 1.5, fontWeight: 500 }}>
+                  Ingresa tu PIN de 4 dígitos para registrar inicio de turno y acceder.
+                </Typography>
+                <TextField
+                  fullWidth
+                  label="PIN Táctil (4 Dígitos)"
+                  type={showPin ? 'text' : 'password'}
+                  variant="outlined"
+                  value={pin}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                    setPin(val);
+                  }}
+                  required
+                  placeholder="••••"
+                  slotProps={{
+                    htmlInput: {
+                      maxLength: 4,
+                      inputMode: 'numeric',
+                      pattern: '[0-9]*',
+                      style: { textAlign: 'center', fontSize: '1.4rem', letterSpacing: '0.4em', fontWeight: 900 }
+                    },
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton size="small" onClick={() => setShowPin(!showPin)} edge="end">
+                            {showPin ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                      sx: { borderRadius: '12px', bgcolor: '#ffffff', fontWeight: 800 }
+                    }
+                  }}
+                />
+              </Box>
+            )}
             
             <Button
               type="submit"
@@ -246,7 +287,7 @@ export default function Login() {
               }}
               disabled={loading}
             >
-              {loading ? <CircularProgress size={24} color="inherit" /> : 'Iniciar Turno & Acceder'}
+              {loading ? <CircularProgress size={24} color="inherit" /> : (isAdmin ? 'Iniciar Sesión (Admin)' : 'Iniciar Turno & Acceder')}
             </Button>
             
             <Button
@@ -260,11 +301,11 @@ export default function Login() {
 
             <Box sx={{ mt: 2, pt: 2, borderTop: '1px dashed #cbd5e1' }}>
               <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', fontWeight: 800, color: '#64748b', mb: 1, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Accesos rápidos por rol (Requiere tu PIN):
+                Accesos rápidos por rol:
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center' }}>
-                <Button size="small" variant="outlined" onClick={() => { setEmail('admin@sesamo.com'); setPassword('password123'); setPin(''); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700 }}>
-                  👑 Admin
+                <Button size="small" variant="outlined" onClick={() => { setEmail('admin@sesamo.com'); setPassword('password123'); setPin(''); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 800, color: '#16a34a', borderColor: '#bbf7d0', bgcolor: '#f0fdf4' }}>
+                  👑 Admin (Sin PIN)
                 </Button>
                 <Button size="small" variant="outlined" onClick={() => { setEmail('cocina@sesamo.com'); setPassword('password123'); setPin(''); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#ea580c', borderColor: '#fdba74' }}>
                   👨‍🍳 Cocina
