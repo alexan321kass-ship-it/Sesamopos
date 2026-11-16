@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -20,7 +20,13 @@ import {
   Link,
   Collapse,
   Chip,
-  Button
+  Button,
+  Badge,
+  Popover,
+  Tooltip,
+  Paper,
+  Stack,
+  LinearProgress
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -38,8 +44,15 @@ import {
   LocalShipping as DeliveryIcon,
   ShoppingCart as PurchasesIcon,
   GetApp as InstallIcon,
+  Notifications as NotificationsIcon,
+  WarningAmber as WarningAmberIcon,
+  CheckCircle as CheckCircleIcon,
+  ArrowForward as ArrowForwardIcon,
+  ShoppingCartCheckout as OrderMoreIcon,
 } from '@mui/icons-material';
 import { useAuthStore } from '../store/authStore';
+import { mockApi } from '../services/mockApi';
+import { InventoryItem } from '../types';
 
 const drawerWidth = 260;
 
@@ -87,12 +100,56 @@ export default function MainLayout() {
     '5. Stock y Abastecimiento': true,
   });
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [notifAnchorEl, setNotifAnchorEl] = useState<null | HTMLElement>(null);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
   
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
+
+  // Load and listen to live inventory changes
+  useEffect(() => {
+    let isMounted = true;
+    const fetchInventory = async () => {
+      try {
+        const data = await mockApi.inventory.getAll();
+        if (isMounted) {
+          setInventory(data || []);
+        }
+      } catch (err) {
+        console.warn('Error loading inventory alerts:', err);
+      }
+    };
+
+    fetchInventory();
+
+    const handleInvChange = () => fetchInventory();
+    window.addEventListener('sesamo_inventory_updated', handleInvChange);
+    window.addEventListener('sesamo_orders_updated', handleInvChange);
+    window.addEventListener('sesamo_purchases_updated', handleInvChange);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('sesamo_inventory_updated', handleInvChange);
+      window.removeEventListener('sesamo_orders_updated', handleInvChange);
+      window.removeEventListener('sesamo_purchases_updated', handleInvChange);
+    };
+  }, []);
+
+  // Compute critical and warning items
+  const criticalItems = useMemo(() => {
+    return inventory.filter(i => (Number(i.currentStock) || 0) <= (Number(i.minStock) || 0));
+  }, [inventory]);
+
+  const warningItems = useMemo(() => {
+    return inventory.filter(i => {
+      const cur = Number(i.currentStock) || 0;
+      const min = Number(i.minStock) || 0;
+      return cur > min && cur <= min * 1.5;
+    });
+  }, [inventory]);
 
   useEffect(() => {
     // Check if app is already running in standalone desktop mode
@@ -423,6 +480,285 @@ export default function MainLayout() {
                 Instalar App en PC
               </Button>
             )}
+
+            {/* Campanita de Notificaciones de Inventario y Alertas */}
+            <Tooltip title={criticalItems.length > 0 ? `${criticalItems.length} insumos en nivel crítico` : 'Alertas de inventario'}>
+              <IconButton
+                size="medium"
+                aria-label="alertas de inventario"
+                onClick={(e) => setNotifAnchorEl(e.currentTarget)}
+                sx={{
+                  color: criticalItems.length > 0 ? '#dc2626' : '#64748b',
+                  bgcolor: criticalItems.length > 0 ? '#fee2e2' : 'transparent',
+                  border: criticalItems.length > 0 ? '1px solid #fca5a5' : '1px solid transparent',
+                  '&:hover': {
+                    bgcolor: criticalItems.length > 0 ? '#fecaca' : 'rgba(0,0,0,0.05)',
+                  },
+                  transition: 'all 0.2s',
+                  width: 38,
+                  height: 38,
+                }}
+              >
+                <Badge
+                  badgeContent={criticalItems.length}
+                  color="error"
+                  overlap="circular"
+                  sx={{
+                    '& .MuiBadge-badge': {
+                      fontWeight: 900,
+                      fontSize: '0.7rem',
+                      height: 18,
+                      minWidth: 18,
+                      bgcolor: '#dc2626',
+                      color: '#ffffff',
+                    }
+                  }}
+                >
+                  <NotificationsIcon sx={{ fontSize: 21 }} />
+                </Badge>
+              </IconButton>
+            </Tooltip>
+
+            {/* Popover de Alertas de Inventario */}
+            <Popover
+              open={Boolean(notifAnchorEl)}
+              anchorEl={notifAnchorEl}
+              onClose={() => setNotifAnchorEl(null)}
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'right',
+              }}
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'right',
+              }}
+              slotProps={{
+                paper: {
+                  sx: {
+                    width: { xs: '92vw', sm: 380 },
+                    maxWidth: 400,
+                    borderRadius: '16px',
+                    boxShadow: '0 16px 40px rgba(0,0,0,0.18)',
+                    overflow: 'hidden',
+                    border: '1px solid #e2e8f0',
+                    mt: 1.5,
+                  }
+                }
+              }}
+            >
+              {/* Encabezado */}
+              <Box sx={{ p: 2, bgcolor: criticalItems.length > 0 ? '#fef2f2' : '#f0fdf4', borderBottom: '1px solid #e2e8f0' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    {criticalItems.length > 0 ? (
+                      <Avatar sx={{ bgcolor: '#fee2e2', color: '#dc2626', width: 34, height: 34 }}>
+                        <WarningAmberIcon sx={{ fontSize: 20 }} />
+                      </Avatar>
+                    ) : (
+                      <Avatar sx={{ bgcolor: '#dcfce7', color: '#16a34a', width: 34, height: 34 }}>
+                        <CheckCircleIcon sx={{ fontSize: 20 }} />
+                      </Avatar>
+                    )}
+                    <Box>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#1e290b' }}>
+                        Alertas de Inventario
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+                        {criticalItems.length > 0
+                          ? `${criticalItems.length} insumos bajo stock mínimo`
+                          : 'Insumos en niveles óptimos'}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  {criticalItems.length > 0 && (
+                    <Chip
+                      label={`${criticalItems.length} Críticos`}
+                      size="small"
+                      sx={{ bgcolor: '#dc2626', color: '#ffffff', fontWeight: 900, fontSize: '0.68rem', height: 22 }}
+                    />
+                  )}
+                </Box>
+              </Box>
+
+              {/* Lista scrollable de insumos */}
+              <Box sx={{ maxHeight: 340, overflowY: 'auto', p: 1.5 }}>
+                {criticalItems.length === 0 && warningItems.length === 0 ? (
+                  <Box sx={{ py: 4, textAlign: 'center', px: 2 }}>
+                    <CheckCircleIcon sx={{ fontSize: 42, color: '#16a34a', mb: 1, opacity: 0.8 }} />
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1e290b' }}>
+                      ¡Cocina y bodega al día!
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#64748b' }}>
+                      No hay insumos agotados ni bajo el stock de seguridad.
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Stack spacing={1.2}>
+                    {criticalItems.map((item) => {
+                      const min = Number(item.minStock) || 0;
+                      const cur = Number(item.currentStock) || 0;
+                      const max = Number(item.maxStock) || Math.max(min * 4, 30);
+                      const percent = Math.min(100, Math.round((cur / (max || 1)) * 100));
+
+                      return (
+                        <Paper
+                          key={item.id}
+                          elevation={0}
+                          sx={{
+                            p: 1.5,
+                            borderRadius: '12px',
+                            border: '1px solid #fecaca',
+                            bgcolor: '#fff5f5',
+                            transition: 'all 0.2s',
+                            '&:hover': { bgcolor: '#fee2e2' }
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
+                            <Box sx={{ pr: 1 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 900, color: '#991b1b', lineHeight: 1.2 }}>
+                                {item.name}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: '#b91c1c', fontWeight: 600 }}>
+                                {item.category || 'Insumo'}
+                              </Typography>
+                            </Box>
+                            <Chip
+                              label="Agotado"
+                              size="small"
+                              sx={{
+                                bgcolor: '#fee2e2',
+                                color: '#b91c1c',
+                                fontWeight: 900,
+                                fontSize: '0.66rem',
+                                height: 20,
+                                border: '1px solid #fca5a5'
+                              }}
+                            />
+                          </Box>
+
+                          <Box sx={{ mt: 1 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.4 }}>
+                              <Typography variant="caption" sx={{ fontWeight: 800, color: '#7f1d1d' }}>
+                                Stock: {cur} {item.unit}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: '#991b1b', fontWeight: 600 }}>
+                                Mínimo: {min} {item.unit}
+                              </Typography>
+                            </Box>
+                            <LinearProgress
+                              variant="determinate"
+                              value={percent}
+                              sx={{
+                                height: 5,
+                                borderRadius: 3,
+                                bgcolor: '#fecaca',
+                                '& .MuiLinearProgress-bar': { bgcolor: '#dc2626' }
+                              }}
+                            />
+                          </Box>
+                        </Paper>
+                      );
+                    })}
+
+                    {warningItems.slice(0, 3).map((item) => {
+                      const min = Number(item.minStock) || 0;
+                      const cur = Number(item.currentStock) || 0;
+
+                      return (
+                        <Paper
+                          key={item.id}
+                          elevation={0}
+                          sx={{
+                            p: 1.5,
+                            borderRadius: '12px',
+                            border: '1px solid #fef08a',
+                            bgcolor: '#fefce8',
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <Box>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#854d0e', lineHeight: 1.2 }}>
+                                {item.name}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: '#a16207', fontWeight: 600 }}>
+                                {item.category || 'Insumo'} • Quedan: {cur} {item.unit} (Mín: {min})
+                              </Typography>
+                            </Box>
+                            <Chip
+                              label="Por agotarse"
+                              size="small"
+                              sx={{
+                                bgcolor: '#fef08a',
+                                color: '#854d0e',
+                                fontWeight: 800,
+                                fontSize: '0.66rem',
+                                height: 20,
+                              }}
+                            />
+                          </Box>
+                        </Paper>
+                      );
+                    })}
+                  </Stack>
+                )}
+              </Box>
+
+              {/* Botones de acción */}
+              <Divider />
+              <Box sx={{ p: 1.5, bgcolor: '#f8fafc', display: 'flex', gap: 1 }}>
+                {criticalItems.length > 0 && (
+                  <Button
+                    variant="contained"
+                    fullWidth
+                    size="small"
+                    startIcon={<OrderMoreIcon sx={{ fontSize: 16 }} />}
+                    onClick={() => {
+                      setNotifAnchorEl(null);
+                      const itemsToOrder = criticalItems.map((item) => ({
+                        itemId: item.id,
+                        quantity: Math.max(5, (Number(item.maxStock) || 20) - (Number(item.currentStock) || 0)),
+                        unitCost: item.unitCost || 10000,
+                      }));
+                      sessionStorage.setItem('sesamo_suggested_po_items', JSON.stringify(itemsToOrder));
+                      navigate('/purchases');
+                    }}
+                    sx={{
+                      bgcolor: '#ea580c',
+                      color: '#ffffff',
+                      fontWeight: 800,
+                      borderRadius: '10px',
+                      textTransform: 'none',
+                      fontSize: '0.78rem',
+                      '&:hover': { bgcolor: '#c2410c' }
+                    }}
+                  >
+                    Pedir Insumos
+                  </Button>
+                )}
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  size="small"
+                  endIcon={<ArrowForwardIcon sx={{ fontSize: 16 }} />}
+                  onClick={() => {
+                    setNotifAnchorEl(null);
+                    navigate('/inventory');
+                  }}
+                  sx={{
+                    color: '#1e290b',
+                    borderColor: '#cbd5e1',
+                    fontWeight: 800,
+                    borderRadius: '10px',
+                    textTransform: 'none',
+                    fontSize: '0.78rem',
+                    '&:hover': { bgcolor: '#f1f5f9', borderColor: '#94a3b8' }
+                  }}
+                >
+                  Ver Inventario
+                </Button>
+              </Box>
+            </Popover>
 
             <div>
               <IconButton
