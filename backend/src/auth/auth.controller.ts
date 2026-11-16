@@ -7,6 +7,6 @@ export class AuthController {
 
   @Post('login')
   login(@Body() loginDto: any) {
-    return this.authService.login(loginDto.email, loginDto.password);
+    return this.authService.login(loginDto.email, loginDto.password, loginDto.pin);
   }
 }

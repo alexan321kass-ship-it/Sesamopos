@@ -8,14 +8,23 @@ import {
   TextField,
   Button,
   Alert,
-  CircularProgress
+  CircularProgress,
+  InputAdornment,
+  IconButton
 } from '@mui/material';
+import {
+  LockClock as LockClockIcon,
+  Visibility as VisibilityIcon,
+  VisibilityOff as VisibilityOffIcon
+} from '@mui/icons-material';
 import { useAuthStore } from '../store/authStore';
 import { mockApi } from '../services/mockApi';
 
 export default function Login() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState(''); // password logic not fully implemented in mock
+  const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
+  const [showPin, setShowPin] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [inactivityNotice, setInactivityNotice] = useState(false);
@@ -50,12 +59,18 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+
+    if (!pin || pin.trim().length < 4) {
+      setError('Debes ingresar tu código privado (PIN de 4 dígitos) para indicar que inicias tu turno.');
+      return;
+    }
+
+    setLoading(true);
     
     try {
-      // Usar API real para login
-      const loggedUser = await mockApi.auth.login(email, password);
+      // Usar API con código privado para iniciar turno
+      const loggedUser = await mockApi.auth.login(email, password, pin.trim());
       login(loggedUser);
       navigate(getRolePath(loggedUser.role));
     } catch (err: any) {
@@ -128,11 +143,11 @@ export default function Login() {
               onClose={() => setInactivityNotice(false)}
               sx={{ mb: 2, borderRadius: '12px', fontWeight: 600, fontSize: '0.88rem' }}
             >
-              Tu sesión se cerró automáticamente por inactividad (más de 20 minutos sin uso). Inicia sesión nuevamente para continuar.
+              Tu sesión se cerró automáticamente por inactividad (más de 20 minutos sin uso). Inicia sesión nuevamente con tu PIN de turno para continuar.
             </Alert>
           )}
 
-          {error && <Alert severity="error" sx={{ mb: 2, borderRadius: '12px' }}>{error}</Alert>}
+          {error && <Alert severity="error" sx={{ mb: 2, borderRadius: '12px', fontWeight: 600 }}>{error}</Alert>}
 
           <form onSubmit={handleSubmit}>
             <TextField
@@ -144,6 +159,7 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
+              slotProps={{ input: { sx: { borderRadius: '12px' } } }}
             />
             <TextField
               fullWidth
@@ -155,7 +171,63 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
+              slotProps={{ input: { sx: { borderRadius: '12px' } } }}
             />
+
+            {/* Código Privado / PIN de Turno */}
+            <Box
+              sx={{
+                mt: 2,
+                mb: 1,
+                p: 2,
+                bgcolor: '#f8fafc',
+                borderRadius: '16px',
+                border: '1px solid #e2e8f0',
+                transition: 'all 0.2s ease',
+                '&:hover': { borderColor: '#16a34a' }
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                <LockClockIcon sx={{ color: '#16a34a', fontSize: 20 }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a' }}>
+                  Código Privado de Turno
+                </Typography>
+              </Box>
+              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 1.5, fontWeight: 500 }}>
+                Ingresa tu PIN de 4 dígitos para registrar inicio de turno y acceder.
+              </Typography>
+              <TextField
+                fullWidth
+                label="PIN Táctil (4 Dígitos)"
+                type={showPin ? 'text' : 'password'}
+                variant="outlined"
+                value={pin}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                  setPin(val);
+                }}
+                required
+                placeholder="••••"
+                slotProps={{
+                  htmlInput: {
+                    maxLength: 4,
+                    inputMode: 'numeric',
+                    pattern: '[0-9]*',
+                    style: { textAlign: 'center', fontSize: '1.4rem', letterSpacing: '0.4em', fontWeight: 900 }
+                  },
+                  input: {
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setShowPin(!showPin)} edge="end">
+                          {showPin ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                    sx: { borderRadius: '12px', bgcolor: '#ffffff', fontWeight: 800 }
+                  }
+                }}
+              />
+            </Box>
             
             <Button
               type="submit"
@@ -163,18 +235,18 @@ export default function Login() {
               variant="contained"
               size="large"
               sx={{
-                mt: 3,
+                mt: 2.5,
                 mb: 2,
                 py: 1.5,
                 borderRadius: '12px',
-                fontWeight: 700,
-                bgcolor: '#65a30d',
+                fontWeight: 800,
+                bgcolor: '#16a34a',
                 color: '#ffffff',
-                '&:hover': { bgcolor: '#4d7c0f' }
+                '&:hover': { bgcolor: '#15803d' }
               }}
               disabled={loading}
             >
-              {loading ? <CircularProgress size={24} color="inherit" /> : 'Iniciar Sesión'}
+              {loading ? <CircularProgress size={24} color="inherit" /> : 'Iniciar Turno & Acceder'}
             </Button>
             
             <Button
@@ -188,31 +260,29 @@ export default function Login() {
 
             <Box sx={{ mt: 2, pt: 2, borderTop: '1px dashed #cbd5e1' }}>
               <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', fontWeight: 800, color: '#64748b', mb: 1, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Accesos rápidos por rol (1-Clic):
+                Accesos rápidos por rol (Requiere tu PIN):
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center' }}>
-                <Button size="small" variant="outlined" onClick={() => { setEmail('admin@sesamo.com'); setPassword('password123'); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700 }}>
+                <Button size="small" variant="outlined" onClick={() => { setEmail('admin@sesamo.com'); setPassword('password123'); setPin(''); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700 }}>
                   👑 Admin
                 </Button>
-                <Button size="small" variant="outlined" onClick={() => { setEmail('cocina@sesamo.com'); setPassword('password123'); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#ea580c', borderColor: '#fdba74' }}>
+                <Button size="small" variant="outlined" onClick={() => { setEmail('cocina@sesamo.com'); setPassword('password123'); setPin(''); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#ea580c', borderColor: '#fdba74' }}>
                   👨‍🍳 Cocina
                 </Button>
-                <Button size="small" variant="outlined" onClick={() => { setEmail('carlos@sesamo.com'); setPassword('password123'); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#65a30d', borderColor: '#bef264' }}>
+                <Button size="small" variant="outlined" onClick={() => { setEmail('carlos@sesamo.com'); setPassword('password123'); setPin(''); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#65a30d', borderColor: '#bef264' }}>
                   🛎️ Mesero
                 </Button>
-                <Button size="small" variant="outlined" onClick={() => { setEmail('laura@sesamo.com'); setPassword('password123'); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#0284c7', borderColor: '#bae6fd' }}>
+                <Button size="small" variant="outlined" onClick={() => { setEmail('laura@sesamo.com'); setPassword('password123'); setPin(''); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#0284c7', borderColor: '#bae6fd' }}>
                   💵 Cajero
                 </Button>
-                <Button size="small" variant="outlined" onClick={() => { setEmail('kevin@sesamo.com'); setPassword('password123'); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#d97706', borderColor: '#fde68a' }}>
+                <Button size="small" variant="outlined" onClick={() => { setEmail('kevin@sesamo.com'); setPassword('password123'); setPin(''); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#d97706', borderColor: '#fde68a' }}>
                   🛵 Repartidor
                 </Button>
-                <Button size="small" variant="outlined" onClick={() => { setEmail('mateo@sesamo.com'); setPassword('password123'); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#7c3aed', borderColor: '#ddd6fe' }}>
+                <Button size="small" variant="outlined" onClick={() => { setEmail('mateo@sesamo.com'); setPassword('password123'); setPin(''); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#7c3aed', borderColor: '#ddd6fe' }}>
                   📦 Inventario
                 </Button>
               </Box>
             </Box>
-
-            
           </form>
         </CardContent>
       </Card>

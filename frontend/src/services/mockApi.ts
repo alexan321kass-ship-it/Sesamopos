@@ -672,22 +672,38 @@ let memoryCashMovements: any[] | null = null;
 
 export const mockApi = {
   auth: {
-    login: async (email: string, password?: string): Promise<User> => {
+    login: async (email: string, password?: string, pin?: string): Promise<User> => {
+      const cleanPin = String(pin || '').trim();
+      if (!cleanPin) {
+        throw new Error('Debes ingresar tu código privado (PIN de 4 dígitos) para indicar que inicias tu turno.');
+      }
+
       try {
         const response = await fetchWithTimeout(`${getApiUrl()}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password: password || '' })
+          body: JSON.stringify({ email, password: password || '', pin: cleanPin })
         });
         
         if (!response.ok) {
           const error = await response.json().catch(() => ({}));
-          throw new Error(error.message || 'Credenciales inválidas');
+          throw new Error(error.message || 'Código privado o credenciales incorrectas');
         }
         
         const data = await response.json();
-        return data.user;
+        const loggedUser = data.user;
+
+        // Iniciar turno en memoria frontend
+        try {
+          await mockApi.staff.clockIn(loggedUser.id);
+        } catch (e) {}
+
+        return loggedUser;
       } catch (err: any) {
+        if (err.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError') && !err.message.includes('timeout')) {
+          throw err;
+        }
+
         const allStaff = getStoredStaff();
         const user = allStaff.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim()) ||
                      mockUsers.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim());
@@ -704,7 +720,18 @@ export const mockApi = {
           throw new Error('El usuario se encuentra inactivo.');
         }
 
+        const expectedPin = String(user.pin || '1234').trim();
+        if (cleanPin !== expectedPin) {
+          throw new Error('Código privado incorrecto. Debes ingresar tu PIN de 4 dígitos para iniciar tu turno.');
+        }
+
+        // Marcar turno iniciado (clockIn)
+        try {
+          await mockApi.staff.clockIn(user.id);
+        } catch (e) {}
+
         const { password: _, ...cleanUser } = user;
+        cleanUser.shiftStatus = 'EN_TURNO';
         return cleanUser;
       }
     },
