@@ -1,5 +1,5 @@
 import { mockUsers, mockStaffMembers, mockStaffShifts, mockCategories, mockProducts, mockTables, mockInventory, mockSuppliers, mockCashRegisters, mockCustomers, mockSettings, mockRecipes } from '../mocks/db';
-import { User, StaffMember, StaffShiftRecord, Category, Product, Table, Order, InventoryItem, MeasurementUnit, Supplier, PurchaseOrder, PurchaseOrderStatus, CashRegister, Customer, DeliveryOrder, StoreSettings, Reservation, Recipe } from '../types';
+import { User, StaffMember, StaffShiftRecord, ShiftAuditLog, Category, Product, Table, Order, InventoryItem, MeasurementUnit, Supplier, PurchaseOrder, PurchaseOrderStatus, CashRegister, Customer, DeliveryOrder, StoreSettings, Reservation, Recipe } from '../types';
 import { playKitchenBellSound } from '../utils/audioAlerts';
 import { notifyRealtimeEvent } from './eventBus';
 
@@ -42,6 +42,75 @@ export const getStoredShifts = (): StaffShiftRecord[] => {
 export const saveStoredShifts = (shifts: StaffShiftRecord[]) => {
   memoryShiftsCache = shifts;
   notifyRealtimeEvent('sesamo_shifts_updated');
+};
+
+let memoryShiftLogsCache: ShiftAuditLog[] | null = null;
+export const getStoredShiftLogs = (): ShiftAuditLog[] => {
+  if (memoryShiftLogsCache) return memoryShiftLogsCache;
+  const today = new Date().toISOString().split('T')[0];
+  memoryShiftLogsCache = [
+    {
+      id: 'log-init-1',
+      timestamp: Date.now() - 3600000 * 3.5,
+      date: today,
+      time: '09:00',
+      staffId: '1',
+      staffName: 'Administrador General',
+      role: 'ADMINISTRADOR',
+      eventType: 'INICIO_TURNO',
+      description: 'Apertura general del restaurante y verificación de puestos.',
+    },
+    {
+      id: 'log-init-2',
+      timestamp: Date.now() - 3600000 * 2.8,
+      date: today,
+      time: '10:00',
+      staffId: '5',
+      staffName: 'Andrea Silva',
+      role: 'GERENTE',
+      eventType: 'INICIO_TURNO',
+      description: 'Inicio de turno en supervisión de servicio.',
+    },
+    {
+      id: 'log-init-3',
+      timestamp: Date.now() - 3600000 * 2.2,
+      date: today,
+      time: '11:00',
+      staffId: '3',
+      staffName: 'Laura Gómez',
+      role: 'CAJERO',
+      eventType: 'INICIO_TURNO',
+      description: 'Fichaje e inicio de turno en Caja Central #1.',
+    },
+    {
+      id: 'log-init-4',
+      timestamp: Date.now() - 3600000 * 1.8,
+      date: today,
+      time: '11:30',
+      staffId: '2',
+      staffName: 'Carlos Ruiz',
+      role: 'MESERO',
+      eventType: 'INICIO_TURNO',
+      description: 'Inicio de turno en atención de mesas salón comedor.',
+    },
+    {
+      id: 'log-init-5',
+      timestamp: Date.now() - 3600000 * 1.2,
+      date: today,
+      time: '11:45',
+      staffId: '8',
+      staffName: 'Sofía López',
+      role: 'MESERO',
+      eventType: 'PAUSA_INICIADA',
+      description: 'Pausa de turno iniciada (salida a descanso/refrigerio).',
+    },
+  ];
+  return memoryShiftLogsCache;
+};
+
+export const saveStoredShiftLogs = (logs: ShiftAuditLog[]) => {
+  memoryShiftLogsCache = logs;
+  notifyRealtimeEvent('sesamo_shift_logs_updated');
 };
 
 export const normalizeInventoryItem = (item: any, idx: number = 0): InventoryItem => {
@@ -2557,9 +2626,26 @@ export const mockApi = {
         checkIn: timeStr,
         status: 'ACTIVO',
         hoursWorked: 0,
+        breaks: [],
+        totalBreakMinutes: 0,
         notes: `Turno iniciado a las ${timeStr}`
       };
       saveStoredShifts([newShift, ...shifts]);
+
+      const logs = getStoredShiftLogs();
+      const newLog: ShiftAuditLog = {
+        id: 'log-' + Date.now(),
+        timestamp: Date.now(),
+        date: dateStr,
+        time: timeStr,
+        staffId: member.id,
+        staffName: member.name,
+        role: member.role,
+        eventType: 'INICIO_TURNO',
+        description: `Inicio de turno registrado a las ${timeStr}`,
+      };
+      saveStoredShiftLogs([newLog, ...logs]);
+
       return member;
     },
     clockOut: async (id: string): Promise<StaffMember> => {
@@ -2586,22 +2672,57 @@ export const mockApi = {
       if (!member) throw new Error('Colaborador no encontrado');
       const now = new Date();
       const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const dateStr = now.toISOString().split('T')[0];
       
       const shifts = getStoredShifts();
-      const activeShift = shifts.find(sh => String(sh.staffId) === String(id) && sh.status === 'ACTIVO');
+      const activeShift = shifts.find(sh => String(sh.staffId) === String(id) && (sh.status === 'ACTIVO' || sh.status === 'DESCANSO'));
+      let hoursWorked = 0;
+      let totalBreak = 0;
+
       if (activeShift) {
+        if (activeShift.breaks && activeShift.breaks.length > 0) {
+          const openBreak = activeShift.breaks.find(b => !b.endTime);
+          if (openBreak) {
+            openBreak.endTime = timeStr;
+            const [bInH, bInM] = openBreak.startTime.split(':').map(Number);
+            const [bOutH, bOutM] = timeStr.split(':').map(Number);
+            const brkMins = Math.max(1, (bOutH * 60 + bOutM) - (bInH * 60 + bInM));
+            openBreak.durationMinutes = brkMins;
+            activeShift.totalBreakMinutes = (activeShift.totalBreakMinutes || 0) + brkMins;
+          }
+        }
+
         activeShift.checkOut = timeStr;
         activeShift.status = 'COMPLETADO';
         const [inH, inM] = activeShift.checkIn.split(':').map(Number);
         const [outH, outM] = timeStr.split(':').map(Number);
         const totalMinutes = Math.max(15, (outH * 60 + outM) - (inH * 60 + inM));
-        activeShift.hoursWorked = parseFloat((totalMinutes / 60).toFixed(2));
+        hoursWorked = parseFloat((totalMinutes / 60).toFixed(2));
+        totalBreak = activeShift.totalBreakMinutes || 0;
+        activeShift.hoursWorked = hoursWorked;
+        activeShift.effectiveHoursWorked = parseFloat(Math.max(0.25, (totalMinutes - totalBreak) / 60).toFixed(2));
+        activeShift.notes = (activeShift.notes ? `${activeShift.notes} · ` : '') + `[Turno finalizado a las ${timeStr}]`;
         saveStoredShifts([...shifts]);
       }
 
       member.shiftStatus = 'FUERA_DE_TURNO';
       member.shiftStartTime = undefined;
       saveStoredStaff([...staff]);
+
+      const logs = getStoredShiftLogs();
+      const newLog: ShiftAuditLog = {
+        id: 'log-' + Date.now(),
+        timestamp: Date.now(),
+        date: dateStr,
+        time: timeStr,
+        staffId: member.id,
+        staffName: member.name,
+        role: member.role,
+        eventType: 'FIN_TURNO',
+        description: `Finalizó su turno a las ${timeStr} (${hoursWorked} hrs brutas, ${totalBreak} min en descanso)`,
+      };
+      saveStoredShiftLogs([newLog, ...logs]);
+
       return member;
     },
     setBreak: async (id: string): Promise<StaffMember> => {
@@ -2626,16 +2747,74 @@ export const mockApi = {
       const staff = getStoredStaff();
       const member = staff.find(s => String(s.id) === String(id));
       if (!member) throw new Error('Colaborador no encontrado');
-      member.shiftStatus = member.shiftStatus === 'DESCANSO' ? 'EN_TURNO' : 'DESCANSO';
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const dateStr = now.toISOString().split('T')[0];
+
+      const goingOnBreak = member.shiftStatus !== 'DESCANSO';
+      member.shiftStatus = goingOnBreak ? 'DESCANSO' : 'EN_TURNO';
       saveStoredStaff([...staff]);
 
       const shifts = getStoredShifts();
-      const activeShift = shifts.find(sh => String(sh.staffId) === String(id));
+      const activeShift = shifts.find(sh => String(sh.staffId) === String(id) && (sh.status === 'ACTIVO' || sh.status === 'DESCANSO'));
+      let breakDuration = 0;
+
       if (activeShift) {
-        activeShift.status = member.shiftStatus === 'DESCANSO' ? 'DESCANSO' : 'ACTIVO';
+        if (!activeShift.breaks) activeShift.breaks = [];
+        activeShift.status = goingOnBreak ? 'DESCANSO' : 'ACTIVO';
+        
+        if (goingOnBreak) {
+          activeShift.breaks.push({
+            id: 'brk-' + Date.now(),
+            startTime: timeStr,
+          });
+          activeShift.notes = (activeShift.notes ? `${activeShift.notes} · ` : '') + `[Pausa iniciada a las ${timeStr}]`;
+        } else {
+          const openBreak = [...activeShift.breaks].reverse().find(b => !b.endTime);
+          if (openBreak) {
+            openBreak.endTime = timeStr;
+            const [bInH, bInM] = openBreak.startTime.split(':').map(Number);
+            const [bOutH, bOutM] = timeStr.split(':').map(Number);
+            breakDuration = Math.max(1, (bOutH * 60 + bOutM) - (bInH * 60 + bInM));
+            openBreak.durationMinutes = breakDuration;
+            activeShift.totalBreakMinutes = (activeShift.totalBreakMinutes || 0) + breakDuration;
+          }
+          activeShift.notes = (activeShift.notes ? `${activeShift.notes} · ` : '') + `[Pausa finalizada a las ${timeStr} (${breakDuration} min)]`;
+        }
         saveStoredShifts([...shifts]);
       }
+
+      const logs = getStoredShiftLogs();
+      const newLog: ShiftAuditLog = {
+        id: 'log-' + Date.now(),
+        timestamp: Date.now(),
+        date: dateStr,
+        time: timeStr,
+        staffId: member.id,
+        staffName: member.name,
+        role: member.role,
+        eventType: goingOnBreak ? 'PAUSA_INICIADA' : 'PAUSA_FINALIZADA',
+        description: goingOnBreak
+          ? `Pausó su turno de trabajo (salida a descanso/refrigerio) a las ${timeStr}`
+          : `Reanudó su turno tras pausa a las ${timeStr} (descanso de ${breakDuration} min)`,
+        durationMinutes: goingOnBreak ? undefined : breakDuration,
+      };
+      saveStoredShiftLogs([newLog, ...logs]);
+
       return member;
+    },
+    getShiftLogs: async (): Promise<ShiftAuditLog[]> => {
+      try {
+        const response = await fetchWithTimeout(`${getApiUrl()}/staff/shifts/logs`);
+        if (response.ok) {
+          const logs = await response.json();
+          if (Array.isArray(logs) && logs.length > 0) {
+            saveStoredShiftLogs(logs);
+            return logs;
+          }
+        }
+      } catch (e) {}
+      return getStoredShiftLogs();
     },
     getShifts: async (): Promise<StaffShiftRecord[]> => {
       try {

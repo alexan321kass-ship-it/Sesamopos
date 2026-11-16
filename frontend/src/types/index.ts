@@ -10,6 +10,26 @@ export interface StaffPermissions {
   canManageStaff: boolean;
 }
 
+export interface ShiftBreakItem {
+  id: string;
+  startTime: string; // HH:mm
+  endTime?: string; // HH:mm
+  durationMinutes?: number;
+}
+
+export interface ShiftAuditLog {
+  id: string;
+  timestamp: number;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:mm
+  staffId: string;
+  staffName: string;
+  role: Role;
+  eventType: 'INICIO_TURNO' | 'PAUSA_INICIADA' | 'PAUSA_FINALIZADA' | 'FIN_TURNO' | 'TURNO_MANUAL';
+  description: string;
+  durationMinutes?: number;
+}
+
 export interface StaffShiftRecord {
   id: string;
   staffId: string;
@@ -20,6 +40,9 @@ export interface StaffShiftRecord {
   checkOut?: string; // HH:mm
   status: 'ACTIVO' | 'COMPLETADO' | 'DESCANSO';
   hoursWorked: number;
+  effectiveHoursWorked?: number;
+  breaks?: ShiftBreakItem[];
+  totalBreakMinutes?: number;
   notes?: string;
 }
 

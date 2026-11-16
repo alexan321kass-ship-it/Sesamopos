@@ -79,9 +79,12 @@ import {
   FiberManualRecord as DotIcon,
   Timer as TimerIcon,
   PlayArrow as PlayArrowIcon,
+  History as HistoryIcon,
+  FreeBreakfast as BreakIcon,
+  StopCircle as StopCircleIcon,
 } from '@mui/icons-material';
 import { mockApi } from '../services/mockApi';
-import { StaffMember, Role, StaffShiftRecord, StaffPermissions, DeliveryOrder } from '../types';
+import { StaffMember, Role, StaffShiftRecord, ShiftAuditLog, StaffPermissions, DeliveryOrder } from '../types';
 
 export default function StaffScreen() {
   const { user } = useAuthStore();
@@ -93,6 +96,12 @@ export default function StaffScreen() {
 
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [shiftsList, setShiftsList] = useState<StaffShiftRecord[]>([]);
+  const [shiftLogs, setShiftLogs] = useState<ShiftAuditLog[]>([]);
+  const [subTabTurnos, setSubTabTurnos] = useState<'trazabilidad' | 'monitor' | 'historial'>('trazabilidad');
+  const [logSearchTerm, setLogSearchTerm] = useState('');
+  const [logEventTypeFilter, setLogEventTypeFilter] = useState<string>('ALL');
+  const [logRoleFilter, setLogRoleFilter] = useState<string>('ALL');
+  const [selectedShiftForTraceability, setSelectedShiftForTraceability] = useState<StaffShiftRecord | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Tabs
@@ -190,14 +199,16 @@ export default function StaffScreen() {
   const loadData = async (showSpinner = false) => {
     try {
       if (showSpinner) setLoading(true);
-      const [staffData, shiftsData, delData] = await Promise.all([
+      const [staffData, shiftsData, delData, logsData] = await Promise.all([
         mockApi.staff.getAll(),
         mockApi.staff.getShifts(),
         mockApi.deliveries.getAll(),
+        mockApi.staff.getShiftLogs(),
       ]);
       setStaffList(staffData || []);
       setShiftsList(shiftsData || []);
       setDeliveries(delData || []);
+      setShiftLogs(logsData || []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -218,6 +229,8 @@ export default function StaffScreen() {
       setCurrentTab(3);
     } else if (tabParam === 'propinas' || tabParam === 'tips') {
       setCurrentTab(4);
+    } else if (tabParam === 'turnos' || tabParam === 'trazabilidad' || tabParam === 'asistencia') {
+      setCurrentTab(1);
     }
   }, [searchParams, isCashier]);
 
@@ -230,11 +243,13 @@ export default function StaffScreen() {
 
     window.addEventListener('sesamo_staff_updated', handleUpdate);
     window.addEventListener('sesamo_shifts_updated', handleUpdate);
+    window.addEventListener('sesamo_shift_logs_updated', handleUpdate);
     window.addEventListener('sesamo_deliveries_updated', handleUpdate);
     window.addEventListener('sesamo_cash_updated', handleUpdate);
     return () => {
       window.removeEventListener('sesamo_staff_updated', handleUpdate);
       window.removeEventListener('sesamo_shifts_updated', handleUpdate);
+      window.removeEventListener('sesamo_shift_logs_updated', handleUpdate);
       window.removeEventListener('sesamo_deliveries_updated', handleUpdate);
       window.removeEventListener('sesamo_cash_updated', handleUpdate);
     };
@@ -277,6 +292,39 @@ export default function StaffScreen() {
         : '5.0';
 
     return { total, active, onShift, onBreak, totalTipsCollected, totalOrdersServed, avgRating };
+  }, [staffList]);
+
+  // Filtros y Métricas de Trazabilidad de Turnos y Pausas
+  const filteredLogs = useMemo(() => {
+    return shiftLogs.filter((log) => {
+      const matchSearch =
+        log.staffName.toLowerCase().includes(logSearchTerm.toLowerCase()) ||
+        log.description.toLowerCase().includes(logSearchTerm.toLowerCase());
+      const matchRole = logRoleFilter === 'ALL' || log.role === logRoleFilter;
+      let matchType = true;
+      if (logEventTypeFilter === 'PAUSAS') {
+        matchType = log.eventType === 'PAUSA_INICIADA' || log.eventType === 'PAUSA_FINALIZADA';
+      } else if (logEventTypeFilter === 'INICIOS') {
+        matchType = log.eventType === 'INICIO_TURNO' || log.eventType === 'TURNO_MANUAL';
+      } else if (logEventTypeFilter === 'FINALIZACIONES') {
+        matchType = log.eventType === 'FIN_TURNO';
+      } else if (logEventTypeFilter !== 'ALL') {
+        matchType = log.eventType === logEventTypeFilter;
+      }
+      return matchSearch && matchRole && matchType;
+    });
+  }, [shiftLogs, logSearchTerm, logRoleFilter, logEventTypeFilter]);
+
+  const totalBreaksCount = useMemo(() => {
+    return shiftLogs.filter((l) => l.eventType === 'PAUSA_INICIADA').length;
+  }, [shiftLogs]);
+
+  const totalBreakMinutesToday = useMemo(() => {
+    return shiftsList.reduce((acc, s) => acc + (s.totalBreakMinutes || 0), 0);
+  }, [shiftsList]);
+
+  const staffOnBreakCount = useMemo(() => {
+    return staffList.filter((s) => s.shiftStatus === 'DESCANSO').length;
   }, [staffList]);
 
   // Rider Settlement Calculations (Recaudos en efectivo y fletes)
@@ -2347,7 +2395,7 @@ export default function StaffScreen() {
       )}
 
       {/* ======================================================== */}
-      {/* TAB 1: ASISTENCIA Y CONTROL DE TURNOS EN VIVO */}
+      {/* TAB 1: ASISTENCIA, CONTROL DE TURNOS & TRAZABILIDAD DE PAUSAS */}
       {/* ======================================================== */}
       {!isCashier && currentTab === 1 && (
         <Box>
@@ -2355,7 +2403,7 @@ export default function StaffScreen() {
           <Paper
             sx={{
               p: 3,
-              mb: 3.5,
+              mb: 3,
               borderRadius: '22px',
               bgcolor: '#f8fafc',
               border: '1px solid #e2e8f0',
@@ -2367,11 +2415,19 @@ export default function StaffScreen() {
             }}
           >
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 900, color: '#0f172a' }}>
-                Monitor de Asistencia en Tiempo Real
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#64748b', mt: 0.3 }}>
-                Visualiza los colaboradores activos en sala, cocina y caja, y audita las jornadas registradas hoy.
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 0.5 }}>
+                <Typography variant="h6" sx={{ fontWeight: 900, color: '#0f172a' }}>
+                  Control de Asistencia, Turnos & Trazabilidad
+                </Typography>
+                <Chip
+                  icon={<HistoryIcon sx={{ fontSize: 16 }} />}
+                  label="Bitácora en Tiempo Real"
+                  size="small"
+                  sx={{ bgcolor: '#dcfce7', color: '#15803d', fontWeight: 800, borderRadius: '8px' }}
+                />
+              </Box>
+              <Typography variant="body2" sx={{ color: '#64748b' }}>
+                Audita en vivo el fichaje, inicios de turno, cada pausa y descanso con su duración exacta, y los cierres de jornada de todo el equipo.
               </Typography>
             </Box>
 
@@ -2412,195 +2468,652 @@ export default function StaffScreen() {
             </Box>
           </Paper>
 
-          {/* Active Working Staff Live Cards */}
-          <Box sx={{ mb: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-              <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#16a34a' }} />
-              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a' }}>
-                Colaboradores Laborando en Sala & Cocina Ahora ({staffList.filter((s) => s.shiftStatus === 'EN_TURNO' || s.shiftStatus === 'DESCANSO').length})
-              </Typography>
-            </Box>
+          {/* KPI Summary Cards */}
+          <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+              <Card sx={{ p: 2, borderRadius: '18px', border: '1px solid #bbf7d0', bgcolor: '#f0fdf4' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Laborando Ahora
+                  </Typography>
+                  <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#22c55e' }} />
+                </Box>
+                <Typography variant="h4" sx={{ fontWeight: 900, color: '#15803d' }}>
+                  {stats.onShift}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#166534', fontWeight: 600 }}>
+                  Colaboradores activos en servicio
+                </Typography>
+              </Card>
+            </Grid>
 
-            {staffList.filter((s) => s.shiftStatus === 'EN_TURNO' || s.shiftStatus === 'DESCANSO').length === 0 ? (
-              <Paper sx={{ p: 4, textAlign: 'center', borderRadius: '18px', border: '1px dashed #cbd5e1', bgcolor: '#ffffff' }}>
-                <TimerIcon sx={{ fontSize: 48, color: '#94a3b8', mb: 1 }} />
-                <Typography variant="h6" sx={{ fontWeight: 800, color: '#475569' }}>
-                  No hay personal fichado en turno actualmente
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+              <Card sx={{ p: 2, borderRadius: '18px', border: '1px solid #fed7aa', bgcolor: '#fff7ed' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#9a3412', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    En Pausa / Descanso
+                  </Typography>
+                  <BreakIcon sx={{ color: '#ea580c', fontSize: 20 }} />
+                </Box>
+                <Typography variant="h4" sx={{ fontWeight: 900, color: '#c2410c' }}>
+                  {staffOnBreakCount}
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#94a3b8', mt: 0.5 }}>
-                  Utiliza el botón de Fichar Asistencia o haz clic en "Iniciar Turno" en el perfil de cualquier colaborador.
+                <Typography variant="caption" sx={{ color: '#9a3412', fontWeight: 600 }}>
+                  Personal tomando refrigerio ahora
                 </Typography>
+              </Card>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+              <Card sx={{ p: 2, borderRadius: '18px', border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Pausas Hoy
+                  </Typography>
+                  <HistoryIcon sx={{ color: '#64748b', fontSize: 20 }} />
+                </Box>
+                <Typography variant="h4" sx={{ fontWeight: 900, color: '#0f172a' }}>
+                  {totalBreaksCount}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+                  Descansos registrados en la jornada
+                </Typography>
+              </Card>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+              <Card sx={{ p: 2, borderRadius: '18px', border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Minutos en Pausas
+                  </Typography>
+                  <TimerIcon sx={{ color: '#64748b', fontSize: 20 }} />
+                </Box>
+                <Typography variant="h4" sx={{ fontWeight: 900, color: '#0f172a' }}>
+                  {totalBreakMinutesToday} <span style={{ fontSize: '1rem', fontWeight: 700, color: '#64748b' }}>min</span>
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+                  Tiempo total acumulado en descansos
+                </Typography>
+              </Card>
+            </Grid>
+          </Grid>
+
+          {/* Sub-Tab Navigation Bar */}
+          <Box sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap', p: 0.8, bgcolor: '#f1f5f9', borderRadius: '16px', width: 'fit-content' }}>
+            <Button
+              variant={subTabTurnos === 'trazabilidad' ? 'contained' : 'text'}
+              onClick={() => setSubTabTurnos('trazabilidad')}
+              startIcon={<HistoryIcon />}
+              sx={{
+                borderRadius: '12px',
+                fontWeight: 800,
+                textTransform: 'none',
+                px: 2.2,
+                py: 0.8,
+                bgcolor: subTabTurnos === 'trazabilidad' ? '#16a34a' : 'transparent',
+                color: subTabTurnos === 'trazabilidad' ? '#ffffff' : '#64748b',
+                boxShadow: subTabTurnos === 'trazabilidad' ? '0 4px 12px rgba(22,163,74,0.3)' : 'none',
+                '&:hover': { bgcolor: subTabTurnos === 'trazabilidad' ? '#15803d' : '#e2e8f0' }
+              }}
+            >
+              📜 Bitácora de Trazabilidad & Pausas ({filteredLogs.length})
+            </Button>
+            <Button
+              variant={subTabTurnos === 'monitor' ? 'contained' : 'text'}
+              onClick={() => setSubTabTurnos('monitor')}
+              startIcon={<TeamIcon />}
+              sx={{
+                borderRadius: '12px',
+                fontWeight: 800,
+                textTransform: 'none',
+                px: 2.2,
+                py: 0.8,
+                bgcolor: subTabTurnos === 'monitor' ? '#16a34a' : 'transparent',
+                color: subTabTurnos === 'monitor' ? '#ffffff' : '#64748b',
+                boxShadow: subTabTurnos === 'monitor' ? '0 4px 12px rgba(22,163,74,0.3)' : 'none',
+                '&:hover': { bgcolor: subTabTurnos === 'monitor' ? '#15803d' : '#e2e8f0' }
+              }}
+            >
+              🟢 Colaboradores en Turno ({staffList.filter((s) => s.shiftStatus === 'EN_TURNO' || s.shiftStatus === 'DESCANSO').length})
+            </Button>
+            <Button
+              variant={subTabTurnos === 'historial' ? 'contained' : 'text'}
+              onClick={() => setSubTabTurnos('historial')}
+              startIcon={<AccessTimeIcon />}
+              sx={{
+                borderRadius: '12px',
+                fontWeight: 800,
+                textTransform: 'none',
+                px: 2.2,
+                py: 0.8,
+                bgcolor: subTabTurnos === 'historial' ? '#16a34a' : 'transparent',
+                color: subTabTurnos === 'historial' ? '#ffffff' : '#64748b',
+                boxShadow: subTabTurnos === 'historial' ? '0 4px 12px rgba(22,163,74,0.3)' : 'none',
+                '&:hover': { bgcolor: subTabTurnos === 'historial' ? '#15803d' : '#e2e8f0' }
+              }}
+            >
+              📋 Historial de Jornadas ({shiftsList.length})
+            </Button>
+          </Box>
+
+          {/* APARTADO 1: BITÁCORA DE TRAZABILIDAD Y AUDITORÍA DE PAUSAS */}
+          {subTabTurnos === 'trazabilidad' && (
+            <Box>
+              {/* Toolbar de filtros para la bitácora */}
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2,
+                  mb: 2.5,
+                  borderRadius: '18px',
+                  border: '1px solid #e2e8f0',
+                  bgcolor: '#ffffff',
+                  display: 'flex',
+                  gap: 2,
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                }}
+              >
+                <TextField
+                  size="small"
+                  placeholder="Buscar colaborador o evento..."
+                  value={logSearchTerm}
+                  onChange={(e) => setLogSearchTerm(e.target.value)}
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon sx={{ color: '#94a3b8', fontSize: 20 }} />
+                        </InputAdornment>
+                      ),
+                      sx: { borderRadius: '12px' }
+                    }
+                  }}
+                  sx={{ minWidth: 260, flexGrow: 1 }}
+                />
+
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                  <InputLabel>Filtrar por Evento</InputLabel>
+                  <Select
+                    value={logEventTypeFilter}
+                    label="Filtrar por Evento"
+                    onChange={(e) => setLogEventTypeFilter(e.target.value)}
+                    sx={{ borderRadius: '12px' }}
+                  >
+                    <MenuItem value="ALL">Todos los Eventos</MenuItem>
+                    <MenuItem value="PAUSAS">☕ Pausas y Descansos</MenuItem>
+                    <MenuItem value="INICIOS">🟢 Inicios de Turno</MenuItem>
+                    <MenuItem value="FINALIZACIONES">🏁 Cierres de Turno</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <FormControl size="small" sx={{ minWidth: 170 }}>
+                  <InputLabel>Cargo / Rol</InputLabel>
+                  <Select
+                    value={logRoleFilter}
+                    label="Cargo / Rol"
+                    onChange={(e) => setLogRoleFilter(e.target.value)}
+                    sx={{ borderRadius: '12px' }}
+                  >
+                    <MenuItem value="ALL">Todos los Cargos</MenuItem>
+                    <MenuItem value="COCINA">Cocina</MenuItem>
+                    <MenuItem value="MESERO">Mesero</MenuItem>
+                    <MenuItem value="CAJERO">Cajero</MenuItem>
+                    <MenuItem value="REPARTIDOR">Repartidor</MenuItem>
+                    <MenuItem value="INVENTARIO">Inventario</MenuItem>
+                    <MenuItem value="GERENTE">Gerencia</MenuItem>
+                    <MenuItem value="ADMINISTRADOR">Administrador</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<RefreshIcon />}
+                  onClick={() => loadData(true)}
+                  sx={{
+                    borderRadius: '12px',
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    borderColor: '#cbd5e1',
+                    color: '#334155',
+                    height: 40,
+                  }}
+                >
+                  Actualizar
+                </Button>
               </Paper>
-            ) : (
-              <Grid container spacing={2}>
-                {staffList
-                  .filter((s) => s.shiftStatus === 'EN_TURNO' || s.shiftStatus === 'DESCANSO')
-                  .map((s) => {
-                    const roleConfig = getRoleConfig(s.role);
-                    return (
-                      <Grid size={{ xs: 12, sm: 6, md: 4 }} key={s.id}>
-                        <Card
-                          sx={{
-                            p: 2.2,
-                            borderRadius: '18px',
-                            border: '1px solid',
-                            borderColor: s.shiftStatus === 'EN_TURNO' ? '#bbf7d0' : '#fed7aa',
-                            bgcolor: '#ffffff',
-                            boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
-                          }}
-                        >
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                              <Avatar
-                                sx={{
-                                  background: roleConfig.gradient,
-                                  color: '#ffffff',
-                                  fontWeight: 800,
-                                  width: 44,
-                                  height: 44,
-                                  borderRadius: '12px',
-                                }}
-                              >
-                                {s.name.charAt(0)}
-                              </Avatar>
-                              <Box>
-                                <Typography variant="body1" sx={{ fontWeight: 800, color: '#0f172a' }}>
-                                  {s.name}
+
+              {/* Tabla de Bitácora de Trazabilidad */}
+              <TableContainer
+                component={Paper}
+                sx={{
+                  borderRadius: '20px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.02)',
+                  overflowX: 'auto',
+                  maxWidth: '100%',
+                }}
+              >
+                <Table>
+                  <TableHead sx={{ bgcolor: '#f8fafc' }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 800, color: '#475569' }}>Hora & Fecha</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: '#475569' }}>Colaborador</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: '#475569' }} align="center">Tipo de Acción</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: '#475569' }} align="center">Duración Descanso</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: '#475569' }}>Detalle de Auditoría</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filteredLogs.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} sx={{ textAlign: 'center', py: 5 }}>
+                          <HistoryIcon sx={{ fontSize: 48, color: '#cbd5e1', mb: 1 }} />
+                          <Typography variant="body1" sx={{ fontWeight: 800, color: '#64748b' }}>
+                            No hay registros de trazabilidad con los filtros seleccionados
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                            Los fichajes, pausas y salidas se registrarán automáticamente aquí en tiempo real.
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredLogs.map((log) => {
+                        const isPauseStart = log.eventType === 'PAUSA_INICIADA';
+                        const isPauseEnd = log.eventType === 'PAUSA_FINALIZADA';
+                        const isShiftStart = log.eventType === 'INICIO_TURNO' || log.eventType === 'TURNO_MANUAL';
+                        const isShiftEnd = log.eventType === 'FIN_TURNO';
+
+                        return (
+                          <TableRow key={log.id} hover>
+                            <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#0f172a' }}>
+                                {log.time}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                                {log.date}
+                              </Typography>
+                            </TableCell>
+
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                                <Avatar
+                                  sx={{
+                                    bgcolor: getRoleConfig(log.role).color,
+                                    width: 34,
+                                    height: 34,
+                                    fontSize: '0.85rem',
+                                    fontWeight: 800,
+                                  }}
+                                >
+                                  {log.staffName.charAt(0)}
+                                </Avatar>
+                                <Box>
+                                  <Typography variant="body2" sx={{ fontWeight: 800, color: '#0f172a' }}>
+                                    {log.staffName}
+                                  </Typography>
+                                  <Chip
+                                    size="small"
+                                    label={log.role}
+                                    sx={{
+                                      height: 18,
+                                      fontSize: '0.65rem',
+                                      fontWeight: 800,
+                                      bgcolor: getRoleConfig(log.role).bgLight,
+                                      color: getRoleConfig(log.role).color,
+                                    }}
+                                  />
+                                </Box>
+                              </Box>
+                            </TableCell>
+
+                            <TableCell align="center">
+                              {isPauseStart && (
+                                <Chip
+                                  icon={<BreakIcon sx={{ fontSize: 15 }} />}
+                                  label="PAUSA INICIADA"
+                                  size="small"
+                                  sx={{
+                                    bgcolor: '#ffedd5',
+                                    color: '#c2410c',
+                                    fontWeight: 900,
+                                    borderRadius: '8px',
+                                    fontSize: '0.72rem',
+                                    border: '1px solid #fed7aa',
+                                  }}
+                                />
+                              )}
+                              {isPauseEnd && (
+                                <Chip
+                                  icon={<PlayArrowIcon sx={{ fontSize: 15 }} />}
+                                  label="PAUSA FINALIZADA"
+                                  size="small"
+                                  sx={{
+                                    bgcolor: '#fefce8',
+                                    color: '#854d0e',
+                                    fontWeight: 900,
+                                    borderRadius: '8px',
+                                    fontSize: '0.72rem',
+                                    border: '1px solid #fef08a',
+                                  }}
+                                />
+                              )}
+                              {isShiftStart && (
+                                <Chip
+                                  icon={<LoginIcon sx={{ fontSize: 15 }} />}
+                                  label="INICIO DE TURNO"
+                                  size="small"
+                                  sx={{
+                                    bgcolor: '#dcfce7',
+                                    color: '#15803d',
+                                    fontWeight: 900,
+                                    borderRadius: '8px',
+                                    fontSize: '0.72rem',
+                                    border: '1px solid #bbf7d0',
+                                  }}
+                                />
+                              )}
+                              {isShiftEnd && (
+                                <Chip
+                                  icon={<StopCircleIcon sx={{ fontSize: 15 }} />}
+                                  label="FIN DE TURNO"
+                                  size="small"
+                                  sx={{
+                                    bgcolor: '#fee2e2',
+                                    color: '#b91c1c',
+                                    fontWeight: 900,
+                                    borderRadius: '8px',
+                                    fontSize: '0.72rem',
+                                    border: '1px solid #fca5a5',
+                                  }}
+                                />
+                              )}
+                            </TableCell>
+
+                            <TableCell align="center">
+                              {log.durationMinutes ? (
+                                <Chip
+                                  label={`⏱️ ${log.durationMinutes} min`}
+                                  size="small"
+                                  sx={{
+                                    bgcolor: '#fff7ed',
+                                    color: '#ea580c',
+                                    fontWeight: 800,
+                                    fontSize: '0.72rem',
+                                    border: '1px solid #fed7aa',
+                                  }}
+                                />
+                              ) : isPauseStart ? (
+                                <Chip
+                                  label="⏳ En curso..."
+                                  size="small"
+                                  sx={{
+                                    bgcolor: '#fefce8',
+                                    color: '#a16207',
+                                    fontWeight: 800,
+                                    fontSize: '0.72rem',
+                                  }}
+                                />
+                              ) : (
+                                <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                                  —
                                 </Typography>
-                                <Typography variant="caption" sx={{ color: '#64748b' }}>
-                                  {s.assignedArea} · {s.role}
+                              )}
+                            </TableCell>
+
+                            <TableCell sx={{ color: '#334155', fontWeight: 600, fontSize: '0.86rem' }}>
+                              {log.description}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
+
+          {/* APARTADO 2: COLABORADORES EN TURNO (MONITOR EN VIVO) */}
+          {subTabTurnos === 'monitor' && (
+            <Box sx={{ mb: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#16a34a' }} />
+                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a' }}>
+                  Colaboradores Laborando en Sala & Cocina Ahora ({staffList.filter((s) => s.shiftStatus === 'EN_TURNO' || s.shiftStatus === 'DESCANSO').length})
+                </Typography>
+              </Box>
+
+              {staffList.filter((s) => s.shiftStatus === 'EN_TURNO' || s.shiftStatus === 'DESCANSO').length === 0 ? (
+                <Paper sx={{ p: 4, textAlign: 'center', borderRadius: '18px', border: '1px dashed #cbd5e1', bgcolor: '#ffffff' }}>
+                  <TimerIcon sx={{ fontSize: 48, color: '#94a3b8', mb: 1 }} />
+                  <Typography variant="h6" sx={{ fontWeight: 800, color: '#475569' }}>
+                    No hay personal fichado en turno actualmente
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#94a3b8', mt: 0.5 }}>
+                    Utiliza el botón de Fichar Asistencia o haz clic en "Iniciar Turno" en el perfil de cualquier colaborador.
+                  </Typography>
+                </Paper>
+              ) : (
+                <Grid container spacing={2}>
+                  {staffList
+                    .filter((s) => s.shiftStatus === 'EN_TURNO' || s.shiftStatus === 'DESCANSO')
+                    .map((s) => {
+                      const roleConfig = getRoleConfig(s.role);
+                      return (
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }} key={s.id}>
+                          <Card
+                            sx={{
+                              p: 2.2,
+                              borderRadius: '18px',
+                              border: '1px solid',
+                              borderColor: s.shiftStatus === 'EN_TURNO' ? '#bbf7d0' : '#fed7aa',
+                              bgcolor: '#ffffff',
+                              boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                <Avatar
+                                  sx={{
+                                    background: roleConfig.gradient,
+                                    color: '#ffffff',
+                                    fontWeight: 800,
+                                    width: 44,
+                                    height: 44,
+                                    borderRadius: '12px',
+                                  }}
+                                >
+                                  {s.name.charAt(0)}
+                                </Avatar>
+                                <Box>
+                                  <Typography variant="body1" sx={{ fontWeight: 800, color: '#0f172a' }}>
+                                    {s.name}
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                    {s.assignedArea} · {s.role}
+                                  </Typography>
+                                </Box>
+                              </Box>
+
+                              <Box sx={{ textAlign: 'right' }}>
+                                <Chip
+                                  size="small"
+                                  label={s.shiftStatus === 'EN_TURNO' ? 'Laborando' : 'En Pausa'}
+                                  sx={{
+                                    bgcolor: s.shiftStatus === 'EN_TURNO' ? '#dcfce7' : '#ffedd5',
+                                    color: s.shiftStatus === 'EN_TURNO' ? '#15803d' : '#c2410c',
+                                    fontWeight: 800,
+                                    height: 24,
+                                    borderRadius: '8px',
+                                  }}
+                                />
+                                <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#94a3b8', fontWeight: 600 }}>
+                                  Ingreso: {s.shiftStartTime || '11:00'}
                                 </Typography>
                               </Box>
                             </Box>
 
-                            <Box sx={{ textAlign: 'right' }}>
-                              <Chip
+                            <Box sx={{ display: 'flex', gap: 1, mt: 2, pt: 1.5, borderTop: '1px solid #f1f5f9' }}>
+                              <Button
                                 size="small"
-                                label={s.shiftStatus === 'EN_TURNO' ? 'Laborando' : 'En Pausa'}
+                                fullWidth
+                                variant="outlined"
+                                color={s.shiftStatus === 'EN_TURNO' ? 'warning' : 'success'}
+                                onClick={() => handleQuickToggleBreak(s)}
+                                sx={{ borderRadius: '10px', fontWeight: 700, textTransform: 'none' }}
+                              >
+                                {s.shiftStatus === 'EN_TURNO' ? 'Pausar Turno' : 'Reanudar'}
+                              </Button>
+                              <Button
+                                size="small"
+                                fullWidth
+                                variant="contained"
+                                color="error"
+                                onClick={() => handleQuickClockOut(s)}
                                 sx={{
-                                  bgcolor: s.shiftStatus === 'EN_TURNO' ? '#dcfce7' : '#ffedd5',
-                                  color: s.shiftStatus === 'EN_TURNO' ? '#15803d' : '#c2410c',
+                                  borderRadius: '10px',
+                                  fontWeight: 700,
+                                  textTransform: 'none',
+                                  bgcolor: '#ef4444',
+                                  '&:hover': { bgcolor: '#dc2626' },
+                                }}
+                              >
+                                Marcar Salida
+                              </Button>
+                            </Box>
+                          </Card>
+                        </Grid>
+                      );
+                    })}
+                </Grid>
+              )}
+            </Box>
+          )}
+
+          {/* APARTADO 3: HISTORIAL DE JORNADAS REGISTRADAS */}
+          {subTabTurnos === 'historial' && (
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a', mb: 1.5 }}>
+                Historial de Jornadas Registradas (Hoy)
+              </Typography>
+
+              <TableContainer
+                component={Paper}
+                sx={{
+                  borderRadius: '20px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.02)',
+                  overflowX: 'auto',
+                  maxWidth: '100%',
+                }}
+              >
+                <Table>
+                  <TableHead sx={{ bgcolor: '#f8fafc' }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 800, color: '#475569' }}>Colaborador</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: '#475569' }} align="center">Cargo</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: '#475569' }} align="center">Fecha</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: '#475569' }} align="center">Hora Ingreso</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: '#475569' }} align="center">Pausas / Descansos</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: '#475569' }} align="center">Hora Salida</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: '#475569' }} align="center">Horas Trabajadas</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: '#475569' }} align="center">Estado</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: '#475569' }} align="center">Trazabilidad</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {shiftsList.map((shift) => {
+                      const breakCount = shift.breaks ? shift.breaks.length : (shift.status === 'DESCANSO' ? 1 : 0);
+                      const totalBreakMins = shift.totalBreakMinutes || (shift.status === 'DESCANSO' ? 15 : 0);
+
+                      return (
+                        <TableRow key={shift.id} hover>
+                          <TableCell sx={{ fontWeight: 800, color: '#0f172a' }}>{shift.staffName}</TableCell>
+                          <TableCell align="center">
+                            <Chip
+                              size="small"
+                              label={shift.role}
+                              sx={{
+                                bgcolor: getRoleConfig(shift.role).bgLight,
+                                color: getRoleConfig(shift.role).color,
+                                fontWeight: 800,
+                                borderRadius: '8px',
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell align="center" sx={{ color: '#64748b', fontWeight: 600 }}>{shift.date}</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 800, color: '#16a34a' }}>
+                            {shift.checkIn}
+                          </TableCell>
+                          <TableCell align="center">
+                            {breakCount > 0 ? (
+                              <Chip
+                                icon={<BreakIcon sx={{ fontSize: 14 }} />}
+                                label={`${breakCount} pausa${breakCount > 1 ? 's' : ''} (${totalBreakMins} min)`}
+                                size="small"
+                                sx={{
+                                  bgcolor: '#fff7ed',
+                                  color: '#ea580c',
                                   fontWeight: 800,
-                                  height: 24,
+                                  border: '1px solid #fed7aa',
                                   borderRadius: '8px',
                                 }}
                               />
-                              <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#94a3b8', fontWeight: 600 }}>
-                                Ingreso: {s.shiftStartTime || '11:00'}
+                            ) : (
+                              <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600 }}>
+                                Sin pausas
                               </Typography>
-                            </Box>
-                          </Box>
-
-                          <Box sx={{ display: 'flex', gap: 1, mt: 2, pt: 1.5, borderTop: '1px solid #f1f5f9' }}>
-                            <Button
+                            )}
+                          </TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 800, color: shift.checkOut ? '#ef4444' : '#94a3b8' }}>
+                            {shift.checkOut || 'En curso...'}
+                          </TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 900, color: '#0f172a' }}>
+                            {shift.hoursWorked ? `${shift.hoursWorked} hrs` : 'Contabilizando...'}
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip
                               size="small"
-                              fullWidth
-                              variant="outlined"
-                              color={s.shiftStatus === 'EN_TURNO' ? 'warning' : 'success'}
-                              onClick={() => handleQuickToggleBreak(s)}
-                              sx={{ borderRadius: '10px', fontWeight: 700, textTransform: 'none' }}
-                            >
-                              {s.shiftStatus === 'EN_TURNO' ? 'Pausar Turno' : 'Reanudar'}
-                            </Button>
-                            <Button
-                              size="small"
-                              fullWidth
-                              variant="contained"
-                              color="error"
-                              onClick={() => handleQuickClockOut(s)}
+                              label={shift.status}
                               sx={{
-                                borderRadius: '10px',
-                                fontWeight: 700,
+                                bgcolor: shift.status === 'ACTIVO' ? '#dcfce7' : shift.status === 'DESCANSO' ? '#ffedd5' : '#f1f5f9',
+                                color: shift.status === 'ACTIVO' ? '#15803d' : shift.status === 'DESCANSO' ? '#c2410c' : '#475569',
+                                fontWeight: 800,
+                                borderRadius: '8px',
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell align="center">
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<HistoryIcon sx={{ fontSize: 15 }} />}
+                              onClick={() => setSelectedShiftForTraceability(shift)}
+                              sx={{
+                                borderRadius: '8px',
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
                                 textTransform: 'none',
-                                bgcolor: '#ef4444',
-                                '&:hover': { bgcolor: '#dc2626' },
+                                color: '#16a34a',
+                                borderColor: '#bbf7d0',
+                                bgcolor: '#f0fdf4',
+                                '&:hover': { bgcolor: '#dcfce7', borderColor: '#86efac' }
                               }}
                             >
-                              Marcar Salida
+                              Ver Bitácora
                             </Button>
-                          </Box>
-                        </Card>
-                      </Grid>
-                    );
-                  })}
-              </Grid>
-            )}
-          </Box>
-
-          {/* Shifts History Log Table */}
-          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a', mb: 1.5 }}>
-            Historial de Jornadas Registradas (Hoy)
-          </Typography>
-
-          <TableContainer
-            component={Paper}
-            sx={{
-              borderRadius: '20px',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.02)',
-              overflowX: 'auto',
-              maxWidth: '100%',
-            }}
-          >
-            <Table>
-              <TableHead sx={{ bgcolor: '#f8fafc' }}>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 800, color: '#475569' }}>Colaborador</TableCell>
-                  <TableCell sx={{ fontWeight: 800, color: '#475569' }} align="center">Cargo</TableCell>
-                  <TableCell sx={{ fontWeight: 800, color: '#475569' }} align="center">Fecha</TableCell>
-                  <TableCell sx={{ fontWeight: 800, color: '#475569' }} align="center">Hora Ingreso</TableCell>
-                  <TableCell sx={{ fontWeight: 800, color: '#475569' }} align="center">Hora Salida</TableCell>
-                  <TableCell sx={{ fontWeight: 800, color: '#475569' }} align="center">Horas Trabajadas</TableCell>
-                  <TableCell sx={{ fontWeight: 800, color: '#475569' }} align="center">Estado</TableCell>
-                  <TableCell sx={{ fontWeight: 800, color: '#475569' }}>Observaciones / Notas</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {shiftsList.map((shift) => (
-                  <TableRow key={shift.id} hover>
-                    <TableCell sx={{ fontWeight: 800, color: '#0f172a' }}>{shift.staffName}</TableCell>
-                    <TableCell align="center">
-                      <Chip
-                        size="small"
-                        label={shift.role}
-                        sx={{
-                          bgcolor: getRoleConfig(shift.role).bgLight,
-                          color: getRoleConfig(shift.role).color,
-                          fontWeight: 800,
-                          borderRadius: '8px',
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell align="center" sx={{ color: '#64748b', fontWeight: 600 }}>{shift.date}</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 800, color: '#16a34a' }}>
-                      {shift.checkIn}
-                    </TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 800, color: shift.checkOut ? '#ef4444' : '#94a3b8' }}>
-                      {shift.checkOut || 'En curso...'}
-                    </TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 900, color: '#0f172a' }}>
-                      {shift.hoursWorked ? `${shift.hoursWorked} hrs` : 'Contabilizando...'}
-                    </TableCell>
-                    <TableCell align="center">
-                      <Chip
-                        size="small"
-                        label={shift.status}
-                        sx={{
-                          bgcolor: shift.status === 'ACTIVO' ? '#dcfce7' : shift.status === 'DESCANSO' ? '#ffedd5' : '#f1f5f9',
-                          color: shift.status === 'ACTIVO' ? '#15803d' : shift.status === 'DESCANSO' ? '#c2410c' : '#475569',
-                          fontWeight: 800,
-                          borderRadius: '8px',
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell sx={{ color: '#64748b', fontSize: '0.85rem' }}>
-                      {shift.notes || '—'}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
         </Box>
       )}
 
@@ -4397,6 +4910,191 @@ export default function StaffScreen() {
             sx={{ fontWeight: 900, bgcolor: '#1e290b', color: '#ffffff' }}
           >
             Imprimir Volante
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ======================================================== */}
+      {/* DIÁLOGO DETALLE DE TRAZABILIDAD Y PAUSAS DEL TURNO */}
+      {/* ======================================================== */}
+      <Dialog
+        open={Boolean(selectedShiftForTraceability)}
+        onClose={() => setSelectedShiftForTraceability(null)}
+        maxWidth="sm"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: { borderRadius: '22px', p: 1 }
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box sx={{ width: 42, height: 42, borderRadius: '12px', bgcolor: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
+              <HistoryIcon />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 900, color: '#0f172a' }}>
+                Trazabilidad del Turno
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+                Auditoría detallada de fichaje y descansos
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton onClick={() => setSelectedShiftForTraceability(null)} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent dividers sx={{ p: 2.5 }}>
+          {selectedShiftForTraceability && (
+            <Box>
+              {/* Resumen del colaborador */}
+              <Box sx={{ p: 2, mb: 2.5, bgcolor: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#0f172a' }}>
+                    {selectedShiftForTraceability.staffName}
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.3 }}>
+                    <Chip
+                      size="small"
+                      label={selectedShiftForTraceability.role}
+                      sx={{
+                        bgcolor: getRoleConfig(selectedShiftForTraceability.role).bgLight,
+                        color: getRoleConfig(selectedShiftForTraceability.role).color,
+                        fontWeight: 800,
+                        fontSize: '0.7rem',
+                        height: 20,
+                      }}
+                    />
+                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+                      Fecha: {selectedShiftForTraceability.date}
+                    </Typography>
+                  </Box>
+                </Box>
+                <Chip
+                  size="small"
+                  label={selectedShiftForTraceability.status}
+                  sx={{
+                    bgcolor: selectedShiftForTraceability.status === 'ACTIVO' ? '#dcfce7' : selectedShiftForTraceability.status === 'DESCANSO' ? '#ffedd5' : '#f1f5f9',
+                    color: selectedShiftForTraceability.status === 'ACTIVO' ? '#15803d' : selectedShiftForTraceability.status === 'DESCANSO' ? '#c2410c' : '#475569',
+                    fontWeight: 900,
+                  }}
+                />
+              </Box>
+
+              {/* Métricas clave del turno */}
+              <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
+                <Grid size={{ xs: 6, sm: 3 }}>
+                  <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center', borderRadius: '12px' }}>
+                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, display: 'block' }}>Entrada</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 900, color: '#16a34a' }}>{selectedShiftForTraceability.checkIn}</Typography>
+                  </Paper>
+                </Grid>
+                <Grid size={{ xs: 6, sm: 3 }}>
+                  <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center', borderRadius: '12px' }}>
+                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, display: 'block' }}>Salida</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 900, color: selectedShiftForTraceability.checkOut ? '#dc2626' : '#94a3b8' }}>
+                      {selectedShiftForTraceability.checkOut || 'En curso'}
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid size={{ xs: 6, sm: 3 }}>
+                  <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center', borderRadius: '12px', bgcolor: '#fff7ed', borderColor: '#fed7aa' }}>
+                    <Typography variant="caption" sx={{ color: '#c2410c', fontWeight: 700, display: 'block' }}>Descansos</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 900, color: '#ea580c' }}>
+                      {selectedShiftForTraceability.totalBreakMinutes || (selectedShiftForTraceability.status === 'DESCANSO' ? 15 : 0)} min
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid size={{ xs: 6, sm: 3 }}>
+                  <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center', borderRadius: '12px' }}>
+                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, display: 'block' }}>Horas Total</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 900, color: '#0f172a' }}>
+                      {selectedShiftForTraceability.hoursWorked ? `${selectedShiftForTraceability.hoursWorked} h` : '—'}
+                    </Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              {/* Desglose de Pausas y Descansos */}
+              <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#0f172a', mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <BreakIcon sx={{ color: '#ea580c', fontSize: 18 }} />
+                Registro de Pausas Tomadas
+              </Typography>
+
+              {(!selectedShiftForTraceability.breaks || selectedShiftForTraceability.breaks.length === 0) && selectedShiftForTraceability.status !== 'DESCANSO' ? (
+                <Paper sx={{ p: 2, textAlign: 'center', borderRadius: '12px', border: '1px dashed #cbd5e1', bgcolor: '#f8fafc', mb: 2 }}>
+                  <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
+                    Este colaborador no registró pausas durante esta jornada.
+                  </Typography>
+                </Paper>
+              ) : (
+                <Stack spacing={1} sx={{ mb: 2.5 }}>
+                  {selectedShiftForTraceability.breaks && selectedShiftForTraceability.breaks.map((brk, idx) => (
+                    <Paper key={brk.id || idx} variant="outlined" sx={{ p: 1.5, borderRadius: '12px', bgcolor: '#fffbf5', borderColor: '#fed7aa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                        <Box sx={{ width: 28, height: 28, borderRadius: '8px', bgcolor: '#ffedd5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ea580c', fontWeight: 800, fontSize: '0.75rem' }}>
+                          #{idx + 1}
+                        </Box>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 800, color: '#0f172a' }}>
+                            Pausa / Refrigerio
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#64748b' }}>
+                            Inicio: <strong>{brk.startTime}</strong> {brk.endTime ? `— Fin: ${brk.endTime}` : '(En curso)'}
+                          </Typography>
+                        </Box>
+                      </Box>
+                      <Chip
+                        label={brk.durationMinutes ? `${brk.durationMinutes} min` : 'En curso...'}
+                        size="small"
+                        sx={{ bgcolor: '#ffedd5', color: '#c2410c', fontWeight: 800, borderRadius: '8px' }}
+                      />
+                    </Paper>
+                  ))}
+                  {selectedShiftForTraceability.status === 'DESCANSO' && (!selectedShiftForTraceability.breaks || selectedShiftForTraceability.breaks.length === 0) && (
+                    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: '12px', bgcolor: '#fffbf5', borderColor: '#fed7aa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                        <Box sx={{ width: 28, height: 28, borderRadius: '8px', bgcolor: '#ffedd5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ea580c', fontWeight: 800 }}>
+                          #1
+                        </Box>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 800, color: '#0f172a' }}>Pausa Actual</Typography>
+                          <Typography variant="caption" sx={{ color: '#64748b' }}>El colaborador se encuentra actualmente en refrigerio</Typography>
+                        </Box>
+                      </Box>
+                      <Chip label="En Pausa Activa" size="small" sx={{ bgcolor: '#ffedd5', color: '#c2410c', fontWeight: 800 }} />
+                    </Paper>
+                  )}
+                </Stack>
+              )}
+
+              {/* Bitácora / Notas de Auditoría */}
+              {selectedShiftForTraceability.notes && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 0.5 }}>
+                    Bitácora de Observaciones Registradas:
+                  </Typography>
+                  <Paper sx={{ p: 1.5, bgcolor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <Typography variant="body2" sx={{ color: '#334155', fontSize: '0.86rem', lineHeight: 1.6 }}>
+                      {selectedShiftForTraceability.notes}
+                    </Typography>
+                  </Paper>
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            variant="contained"
+            onClick={() => setSelectedShiftForTraceability(null)}
+            sx={{ fontWeight: 800, borderRadius: '10px', bgcolor: '#16a34a', textTransform: 'none', px: 3, '&:hover': { bgcolor: '#15803d' } }}
+          >
+            Entendido
           </Button>
         </DialogActions>
       </Dialog>

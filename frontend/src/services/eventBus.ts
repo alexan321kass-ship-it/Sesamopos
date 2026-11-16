@@ -70,6 +70,7 @@ export type RealtimeEventType =
   | 'sesamo_deliveries_updated'
   | 'sesamo_staff_updated'
   | 'sesamo_shifts_updated'
+  | 'sesamo_shift_logs_updated'
   | 'sesamo_settings_updated'
   | 'sesamo_waiter_called';
 

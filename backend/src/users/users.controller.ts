@@ -15,6 +15,11 @@ export class StaffController {
     return this.usersService.getShifts();
   }
 
+  @Get('shifts/logs')
+  async getShiftLogs() {
+    return this.usersService.getShiftLogs();
+  }
+
   @Post('shifts')
   async addShift(@Body() body: any, @Headers('x-user-role') role?: string) {
     if (role && !['ADMINISTRADOR', 'GERENTE'].includes(role)) {
