@@ -404,10 +404,10 @@ export default function PosScreen() {
   const handleSendToKitchen = async () => {
     if (posStore.items.length === 0 || isSubmittingKitchen) return;
     if (!posStore.editingOrderId) {
-      const confirmUnpaid = window.confirm(
-        '⚠️ AVISO DE AUTOSERVICIO:\n\nEl restaurante funciona en modalidad Autoservicio (primero se cobra y luego pasa el pedido a cocina).\n\n¿Deseas enviar esta comanda a cocina SIN registrar el cobro previo?'
+      alert(
+        '⛔ BLOQUEO DE AUTOSERVICIO:\n\nEn este restaurante primero se paga y después se procesa el pedido en cocina.\n\nNo es posible enviar pedidos a cocina sin registrar el cobro previo. Por favor utiliza el botón "💵 Cobrar y Pasar a Cocina".'
       );
-      if (!confirmUnpaid) return;
+      return;
     }
     if (!posStore.currentTableId && !posStore.editingOrderId) {
       setPendingAction('KITCHEN');
@@ -1536,24 +1536,27 @@ export default function PosScreen() {
               💵 Cobrar y Pasar a Cocina
             </Button>
 
-            <Button
-              fullWidth
-              variant="text"
-              size="small"
-              startIcon={<KitchenIcon sx={{ fontSize: 16 }} />}
-              onClick={handleSendToKitchen}
-              disabled={posStore.items.length === 0 || isSubmittingKitchen}
-              sx={{
-                color: '#64748b',
-                fontWeight: 700,
-                fontSize: '0.74rem',
-                textTransform: 'none',
-                py: 0.4,
-                '&:hover': { color: '#0f172a', bgcolor: 'transparent' }
-              }}
-            >
-              {posStore.editingOrderId ? '🍳 Actualizar comanda en cocina' : '🍳 Enviar a cocina sin cobrar (Cortesía / Excepción)'}
-            </Button>
+            {posStore.editingOrderId && (
+              <Button
+                fullWidth
+                variant="outlined"
+                size="small"
+                startIcon={<KitchenIcon sx={{ fontSize: 16 }} />}
+                onClick={handleSendToKitchen}
+                disabled={posStore.items.length === 0 || isSubmittingKitchen}
+                sx={{
+                  color: '#ea580c',
+                  borderColor: '#ea580c',
+                  fontWeight: 800,
+                  fontSize: '0.8rem',
+                  py: 0.8,
+                  borderRadius: '12px',
+                  '&:hover': { bgcolor: '#fff7ed' }
+                }}
+              >
+                🍳 Actualizar comanda en cocina
+              </Button>
+            )}
           </Stack>
         </Box>
       </Card>

@@ -122,11 +122,14 @@ export default function KitchenScreen() {
         mockApi.deliveries.getAll(),
       ]);
 
-      // 1. Active table orders (En autoservicio los pedidos pagados entran a cocina a preparar)
+      // 1. Active table orders (En autoservicio estricto, cocina SOLO recibe y prepara pedidos con pago confirmado)
       const salonKitchenOrders: KitchenDisplayOrder[] = (allOrders || [])
-        .filter((o) =>
-          ['CREADO', 'CONFIRMADO', 'EN_COCINA', 'EN_PREPARACION', 'LISTO', 'PAGADO'].includes(o.status)
-        )
+        .filter((o) => {
+          // Filtrado estricto de Autoservicio: No permitir órdenes no pagadas en cocina
+          const isPaid = o.status === 'PAGADO' || Boolean(o.paidAt) || Boolean((o as any).invoiceNumber) || Boolean((o as any).isPaid);
+          if (!isPaid) return false;
+          return ['PAGADO', 'EN_COCINA', 'EN_PREPARACION', 'LISTO'].includes(o.status);
+        })
         .map((o) => ({
           ...o,
           createdAt: parseDateOrTimestamp(o.createdAt),
@@ -204,12 +207,12 @@ export default function KitchenScreen() {
       );
       setDeliveredHistory(historyList.slice(0, 50));
 
-      // Detect incoming new orders and sound chime
+      // Detect incoming new orders and sound chime (solo pedidos pagados en autoservicio o domicilios)
       if (!isInitialLoad && knownOrderIdsRef.current.size > 0 && soundEnabled) {
         const hasNewIncoming = combinedOrders.some(
           (o) =>
             !knownOrderIdsRef.current.has(o.id) &&
-            ['CREADO', 'CONFIRMADO', 'EN_COCINA', 'EN_PREPARACION', 'PAGADO'].includes(o.status)
+            ['PAGADO', 'EN_COCINA', 'EN_PREPARACION'].includes(o.status)
         );
         if (hasNewIncoming) {
           playKitchenBellSound();
@@ -1203,8 +1206,8 @@ export default function KitchenScreen() {
       <Grid container spacing={2.5}>
         <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: activeMobileColumn === 'ALL' || activeMobileColumn === 'NEW' ? 'block' : 'none', md: 'block' } }}>
           {renderColumn(
-            'NUEVOS ENTRANTES',
-            ['CREADO', 'CONFIRMADO', 'EN_COCINA', 'PAGADO'],
+            'NUEVOS ENTRANTES (PAGADOS)',
+            ['PAGADO', 'EN_COCINA'],
             '🔥 Iniciar Preparación',
             'EN_PREPARACION',
             {
