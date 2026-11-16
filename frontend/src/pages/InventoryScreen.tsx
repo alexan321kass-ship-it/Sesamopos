@@ -32,6 +32,7 @@ import {
   Tabs,
   Tab,
   Stack,
+  CircularProgress,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -57,6 +58,7 @@ import {
   Check as CheckIcon,
   PieChart as ChartIcon,
   NotificationsActive as NotificationIcon,
+  DeleteOutlined as DeleteOutlineIcon,
 } from '@mui/icons-material';
 import { mockApi } from '../services/mockApi';
 import { InventoryItem, MeasurementUnit } from '../types';
@@ -80,6 +82,7 @@ export default function InventoryScreen() {
   const { user } = useAuthStore();
   const isKitchen = user?.role === 'COCINA';
   const canManageInventory = ['ADMINISTRADOR', 'GERENTE', 'INVENTARIO'].includes(user?.role || '');
+  const isAdmin = ['ADMINISTRADOR', 'GERENTE'].includes(user?.role || '');
 
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [movements, setMovements] = useState<any[]>([]);
@@ -104,6 +107,11 @@ export default function InventoryScreen() {
   // Modals
   const [openItemDialog, setOpenItemDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+
+  // Delete Item Confirmation Modal (Solo Administración)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [openAdjustDialog, setOpenAdjustDialog] = useState(false);
   const [adjustTargetItem, setAdjustTargetItem] = useState<InventoryItem | null>(null);
@@ -387,6 +395,44 @@ export default function InventoryScreen() {
       loadData();
     } catch (e: any) {
       setNotification({ open: true, message: e.message || 'Error al guardar insumo', severity: 'error' });
+    }
+  };
+
+  // Open & Confirm Delete Insumo (Solo Administración)
+  const handleOpenDelete = (item: InventoryItem) => {
+    if (!isAdmin) {
+      setNotification({
+        open: true,
+        message: 'Acceso denegado: Solo el perfil de Administración puede eliminar insumos del catálogo.',
+        severity: 'warning',
+      });
+      return;
+    }
+    setItemToDelete(item);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!itemToDelete) return;
+    setDeleting(true);
+    try {
+      await mockApi.inventory.delete(itemToDelete.id);
+      setNotification({
+        open: true,
+        message: `Insumo "${itemToDelete.name}" eliminado definitivamente del inventario.`,
+        severity: 'success',
+      });
+      setDeleteConfirmOpen(false);
+      setItemToDelete(null);
+      loadData();
+    } catch (err: any) {
+      setNotification({
+        open: true,
+        message: err?.message || 'Error al eliminar el insumo',
+        severity: 'error',
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -1273,6 +1319,22 @@ export default function InventoryScreen() {
                               <EditIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
+                          {isAdmin && (
+                            <Tooltip title="Eliminar Insumo (Solo Admin)">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleOpenDelete(item)}
+                                sx={{
+                                  border: '1px solid #fee2e2',
+                                  borderRadius: 1.5,
+                                  color: '#dc2626',
+                                  '&:hover': { bgcolor: '#fef2f2', borderColor: '#fca5a5' },
+                                }}
+                              >
+                                <DeleteOutlineIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </Box>
                       </Card>
                     </Grid>
@@ -1443,6 +1505,17 @@ export default function InventoryScreen() {
                                   <EditIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
+                              {isAdmin && (
+                                <Tooltip title="Eliminar Insumo (Solo Admin)">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleOpenDelete(item)}
+                                    sx={{ color: '#dc2626', '&:hover': { bgcolor: '#fee2e2' } }}
+                                  >
+                                    <DeleteOutlineIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
                             </Stack>
                           </TableCell>
                         </TableRow>
@@ -1965,15 +2038,41 @@ export default function InventoryScreen() {
             </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions sx={{ p: 2.5 }}>
-          <Button onClick={() => setOpenItemDialog(false)} sx={{ color: '#64748b' }}>Cancelar</Button>
-          <Button
-            variant="contained"
-            onClick={handleSaveItem}
-            sx={{ bgcolor: '#65a30d', '&:hover': { bgcolor: '#4d7c0f' }, fontWeight: 800, px: 3 }}
-          >
-            {editingItem ? 'Guardar Cambios' : 'Registrar Insumo'}
-          </Button>
+        <DialogActions sx={{ p: 2.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box>
+            {editingItem && isAdmin && (
+              <Button
+                color="error"
+                startIcon={<DeleteOutlineIcon />}
+                onClick={() => {
+                  const item = editingItem;
+                  setOpenItemDialog(false);
+                  handleOpenDelete(item);
+                }}
+                sx={{
+                  fontWeight: 800,
+                  textTransform: 'none',
+                  color: '#dc2626',
+                  bgcolor: '#fee2e2',
+                  '&:hover': { bgcolor: '#fecaca' },
+                  borderRadius: 2,
+                  px: 2,
+                }}
+              >
+                Eliminar Insumo
+              </Button>
+            )}
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button onClick={() => setOpenItemDialog(false)} sx={{ color: '#64748b' }}>Cancelar</Button>
+            <Button
+              variant="contained"
+              onClick={handleSaveItem}
+              sx={{ bgcolor: '#65a30d', '&:hover': { bgcolor: '#4d7c0f' }, fontWeight: 800, px: 3 }}
+            >
+              {editingItem ? 'Guardar Cambios' : 'Registrar Insumo'}
+            </Button>
+          </Box>
         </DialogActions>
       </Dialog>
 
@@ -2278,6 +2377,77 @@ export default function InventoryScreen() {
             sx={{ bgcolor: '#65a30d', '&:hover': { bgcolor: '#4d7c0f' }, fontWeight: 800 }}
           >
             {copiedOrder ? '¡Copiado!' : 'Copiar para Enviar a Proveedor'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {/* MODAL: CONFIRMAR ELIMINACIÓN DE INSUMO (SOLO ADMIN)        */}
+      {/* ═══════════════════════════════════════════════════════════ */}
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => !deleting && setDeleteConfirmOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        slotProps={{ paper: { sx: { borderRadius: 3, p: 1 } } }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pb: 1 }}>
+          <Box sx={{ width: 42, height: 42, borderRadius: 2, bgcolor: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
+            <DeleteOutlineIcon fontSize="medium" />
+          </Box>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 800, color: '#991b1b', lineHeight: 1.2 }}>
+              ¿Eliminar Insumo?
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#dc2626', fontWeight: 700 }}>
+              Acción exclusiva de Administración
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <Typography variant="body2" sx={{ color: '#334155', mb: 2 }}>
+            ¿Estás seguro de que deseas eliminar permanentemente el insumo{' '}
+            <strong style={{ color: '#1e290b' }}>"{itemToDelete?.name}"</strong>?
+          </Typography>
+
+          {itemToDelete && (
+            <Paper elevation={0} sx={{ p: 1.5, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0', mb: 2 }}>
+              <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+                Código: <strong>{itemToDelete.code || itemToDelete.id}</strong> • Categoría: <strong>{itemToDelete.category}</strong>
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.5 }}>
+                Stock actual en bodega: <strong>{itemToDelete.currentStock} {itemToDelete.unit}</strong>
+              </Typography>
+            </Paper>
+          )}
+
+          <Alert severity="warning" sx={{ borderRadius: 2, fontSize: '0.78rem', fontWeight: 600 }}>
+            Este insumo se retirará del almacén y ya no podrá ser utilizado en recetas técnicas ni órdenes de compra.
+          </Alert>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, pt: 1, gap: 1 }}>
+          <Button
+            onClick={() => setDeleteConfirmOpen(false)}
+            disabled={deleting}
+            sx={{ color: '#64748b', fontWeight: 700 }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleConfirmDelete}
+            disabled={deleting}
+            startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : <DeleteOutlineIcon />}
+            sx={{
+              fontWeight: 800,
+              bgcolor: '#dc2626',
+              '&:hover': { bgcolor: '#b91c1c' },
+              borderRadius: 2,
+              px: 2.5
+            }}
+          >
+            {deleting ? 'Eliminando...' : 'Eliminar Insumo'}
           </Button>
         </DialogActions>
       </Dialog>
