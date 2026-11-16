@@ -34,6 +34,8 @@ import {
 import { Order, Invoice, Table, StoreSettings } from '../types';
 import { mockApi } from '../services/mockApi';
 import { useAuthStore } from '../store/authStore';
+import { playKitchenBellSound } from '../utils/audioAlerts';
+import { notifyRealtimeEvent } from '../services/eventBus';
 
 interface BillingModalProps {
   open: boolean;
@@ -257,15 +259,21 @@ export default function BillingModal({ open, onClose, order, table, onPaymentSuc
         }
       }
 
-      // Free table if associated
-      const tableIdToFree = table?.id || order.tableId;
-      if (tableIdToFree && String(tableIdToFree).toLowerCase() !== 'barra') {
+      // En autoservicio, si se asignó una mesa para consumir en el local, la mesa permanece OCUPADA
+      const tableIdAssigned = table?.id || order.tableId;
+      if (tableIdAssigned && String(tableIdAssigned).toLowerCase() !== 'barra') {
         try {
-          await mockApi.tables.updateStatus(tableIdToFree, 'DISPONIBLE');
+          await mockApi.tables.updateStatus(tableIdAssigned, 'OCUPADA');
         } catch (e) {
-          console.warn('No se pudo liberar la mesa:', e);
+          console.warn('No se pudo actualizar la mesa:', e);
         }
       }
+
+      // Notificar a KDS Cocina en vivo con sonido campana
+      playKitchenBellSound();
+      notifyRealtimeEvent('sesamo_order_created');
+      notifyRealtimeEvent('sesamo_orders_updated');
+      notifyRealtimeEvent('sesamo_cash_updated');
 
       setCompletedInvoice(invoiceData);
       onPaymentSuccess(invoiceData);
@@ -452,6 +460,29 @@ export default function BillingModal({ open, onClose, order, table, onPaymentSuc
                 <Typography variant="caption" sx={{ display: 'block' }}>Tel: {storeSettings?.phone || '+57 601 745 8900'}</Typography>
                 <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontWeight: 700 }}>
                   {completedInvoice.resolutionInfo}
+                </Typography>
+              </Box>
+
+              {/* Banner de Turno para Autoservicio */}
+              <Box
+                sx={{
+                  textAlign: 'center',
+                  py: 1,
+                  my: 1,
+                  borderTop: '2px dashed #000',
+                  borderBottom: '2px dashed #000',
+                }}
+              >
+                <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: 1, display: 'block', color: '#16a34a' }}>
+                  ✓ AUTOSERVICIO • PAGO CONFIRMADO
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 900, my: 0.3 }}>
+                  TURNO #{order?.orderNumber || completedInvoice.invoiceNumber.slice(-4)}
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 700, display: 'block' }}>
+                  {order?.tableId && String(order.tableId).toLowerCase() !== 'barra'
+                    ? `Mesa / Ficha Asignada: ${order.tableId}`
+                    : 'Espera tu llamado o número para retirar en mostrador'}
                 </Typography>
               </Box>
 

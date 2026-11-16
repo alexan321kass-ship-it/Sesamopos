@@ -122,10 +122,10 @@ export default function KitchenScreen() {
         mockApi.deliveries.getAll(),
       ]);
 
-      // 1. Active table orders
+      // 1. Active table orders (En autoservicio los pedidos pagados entran a cocina a preparar)
       const salonKitchenOrders: KitchenDisplayOrder[] = (allOrders || [])
         .filter((o) =>
-          ['CREADO', 'CONFIRMADO', 'EN_COCINA', 'EN_PREPARACION', 'LISTO'].includes(o.status)
+          ['CREADO', 'CONFIRMADO', 'EN_COCINA', 'EN_PREPARACION', 'LISTO', 'PAGADO'].includes(o.status)
         )
         .map((o) => ({
           ...o,
@@ -169,7 +169,7 @@ export default function KitchenScreen() {
 
       // 3. Historial de comandas despachadas / entregadas
       const deliveredSalonOrders: KitchenDisplayOrder[] = (allOrders || [])
-        .filter((o) => ['ENTREGADO', 'COMPLETADO', 'PAGADO'].includes(o.status))
+        .filter((o) => ['ENTREGADO', 'COMPLETADO'].includes(o.status))
         .map((o) => ({
           ...o,
           createdAt: parseDateOrTimestamp(o.createdAt),
@@ -209,7 +209,7 @@ export default function KitchenScreen() {
         const hasNewIncoming = combinedOrders.some(
           (o) =>
             !knownOrderIdsRef.current.has(o.id) &&
-            ['CREADO', 'CONFIRMADO', 'EN_COCINA', 'EN_PREPARACION'].includes(o.status)
+            ['CREADO', 'CONFIRMADO', 'EN_COCINA', 'EN_PREPARACION', 'PAGADO'].includes(o.status)
         );
         if (hasNewIncoming) {
           playKitchenBellSound();
@@ -320,7 +320,7 @@ export default function KitchenScreen() {
     const counts: Record<string, { name: string; quantity: number; station: CulinaryStation }> = {};
 
     orders.forEach((o) => {
-      if (['CREADO', 'CONFIRMADO', 'EN_COCINA', 'EN_PREPARACION'].includes(o.status)) {
+      if (['CREADO', 'CONFIRMADO', 'EN_COCINA', 'EN_PREPARACION', 'PAGADO'].includes(o.status)) {
         (o.items || []).forEach((it) => {
           if (!it.isDelivered) {
             const st = getItemStation(it.productName);
@@ -552,6 +552,33 @@ export default function KitchenScreen() {
                           label="Domicilio"
                           size="small"
                           sx={{ bgcolor: '#faf5ff', color: '#7c3aed', fontWeight: 900, fontSize: '0.7rem', height: 22, border: '1px solid #ddd6fe' }}
+                        />
+                      )}
+                      {(order.paidAt || order.status === 'PAGADO' || (order as any).isPaid) ? (
+                        <Chip
+                          label="✅ PAGADO"
+                          size="small"
+                          sx={{
+                            bgcolor: '#dcfce7',
+                            color: '#15803d',
+                            fontWeight: 900,
+                            fontSize: '0.68rem',
+                            height: 22,
+                            border: '1.5px solid #86efac',
+                          }}
+                        />
+                      ) : (
+                        <Chip
+                          label="⚠️ PENDIENTE PAGO"
+                          size="small"
+                          sx={{
+                            bgcolor: '#fef2f2',
+                            color: '#b91c1c',
+                            fontWeight: 900,
+                            fontSize: '0.68rem',
+                            height: 22,
+                            border: '1.5px solid #fca5a5',
+                          }}
                         />
                       )}
                     </Box>
@@ -1177,7 +1204,7 @@ export default function KitchenScreen() {
         <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: activeMobileColumn === 'ALL' || activeMobileColumn === 'NEW' ? 'block' : 'none', md: 'block' } }}>
           {renderColumn(
             'NUEVOS ENTRANTES',
-            ['CREADO', 'CONFIRMADO', 'EN_COCINA'],
+            ['CREADO', 'CONFIRMADO', 'EN_COCINA', 'PAGADO'],
             '🔥 Iniciar Preparación',
             'EN_PREPARACION',
             {

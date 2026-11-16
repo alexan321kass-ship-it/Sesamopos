@@ -403,6 +403,12 @@ export default function PosScreen() {
 
   const handleSendToKitchen = async () => {
     if (posStore.items.length === 0 || isSubmittingKitchen) return;
+    if (!posStore.editingOrderId) {
+      const confirmUnpaid = window.confirm(
+        '⚠️ AVISO DE AUTOSERVICIO:\n\nEl restaurante funciona en modalidad Autoservicio (primero se cobra y luego pasa el pedido a cocina).\n\n¿Deseas enviar esta comanda a cocina SIN registrar el cobro previo?'
+      );
+      if (!confirmUnpaid) return;
+    }
     if (!posStore.currentTableId && !posStore.editingOrderId) {
       setPendingAction('KITCHEN');
       setBarPromptOpen(true);
@@ -1507,62 +1513,48 @@ export default function PosScreen() {
             </Typography>
           </Box>
 
-          {/* Botonera de Acción Inferior */}
-          <Grid container spacing={1}>
-            <Grid size={{ xs: ['ADMINISTRADOR', 'GERENTE', 'CAJERO'].includes(user?.role || '') ? 6 : 12 }}>
-              <Button
-                fullWidth
-                variant={['ADMINISTRADOR', 'GERENTE', 'CAJERO'].includes(user?.role || '') ? "outlined" : "contained"}
-                startIcon={<KitchenIcon />}
-                onClick={handleSendToKitchen}
-                disabled={posStore.items.length === 0 || isSubmittingKitchen}
-                sx={{
-                  bgcolor: !['ADMINISTRADOR', 'GERENTE', 'CAJERO'].includes(user?.role || '')
-                    ? (posStore.editingOrderId ? '#ea580c' : '#1e290b')
-                    : '#ffffff',
-                  borderColor: posStore.editingOrderId ? '#ea580c' : '#1e290b',
-                  color: !['ADMINISTRADOR', 'GERENTE', 'CAJERO'].includes(user?.role || '')
-                    ? '#ffffff'
-                    : (posStore.editingOrderId ? '#ea580c' : '#1e290b'),
-                  fontWeight: 900,
-                  py: 1.4,
-                  fontSize: '0.85rem',
-                  borderRadius: '14px',
-                  '&:hover': {
-                    bgcolor: !['ADMINISTRADOR', 'GERENTE', 'CAJERO'].includes(user?.role || '')
-                      ? (posStore.editingOrderId ? '#c2410c' : '#0f172a')
-                      : '#f1f5f9'
-                  }
-                }}
-              >
-                {posStore.editingOrderId ? '🍳 Actualizar Cocina' : '🍳 A Cocina'}
-              </Button>
-            </Grid>
+          {/* Botonera de Acción Inferior: Modalidad Autoservicio (Primero se Paga, luego a Cocina) */}
+          <Stack spacing={1}>
+            <Button
+              fullWidth
+              variant="contained"
+              size="large"
+              startIcon={<CashIcon sx={{ fontSize: 24 }} />}
+              onClick={handleOpenBilling}
+              disabled={posStore.items.length === 0}
+              sx={{
+                bgcolor: '#16a34a',
+                color: '#ffffff',
+                fontWeight: 900,
+                py: 1.5,
+                fontSize: '0.98rem',
+                borderRadius: '16px',
+                boxShadow: '0 6px 18px rgba(22, 163, 74, 0.35)',
+                '&:hover': { bgcolor: '#15803d' }
+              }}
+            >
+              💵 Cobrar y Pasar a Cocina
+            </Button>
 
-            {['ADMINISTRADOR', 'GERENTE', 'CAJERO'].includes(user?.role || '') && (
-              <Grid size={{ xs: 6 }}>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  startIcon={<CashIcon />}
-                  onClick={handleOpenBilling}
-                  disabled={posStore.items.length === 0}
-                  sx={{
-                    bgcolor: '#65a30d',
-                    color: '#ffffff',
-                    fontWeight: 900,
-                    py: 1.4,
-                    fontSize: '0.88rem',
-                    borderRadius: '14px',
-                    boxShadow: '0 4px 14px rgba(101, 163, 13, 0.3)',
-                    '&:hover': { bgcolor: '#4d7c0f' }
-                  }}
-                >
-                  💵 Cobrar
-                </Button>
-              </Grid>
-            )}
-          </Grid>
+            <Button
+              fullWidth
+              variant="text"
+              size="small"
+              startIcon={<KitchenIcon sx={{ fontSize: 16 }} />}
+              onClick={handleSendToKitchen}
+              disabled={posStore.items.length === 0 || isSubmittingKitchen}
+              sx={{
+                color: '#64748b',
+                fontWeight: 700,
+                fontSize: '0.74rem',
+                textTransform: 'none',
+                py: 0.4,
+                '&:hover': { color: '#0f172a', bgcolor: 'transparent' }
+              }}
+            >
+              {posStore.editingOrderId ? '🍳 Actualizar comanda en cocina' : '🍳 Enviar a cocina sin cobrar (Cortesía / Excepción)'}
+            </Button>
+          </Stack>
         </Box>
       </Card>
 
