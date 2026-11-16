@@ -2,6 +2,12 @@ import { mockUsers, mockStaffMembers, mockStaffShifts, mockCategories, mockProdu
 import { User, StaffMember, StaffShiftRecord, ShiftAuditLog, Category, Product, Table, Order, InventoryItem, MeasurementUnit, Supplier, PurchaseOrder, PurchaseOrderStatus, CashRegister, Customer, DeliveryOrder, StoreSettings, Reservation, Recipe } from '../types';
 import { playKitchenBellSound } from '../utils/audioAlerts';
 import { notifyRealtimeEvent } from './eventBus';
+import {
+  getColombiaDateStr,
+  getColombiaTimeStr,
+  calculateShiftDurationHours,
+  calculateMinutesBetween,
+} from '../utils/timeUtils';
 
 export const getApiUrl = (): string => {
   const envUrl = import.meta.env.VITE_API_URL;
@@ -2608,9 +2614,8 @@ export const mockApi = {
       const staff = getStoredStaff();
       const member = staff.find(s => String(s.id) === String(id));
       if (!member) throw new Error('Colaborador no encontrado');
-      const now = new Date();
-      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-      const dateStr = now.toISOString().split('T')[0];
+      const timeStr = getColombiaTimeStr();
+      const dateStr = getColombiaDateStr();
       
       member.shiftStatus = 'EN_TURNO';
       member.shiftStartTime = timeStr;
@@ -2626,6 +2631,7 @@ export const mockApi = {
         checkIn: timeStr,
         status: 'ACTIVO',
         hoursWorked: 0,
+        effectiveHoursWorked: 0,
         breaks: [],
         totalBreakMinutes: 0,
         notes: `Turno iniciado a las ${timeStr}`
@@ -2670,9 +2676,8 @@ export const mockApi = {
       const staff = getStoredStaff();
       const member = staff.find(s => String(s.id) === String(id));
       if (!member) throw new Error('Colaborador no encontrado');
-      const now = new Date();
-      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-      const dateStr = now.toISOString().split('T')[0];
+      const timeStr = getColombiaTimeStr();
+      const dateStr = getColombiaDateStr();
       
       const shifts = getStoredShifts();
       const activeShift = shifts.find(sh => String(sh.staffId) === String(id) && (sh.status === 'ACTIVO' || sh.status === 'DESCANSO'));
@@ -2684,23 +2689,23 @@ export const mockApi = {
           const openBreak = activeShift.breaks.find(b => !b.endTime);
           if (openBreak) {
             openBreak.endTime = timeStr;
-            const [bInH, bInM] = openBreak.startTime.split(':').map(Number);
-            const [bOutH, bOutM] = timeStr.split(':').map(Number);
-            const brkMins = Math.max(1, (bOutH * 60 + bOutM) - (bInH * 60 + bInM));
-            openBreak.durationMinutes = brkMins;
-            activeShift.totalBreakMinutes = (activeShift.totalBreakMinutes || 0) + brkMins;
+            const brkMins = calculateMinutesBetween(openBreak.startTime, timeStr);
+            openBreak.durationMinutes = Math.max(1, brkMins);
+            activeShift.totalBreakMinutes = (activeShift.totalBreakMinutes || 0) + openBreak.durationMinutes;
           }
         }
 
         activeShift.checkOut = timeStr;
         activeShift.status = 'COMPLETADO';
-        const [inH, inM] = activeShift.checkIn.split(':').map(Number);
-        const [outH, outM] = timeStr.split(':').map(Number);
-        const totalMinutes = Math.max(15, (outH * 60 + outM) - (inH * 60 + inM));
-        hoursWorked = parseFloat((totalMinutes / 60).toFixed(2));
         totalBreak = activeShift.totalBreakMinutes || 0;
+        const { totalHours, effectiveHours } = calculateShiftDurationHours(
+          activeShift.checkIn || '08:00',
+          timeStr,
+          totalBreak
+        );
+        hoursWorked = totalHours;
         activeShift.hoursWorked = hoursWorked;
-        activeShift.effectiveHoursWorked = parseFloat(Math.max(0.25, (totalMinutes - totalBreak) / 60).toFixed(2));
+        activeShift.effectiveHoursWorked = effectiveHours;
         activeShift.notes = (activeShift.notes ? `${activeShift.notes} · ` : '') + `[Turno finalizado a las ${timeStr}]`;
         saveStoredShifts([...shifts]);
       }
@@ -2747,9 +2752,8 @@ export const mockApi = {
       const staff = getStoredStaff();
       const member = staff.find(s => String(s.id) === String(id));
       if (!member) throw new Error('Colaborador no encontrado');
-      const now = new Date();
-      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-      const dateStr = now.toISOString().split('T')[0];
+      const timeStr = getColombiaTimeStr();
+      const dateStr = getColombiaDateStr();
 
       const goingOnBreak = member.shiftStatus !== 'DESCANSO';
       member.shiftStatus = goingOnBreak ? 'DESCANSO' : 'EN_TURNO';
@@ -2773,9 +2777,8 @@ export const mockApi = {
           const openBreak = [...activeShift.breaks].reverse().find(b => !b.endTime);
           if (openBreak) {
             openBreak.endTime = timeStr;
-            const [bInH, bInM] = openBreak.startTime.split(':').map(Number);
-            const [bOutH, bOutM] = timeStr.split(':').map(Number);
-            breakDuration = Math.max(1, (bOutH * 60 + bOutM) - (bInH * 60 + bInM));
+            breakDuration = calculateMinutesBetween(openBreak.startTime, timeStr);
+            breakDuration = Math.max(1, breakDuration);
             openBreak.durationMinutes = breakDuration;
             activeShift.totalBreakMinutes = (activeShift.totalBreakMinutes || 0) + breakDuration;
           }

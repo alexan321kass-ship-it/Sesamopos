@@ -57,6 +57,7 @@ import {
 } from '../types';
 import { useAuthStore } from '../store/authStore';
 import { Navigate } from 'react-router-dom';
+import { parseDateOrTimestamp, getColombiaHour } from '../utils/timeUtils';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -446,8 +447,7 @@ export default function Dashboard() {
 
     const isShiftActive = Boolean(cashRegister && cashRegister.isOpen);
     const shiftStart = cashRegister?.openedAt || 0;
-    const now = new Date();
-    const currentHour = now.getHours();
+    const currentHour = getColombiaHour();
 
     const salesByHour: Record<number, { total: number; pedidos: number; salon: number; domicilios: number }> = {};
     for (let h = 0; h < 24; h++) {
@@ -456,15 +456,15 @@ export default function Dashboard() {
 
     const recordedHours: number[] = [currentHour];
     if (isShiftActive && shiftStart > 0) {
-      recordedHours.push(new Date(shiftStart).getHours());
+      recordedHours.push(getColombiaHour(shiftStart));
     }
 
     // Filtrar ventas de salón cobradas
     orders.forEach((o) => {
       if (o.status !== 'PAGADO') return;
-      if (isShiftActive && ((o.paidAt && o.paidAt < shiftStart) || (!o.paidAt && o.createdAt < shiftStart))) return;
-      const ts = Number(o.paidAt || o.createdAt) || Date.now();
-      const h = new Date(ts).getHours();
+      const ts = parseDateOrTimestamp(o.paidAt || o.createdAt);
+      if (isShiftActive && shiftStart > 0 && ts < shiftStart) return;
+      const h = getColombiaHour(ts);
       recordedHours.push(h);
       const amt = Number(o.total) || 0;
       salesByHour[h].total += amt;
@@ -476,9 +476,9 @@ export default function Dashboard() {
     deliveries.forEach((d) => {
       const isDeliveredOrPaid = d.deliveryStatus === 'ENTREGADO' || d.status === 'ENTREGADO' || d.status === 'PAGADO';
       if (!isDeliveredOrPaid) return;
-      if (isShiftActive && ((d.deliveredAt && d.deliveredAt < shiftStart) || (!d.deliveredAt && d.createdAt < shiftStart))) return;
-      const ts = Number(d.deliveredAt || d.dispatchedAt || d.createdAt) || Date.now();
-      const h = new Date(ts).getHours();
+      const ts = parseDateOrTimestamp(d.deliveredAt || d.dispatchedAt || d.createdAt);
+      if (isShiftActive && shiftStart > 0 && ts < shiftStart) return;
+      const h = getColombiaHour(ts);
       recordedHours.push(h);
       const amt = Number(d.total) || 0;
       salesByHour[h].total += amt;

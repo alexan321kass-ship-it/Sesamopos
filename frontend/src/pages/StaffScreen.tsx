@@ -85,6 +85,11 @@ import {
 } from '@mui/icons-material';
 import { mockApi } from '../services/mockApi';
 import { StaffMember, Role, StaffShiftRecord, ShiftAuditLog, StaffPermissions, DeliveryOrder } from '../types';
+import {
+  getColombiaDateStr,
+  calculateShiftDurationHours,
+  getLiveElapsedShiftHours,
+} from '../utils/timeUtils';
 
 export default function StaffScreen() {
   const { user } = useAuthStore();
@@ -868,21 +873,22 @@ export default function StaffScreen() {
     const staff = staffList.find((s) => s.id === shiftStaffId);
     if (!staff) return;
 
-    const [inH, inM] = shiftCheckIn.split(':').map(Number);
-    const [outH, outM] = shiftCheckOut.split(':').map(Number);
-    const totalMinutes = Math.max(30, outH * 60 + outM - (inH * 60 + inM));
-    const hours = parseFloat((totalMinutes / 60).toFixed(2));
+    const { totalHours } = calculateShiftDurationHours(shiftCheckIn, shiftCheckOut, 0);
+    const hours = totalHours;
 
     try {
       await mockApi.staff.addShiftRecord({
         staffId: staff.id,
         staffName: staff.name,
         role: staff.role,
-        date: new Date().toISOString().split('T')[0],
+        date: getColombiaDateStr(),
         checkIn: shiftCheckIn,
         checkOut: shiftCheckOut,
         status: 'COMPLETADO',
         hoursWorked: hours,
+        effectiveHoursWorked: hours,
+        breaks: [],
+        totalBreakMinutes: 0,
         notes: shiftNotes || 'Registro manual por administración',
       });
       setNotification({
@@ -2951,7 +2957,7 @@ export default function StaffScreen() {
                                   }}
                                 />
                                 <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#94a3b8', fontWeight: 600 }}>
-                                  Ingreso: {s.shiftStartTime || '11:00'}
+                                  {s.shiftStartTime ? `Ingreso: ${s.shiftStartTime}` : 'Turno activo'}
                                 </Typography>
                               </Box>
                             </Box>
@@ -3072,7 +3078,22 @@ export default function StaffScreen() {
                             {shift.checkOut || 'En curso...'}
                           </TableCell>
                           <TableCell align="center" sx={{ fontWeight: 900, color: '#0f172a' }}>
-                            {shift.hoursWorked ? `${shift.hoursWorked} hrs` : 'Contabilizando...'}
+                            {shift.checkOut ? (
+                              `${shift.effectiveHoursWorked || shift.hoursWorked || 0} hrs`
+                            ) : (
+                              <Chip
+                                size="small"
+                                label={`${getLiveElapsedShiftHours(shift.checkIn, shift.totalBreakMinutes).label} (En curso)`}
+                                sx={{
+                                  bgcolor: '#f0fdf4',
+                                  color: '#15803d',
+                                  fontWeight: 800,
+                                  border: '1px solid #bbf7d0',
+                                  borderRadius: '6px',
+                                  height: 24,
+                                }}
+                              />
+                            )}
                           </TableCell>
                           <TableCell align="center">
                             <Chip
@@ -5012,7 +5033,9 @@ export default function StaffScreen() {
                   <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center', borderRadius: '12px' }}>
                     <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, display: 'block' }}>Horas Total</Typography>
                     <Typography variant="body1" sx={{ fontWeight: 900, color: '#0f172a' }}>
-                      {selectedShiftForTraceability.hoursWorked ? `${selectedShiftForTraceability.hoursWorked} h` : '—'}
+                      {selectedShiftForTraceability.checkOut
+                        ? `${selectedShiftForTraceability.effectiveHoursWorked || selectedShiftForTraceability.hoursWorked || 0} h`
+                        : `${getLiveElapsedShiftHours(selectedShiftForTraceability.checkIn, selectedShiftForTraceability.totalBreakMinutes).label} (En curso)`}
                     </Typography>
                   </Paper>
                 </Grid>

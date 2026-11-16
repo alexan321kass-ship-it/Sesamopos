@@ -61,6 +61,11 @@ import { mockApi } from '../services/mockApi';
 import { Product, StaffMember, Order, Category } from '../types';
 import { useAuthStore } from '../store/authStore';
 import { Navigate } from 'react-router-dom';
+import {
+  parseDateOrTimestamp,
+  getColombiaDateStr,
+  getColombiaHour,
+} from '../utils/timeUtils';
 
 type DatePreset = 'TODAY' | 'YESTERDAY' | 'LAST_7_DAYS' | 'THIS_MONTH' | 'CUSTOM';
 
@@ -75,9 +80,9 @@ export default function AdvancedReportsScreen() {
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setDate(1);
-    return d.toISOString().split('T')[0];
+    return getColombiaDateStr(d);
   });
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(() => getColombiaDateStr());
   const [loading, setLoading] = useState(false);
 
   // Database Entities
@@ -148,8 +153,7 @@ export default function AdvancedReportsScreen() {
   // Preset date handler
   const handleSelectPreset = (preset: DatePreset) => {
     setDatePreset(preset);
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
+    const todayStr = getColombiaDateStr();
 
     if (preset === 'TODAY') {
       setStartDate(todayStr);
@@ -157,17 +161,18 @@ export default function AdvancedReportsScreen() {
     } else if (preset === 'YESTERDAY') {
       const y = new Date();
       y.setDate(y.getDate() - 1);
-      const yStr = y.toISOString().split('T')[0];
+      const yStr = getColombiaDateStr(y);
       setStartDate(yStr);
       setEndDate(yStr);
     } else if (preset === 'LAST_7_DAYS') {
       const d7 = new Date();
-      d7.setDate(d7.getDate() - 7);
-      setStartDate(d7.toISOString().split('T')[0]);
+      d7.setDate(d7.getDate() - 6);
+      setStartDate(getColombiaDateStr(d7));
       setEndDate(todayStr);
     } else if (preset === 'THIS_MONTH') {
-      const mStart = new Date(today.getFullYear(), today.getMonth(), 1);
-      setStartDate(mStart.toISOString().split('T')[0]);
+      const mStart = new Date();
+      mStart.setDate(1);
+      setStartDate(getColombiaDateStr(mStart));
       setEndDate(todayStr);
     }
   };
@@ -200,7 +205,7 @@ export default function AdvancedReportsScreen() {
     const endTs = new Date(`${endDate}T23:59:59.999`).getTime();
 
     return orders.filter((o) => {
-      const orderTime = o.createdAt || Number(o.id) || Date.now();
+      const orderTime = parseDateOrTimestamp(o.createdAt || o.paidAt || o.id);
       const inDate = orderTime >= startTs && orderTime <= endTs;
       const isValid = o.status !== 'CANCELADO';
       return inDate && isValid;
@@ -210,7 +215,11 @@ export default function AdvancedReportsScreen() {
   // Dynamic Sales Trend based strictly on real database orders
   const salesTrendData = useMemo(() => {
     if (datePreset === 'TODAY' || datePreset === 'YESTERDAY') {
-      const hours = ['11:00 AM', '12:00 PM', '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM', '06:00 PM', '07:00 PM', '08:00 PM', '09:00 PM', '10:00 PM'];
+      const hours = [
+        '08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
+        '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM',
+        '06:00 PM', '07:00 PM', '08:00 PM', '09:00 PM', '10:00 PM', '11:00 PM'
+      ];
       const hoursMap: Record<string, { ventas: number; costo: number; pedidos: number }> = {};
       hours.forEach((h) => {
         hoursMap[h] = { ventas: 0, costo: 0, pedidos: 0 };
@@ -218,20 +227,11 @@ export default function AdvancedReportsScreen() {
 
       // Accumulate ONLY real orders from the database
       filteredOrders.forEach((o) => {
-        const orderDate = new Date(o.createdAt || Date.now());
-        const hour = orderDate.getHours();
-        let targetKey = '01:00 PM';
-        if (hour <= 11) targetKey = '11:00 AM';
-        else if (hour === 12) targetKey = '12:00 PM';
-        else if (hour === 13) targetKey = '01:00 PM';
-        else if (hour === 14) targetKey = '02:00 PM';
-        else if (hour === 15) targetKey = '03:00 PM';
-        else if (hour === 16) targetKey = '04:00 PM';
-        else if (hour <= 18) targetKey = '05:00 PM';
-        else if (hour === 19) targetKey = '07:00 PM';
-        else if (hour === 20) targetKey = '08:00 PM';
-        else if (hour === 21) targetKey = '09:00 PM';
-        else targetKey = '10:00 PM';
+        const orderTs = parseDateOrTimestamp(o.createdAt || o.paidAt || o.id);
+        const hour = getColombiaHour(orderTs);
+        const period = hour >= 12 ? 'PM' : 'AM';
+        const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+        const targetKey = `${String(hour12).padStart(2, '0')}:00 ${period}`;
 
         const orderTotal = o.total || o.subtotal || 0;
         let orderCost = 0;
@@ -264,7 +264,7 @@ export default function AdvancedReportsScreen() {
       for (let i = 6; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
+        const dateStr = getColombiaDateStr(d);
         const dayName = d.toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit' });
         daysList.push({ key: dateStr, name: dayName });
         baseDaily[dateStr] = { ventas: 0, costo: 0, pedidos: 0 };
@@ -272,7 +272,7 @@ export default function AdvancedReportsScreen() {
 
       // Add real database sales onto corresponding days
       filteredOrders.forEach((o) => {
-        const orderDateStr = new Date(o.createdAt || Date.now()).toISOString().split('T')[0];
+        const orderDateStr = getColombiaDateStr(o.createdAt || o.paidAt || o.id);
         if (baseDaily[orderDateStr]) {
           const orderTotal = o.total || o.subtotal || 0;
           let orderCost = 0;
@@ -307,7 +307,8 @@ export default function AdvancedReportsScreen() {
 
       // Add ONLY real database orders onto active weeks
       filteredOrders.forEach((o) => {
-        const orderDate = new Date(o.createdAt || Date.now());
+        const orderTs = parseDateOrTimestamp(o.createdAt || o.paidAt || o.id);
+        const orderDate = new Date(orderTs);
         const weekIdx = Math.min(3, Math.floor((orderDate.getDate() - 1) / 7));
         const orderTotal = o.total || o.subtotal || 0;
         let orderCost = 0;
@@ -613,7 +614,9 @@ export default function AdvancedReportsScreen() {
 
     filteredOrders.forEach((o: any) => {
       if (o.readyAt && o.createdAt) {
-        const diff = (o.readyAt - o.createdAt) / 60000;
+        const readyTs = parseDateOrTimestamp(o.readyAt);
+        const createdTs = parseDateOrTimestamp(o.createdAt);
+        const diff = (readyTs - createdTs) / 60000;
         if (diff > 0 && diff < 180) {
           totalPrepMinutes += diff;
           prepCount++;

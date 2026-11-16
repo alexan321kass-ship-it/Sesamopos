@@ -1,5 +1,13 @@
 import { Category, Product, Table, Order, InventoryItem, Supplier, PurchaseOrder, CashRegister, StaffMember, StaffShiftRecord, Customer, DeliveryOrder, StoreSettings, Reservation, Recipe } from '../types';
 
+const getTodayColombia = () =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+
 export const mockStaffMembers: StaffMember[] = [
   {
     id: '1',
@@ -233,7 +241,7 @@ export const mockStaffShifts: StaffShiftRecord[] = [
     staffId: '1',
     staffName: 'Administrador General',
     role: 'ADMINISTRADOR',
-    date: new Date().toISOString().split('T')[0],
+    date: getTodayColombia(),
     checkIn: '09:00',
     status: 'ACTIVO',
     hoursWorked: 5.5,
@@ -244,7 +252,7 @@ export const mockStaffShifts: StaffShiftRecord[] = [
     staffId: '5',
     staffName: 'Andrea Silva',
     role: 'GERENTE',
-    date: new Date().toISOString().split('T')[0],
+    date: getTodayColombia(),
     checkIn: '10:00',
     status: 'ACTIVO',
     hoursWorked: 4.5,
@@ -255,7 +263,7 @@ export const mockStaffShifts: StaffShiftRecord[] = [
     staffId: '3',
     staffName: 'Laura Gómez',
     role: 'CAJERO',
-    date: new Date().toISOString().split('T')[0],
+    date: getTodayColombia(),
     checkIn: '11:00',
     status: 'ACTIVO',
     hoursWorked: 3.5,
@@ -266,7 +274,7 @@ export const mockStaffShifts: StaffShiftRecord[] = [
     staffId: '2',
     staffName: 'Carlos Ruiz',
     role: 'MESERO',
-    date: new Date().toISOString().split('T')[0],
+    date: getTodayColombia(),
     checkIn: '11:30',
     status: 'ACTIVO',
     hoursWorked: 3.0,
@@ -277,7 +285,7 @@ export const mockStaffShifts: StaffShiftRecord[] = [
     staffId: '7',
     staffName: 'Andrés Ramírez',
     role: 'MESERO',
-    date: new Date().toISOString().split('T')[0],
+    date: getTodayColombia(),
     checkIn: '12:00',
     status: 'ACTIVO',
     hoursWorked: 2.5,
@@ -288,7 +296,7 @@ export const mockStaffShifts: StaffShiftRecord[] = [
     staffId: '8',
     staffName: 'Sofía López',
     role: 'MESERO',
-    date: new Date().toISOString().split('T')[0],
+    date: getTodayColombia(),
     checkIn: '11:45',
     status: 'DESCANSO',
     hoursWorked: 2.75,
@@ -299,7 +307,7 @@ export const mockStaffShifts: StaffShiftRecord[] = [
     staffId: '4',
     staffName: 'Juan Chef',
     role: 'COCINA',
-    date: new Date().toISOString().split('T')[0],
+    date: getTodayColombia(),
     checkIn: '10:30',
     status: 'ACTIVO',
     hoursWorked: 4.0,
@@ -310,7 +318,7 @@ export const mockStaffShifts: StaffShiftRecord[] = [
     staffId: '9',
     staffName: 'Kevin Morales',
     role: 'REPARTIDOR',
-    date: new Date().toISOString().split('T')[0],
+    date: getTodayColombia(),
     checkIn: '12:30',
     status: 'ACTIVO',
     hoursWorked: 2.0,

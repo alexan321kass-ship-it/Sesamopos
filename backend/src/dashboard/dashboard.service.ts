@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service.js';
+import { getColombiaHour } from '../common/utils/time.util.js';
 
 @Injectable()
 export class DashboardService {
@@ -37,46 +38,40 @@ export class DashboardService {
     const activeDeliveries = deliveries.filter(d => ['EN_PREPARACION', 'EN_CAMINO'].includes(d.deliveryStatus));
     const staffOnDuty = users.filter(u => u.isActive);
 
-    // 4. Hourly Sales Distribution (12:00 - 22:00)
-    const hourlyMap: { [hour: string]: { ventas: number; pedidos: number } } = {
-      '12:00': { ventas: 0, pedidos: 0 },
-      '13:00': { ventas: 0, pedidos: 0 },
-      '14:00': { ventas: 0, pedidos: 0 },
-      '15:00': { ventas: 0, pedidos: 0 },
-      '16:00': { ventas: 0, pedidos: 0 },
-      '17:00': { ventas: 0, pedidos: 0 },
-      '18:00': { ventas: 0, pedidos: 0 },
-      '19:00': { ventas: 0, pedidos: 0 },
-      '20:00': { ventas: 0, pedidos: 0 },
-      '21:00': { ventas: 0, pedidos: 0 },
-    };
+    // 4. Hourly Sales Distribution (Colombia Timezone, 08:00 - 23:00)
+    const standardHours = [
+      '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00',
+      '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00',
+      '22:00', '23:00'
+    ];
+    const hourlyMap: { [hour: string]: { ventas: number; pedidos: number } } = {};
+    standardHours.forEach(h => {
+      hourlyMap[h] = { ventas: 0, pedidos: 0 };
+    });
 
     orders.forEach(o => {
-      if (o.createdAt) {
-        const d = new Date(Number(o.createdAt));
-        const hour = `${d.getHours().toString().padStart(2, '0')}:00`;
-        if (hourlyMap[hour]) {
-          hourlyMap[hour].ventas += Number(o.total) || 0;
-          hourlyMap[hour].pedidos += 1;
-        } else {
-          // If out of range, assign to current lunch or dinner block
-          hourlyMap['13:00'].ventas += Number(o.total) || 0;
-          hourlyMap['13:00'].pedidos += 1;
+      const ts = o.paidAt || o.createdAt;
+      if (ts) {
+        const h = getColombiaHour(ts);
+        const hour = `${String(h).padStart(2, '0')}:00`;
+        if (!hourlyMap[hour]) {
+          hourlyMap[hour] = { ventas: 0, pedidos: 0 };
         }
+        hourlyMap[hour].ventas += Number(o.total) || 0;
+        hourlyMap[hour].pedidos += 1;
       }
     });
 
     deliveries.forEach(d => {
-      if (d.createdAt) {
-        const date = new Date(Number(d.createdAt));
-        const hour = `${date.getHours().toString().padStart(2, '0')}:00`;
-        if (hourlyMap[hour]) {
-          hourlyMap[hour].ventas += Number(d.total) || 0;
-          hourlyMap[hour].pedidos += 1;
-        } else {
-          hourlyMap['13:00'].ventas += Number(d.total) || 0;
-          hourlyMap['13:00'].pedidos += 1;
+      const ts = d.deliveredAt || d.dispatchedAt || d.createdAt;
+      if (ts) {
+        const h = getColombiaHour(ts);
+        const hour = `${String(h).padStart(2, '0')}:00`;
+        if (!hourlyMap[hour]) {
+          hourlyMap[hour] = { ventas: 0, pedidos: 0 };
         }
+        hourlyMap[hour].ventas += Number(d.total) || 0;
+        hourlyMap[hour].pedidos += 1;
       }
     });
 
