@@ -18,6 +18,11 @@ import {
   Tooltip,
   TextField,
   InputAdornment,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
 } from '@mui/material';
 import {
   RoomService as RoomServiceIcon,
@@ -36,6 +41,9 @@ import {
   SoupKitchen as HotKitchenIcon,
   AcUnit as ColdStationIcon,
   Layers as AllStationsIcon,
+  History as HistoryIcon,
+  Restore as ReopenIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { mockApi } from '../services/mockApi';
 import { Order } from '../types';
@@ -46,6 +54,7 @@ export type KitchenDisplayOrder = Order & {
   deliveryOriginalId?: string;
   deliveryAddress?: string;
   deliveryCustomerName?: string;
+  updatedAt?: number;
 };
 
 export type CulinaryStation = 'ALL' | 'PARRILLA' | 'COCINA_CALIENTE' | 'ENSALADAS_FRIOS' | 'BARRA';
@@ -60,6 +69,9 @@ export default function KitchenScreen() {
   const [activeMobileColumn, setActiveMobileColumn] = useState<'ALL' | 'NEW' | 'PREP' | 'READY'>('ALL');
   const [now, setNow] = useState<number>(Date.now());
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
+  const [deliveredHistory, setDeliveredHistory] = useState<KitchenDisplayOrder[]>([]);
+  const [historyModalOpen, setHistoryModalOpen] = useState<boolean>(false);
+  const [historySearchQuery, setHistorySearchQuery] = useState<string>('');
 
   // Live timer tick every 8 seconds
   useEffect(() => {
@@ -153,6 +165,42 @@ export default function KitchenScreen() {
         (a, b) => (a.createdAt || 0) - (b.createdAt || 0)
       );
 
+      // 3. Historial de comandas despachadas / entregadas
+      const deliveredSalonOrders: KitchenDisplayOrder[] = (allOrders || [])
+        .filter((o) => ['ENTREGADO', 'COMPLETADO', 'PAGADO'].includes(o.status))
+        .map((o) => ({
+          ...o,
+          items: Array.isArray(o.items) ? o.items : [],
+        }));
+
+      const deliveredDeliveryOrders: KitchenDisplayOrder[] = (allDeliveries || [])
+        .filter((d) => ['ENTREGADO', 'EN_CAMINO'].includes((d.deliveryStatus as any) || d.status || ''))
+        .map((d) => ({
+          id: `deliv-${d.id}`,
+          orderNumber: d.orderNumber || `DOM-${d.id}`,
+          tableId: 'DOMICILIO',
+          tableName: d.customer?.name ? `🛵 ${d.customer.name}` : '🛵 Domicilio Express',
+          waiterId: d.deliveryRiderId || undefined,
+          waiterName: d.deliveryRiderName || 'Repartidor',
+          items: Array.isArray(d.items) ? d.items : [],
+          subtotal: d.subtotal || 0,
+          discount: d.discount || 0,
+          tax: d.tax || 0,
+          total: d.total || 0,
+          status: 'ENTREGADO' as any,
+          type: 'DOMICILIO' as any,
+          createdAt: d.createdAt || Date.now(),
+          customerName: d.customer?.name || 'Cliente Domicilio',
+          deliveryOriginalId: d.id,
+          deliveryAddress: d.deliveryAddress || d.customer?.address || '',
+          deliveryCustomerName: d.customer?.name || 'Cliente Domicilio',
+        }));
+
+      const historyList = [...deliveredSalonOrders, ...deliveredDeliveryOrders].sort(
+        (a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0)
+      );
+      setDeliveredHistory(historyList.slice(0, 50));
+
       // Detect incoming new orders and sound chime
       if (!isInitialLoad && knownOrderIdsRef.current.size > 0 && soundEnabled) {
         const hasNewIncoming = combinedOrders.some(
@@ -195,6 +243,24 @@ export default function KitchenScreen() {
       playOrderReadySound();
     }
     loadOrders(false);
+  };
+
+  const handleReopenOrder = async (order: KitchenDisplayOrder) => {
+    try {
+      if (order.id.startsWith('deliv-')) {
+        const rawDeliveryId = (order as any).deliveryOriginalId || order.id.replace('deliv-', '');
+        await mockApi.deliveries.update(rawDeliveryId, {
+          deliveryStatus: 'EN_PREPARACION',
+          status: 'EN_PREPARACION',
+        });
+      } else {
+        await mockApi.orders.updateStatus(order.id, 'EN_PREPARACION');
+      }
+      playKitchenBellSound();
+      await loadOrders(false);
+    } catch (err) {
+      console.error('Error reabriendo comanda:', err);
+    }
   };
 
   const toggleItemChecked = (orderId: string, itemIdx: number) => {
@@ -833,6 +899,25 @@ export default function KitchenScreen() {
           </Tooltip>
 
           <Button
+            variant="outlined"
+            startIcon={<HistoryIcon />}
+            onClick={() => setHistoryModalOpen(true)}
+            sx={{
+              borderColor: '#cbd5e1',
+              color: '#334155',
+              bgcolor: '#ffffff',
+              borderRadius: '12px',
+              fontWeight: 800,
+              textTransform: 'none',
+              px: 2,
+              py: 0.9,
+              '&:hover': { bgcolor: '#f8fafc', borderColor: '#94a3b8' },
+            }}
+          >
+            Historial Despachadas ({deliveredHistory.length})
+          </Button>
+
+          <Button
             variant="contained"
             startIcon={<BellIcon />}
             onClick={() => playKitchenBellSound()}
@@ -1130,6 +1215,202 @@ export default function KitchenScreen() {
           )}
         </Grid>
       </Grid>
+
+      {/* DIALOG: HISTORIAL DE COMANDAS DESPACHADAS */}
+      <Dialog
+        open={historyModalOpen}
+        onClose={() => setHistoryModalOpen(false)}
+        maxWidth="md"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: '20px',
+              p: 1,
+            }
+          }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+            <Box sx={{ p: 1, bgcolor: '#f1f5f9', borderRadius: '12px', color: '#1e290b', display: 'flex' }}>
+              <HistoryIcon sx={{ fontSize: 24 }} />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 900, color: '#1e290b' }}>
+                Historial de Comandas Despachadas
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Últimos pedidos entregados al salón o despachados a domicilio
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton size="small" onClick={() => setHistoryModalOpen(false)}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent dividers sx={{ p: 2.5 }}>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Buscar por comanda, mesa, cliente o producto..."
+            value={historySearchQuery}
+            onChange={(e) => setHistorySearchQuery(e.target.value)}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon color="action" fontSize="small" />
+                  </InputAdornment>
+                ),
+                sx: { borderRadius: 2, bgcolor: '#f8fafc', mb: 2 }
+              }
+            }}
+          />
+
+          {deliveredHistory.filter((o) => {
+            const q = historySearchQuery.toLowerCase().trim();
+            if (!q) return true;
+            return (
+              (o.orderNumber || '').toLowerCase().includes(q) ||
+              (o.tableName || '').toLowerCase().includes(q) ||
+              (o.waiterName || '').toLowerCase().includes(q) ||
+              (o.customerName || '').toLowerCase().includes(q) ||
+              (o.items || []).some((it) => it.productName.toLowerCase().includes(q))
+            );
+          }).length === 0 ? (
+            <Paper elevation={0} sx={{ p: 4, textAlign: 'center', bgcolor: '#f8fafc', borderRadius: 3, border: '1px dashed #cbd5e1' }}>
+              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                No hay comandas despachadas recientemente que coincidan con la búsqueda.
+              </Typography>
+            </Paper>
+          ) : (
+            <Stack spacing={2} sx={{ maxHeight: '60vh', overflowY: 'auto', pr: 0.5 }}>
+              {deliveredHistory
+                .filter((o) => {
+                  const q = historySearchQuery.toLowerCase().trim();
+                  if (!q) return true;
+                  return (
+                    (o.orderNumber || '').toLowerCase().includes(q) ||
+                    (o.tableName || '').toLowerCase().includes(q) ||
+                    (o.waiterName || '').toLowerCase().includes(q) ||
+                    (o.customerName || '').toLowerCase().includes(q) ||
+                    (o.items || []).some((it) => it.productName.toLowerCase().includes(q))
+                  );
+                })
+                .map((ord) => (
+                  <Paper
+                    key={ord.id}
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 3,
+                      bgcolor: '#ffffff',
+                      transition: 'all 0.2s ease',
+                      '&:hover': { borderColor: '#cbd5e1', boxShadow: '0 4px 12px rgba(0,0,0,0.04)' }
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1, flexWrap: 'wrap', gap: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#1e290b' }}>
+                          #{ord.orderNumber}
+                        </Typography>
+                        <Chip
+                          label={ord.tableName || (ord.type === 'DOMICILIO' ? 'Domicilio' : 'Mesa Salón')}
+                          size="small"
+                          sx={{
+                            fontWeight: 800,
+                            bgcolor: ord.type === 'DOMICILIO' ? '#ffedd5' : '#e0f2fe',
+                            color: ord.type === 'DOMICILIO' ? '#c2410c' : '#0369a1',
+                            fontSize: '0.72rem'
+                          }}
+                        />
+                        <Chip
+                          label="DESPACHADO"
+                          size="small"
+                          sx={{ bgcolor: '#dcfce7', color: '#15803d', fontWeight: 800, fontSize: '0.68rem' }}
+                        />
+                      </Box>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="warning"
+                        startIcon={<ReopenIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => handleReopenOrder(ord)}
+                        sx={{
+                          borderRadius: 2,
+                          fontWeight: 800,
+                          fontSize: '0.75rem',
+                          textTransform: 'none',
+                          borderColor: '#fde047',
+                          color: '#ca8a04',
+                          bgcolor: '#fefce8',
+                          '&:hover': { bgcolor: '#fef9c3', borderColor: '#eab308' }
+                        }}
+                      >
+                        Reabrir a Cocina
+                      </Button>
+                    </Box>
+
+                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 1 }}>
+                      Atendido por: <strong>{ord.waiterName || 'Mesero'}</strong> • Hora: {new Date(ord.createdAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                    </Typography>
+
+                    <Divider sx={{ my: 1, borderColor: '#f1f5f9' }} />
+
+                    <List dense disablePadding>
+                      {ord.items.map((it, idx) => (
+                        <ListItem key={idx} disableGutters sx={{ py: 0.3 }}>
+                          <ListItemText
+                            primary={
+                              <Typography variant="body2" sx={{ fontWeight: 700, color: '#334155' }}>
+                                <span style={{ color: '#65a30d', fontWeight: 900 }}>{it.quantity}x</span> {it.productName}
+                              </Typography>
+                            }
+                            secondary={
+                              <>
+                                {it.modifiers && it.modifiers.length > 0 && (
+                                  <Typography variant="caption" sx={{ color: '#0284c7', fontWeight: 600, display: 'block' }}>
+                                    + {it.modifiers.map((m) => m.name).join(', ')}
+                                  </Typography>
+                                )}
+                                {it.notes && (
+                                  <Typography variant="caption" sx={{ color: '#dc2626', fontWeight: 700, display: 'block' }}>
+                                    ⚠️ {it.notes}
+                                  </Typography>
+                                )}
+                              </>
+                            }
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Paper>
+                ))}
+            </Stack>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={() => setHistoryModalOpen(false)}
+            variant="contained"
+            sx={{
+              bgcolor: '#1e290b',
+              color: '#ffffff',
+              borderRadius: 2,
+              fontWeight: 800,
+              textTransform: 'none',
+              px: 3,
+              '&:hover': { bgcolor: '#2e3d14' }
+            }}
+          >
+            Cerrar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

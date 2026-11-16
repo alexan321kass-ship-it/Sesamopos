@@ -73,6 +73,7 @@ export default function BillingModal({ open, onClose, order, table, onPaymentSuc
   // Invoice finished view
   const [completedInvoice, setCompletedInvoice] = useState<Invoice | null>(null);
   const [isCashOpen, setIsCashOpen] = useState<boolean>(true);
+  const [ticketWidth, setTicketWidth] = useState<'80mm' | '58mm'>('80mm');
 
   useEffect(() => {
     if (open) {
@@ -301,17 +302,17 @@ export default function BillingModal({ open, onClose, order, table, onPaymentSuc
               <title>Factura de Venta POS - Sésamo</title>
               <style>
                 @page {
-                  size: 80mm auto;
+                  size: ${ticketWidth} auto;
                   margin: 0;
                 }
                 body {
                   font-family: 'Courier New', Courier, monospace, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                   margin: 0;
-                  padding: 5mm 4mm;
-                  width: 72mm;
-                  max-width: 72mm;
+                  padding: ${ticketWidth === '58mm' ? '3mm 2mm' : '5mm 4mm'};
+                  width: ${ticketWidth === '58mm' ? '50mm' : '72mm'};
+                  max-width: ${ticketWidth === '58mm' ? '50mm' : '72mm'};
                   color: #000000;
-                  font-size: 11px;
+                  font-size: ${ticketWidth === '58mm' ? '9.5px' : '11px'};
                   line-height: 1.35;
                 }
                 * { box-sizing: border-box; }
@@ -431,6 +432,19 @@ export default function BillingModal({ open, onClose, order, table, onPaymentSuc
               }}
             >
               <Box sx={{ textAlign: 'center', mb: 2 }}>
+                <Box
+                  component="img"
+                  src="/logo.png"
+                  alt="Sésamo Logo"
+                  sx={{
+                    width: ticketWidth === '58mm' ? 85 : 120,
+                    height: 'auto',
+                    mx: 'auto',
+                    mb: 1,
+                    display: 'block',
+                    filter: 'grayscale(100%) contrast(150%)',
+                  }}
+                />
                 <Typography variant="h6" sx={{ fontWeight: 900, letterSpacing: 1 }}>{storeSettings?.name || storeSettings?.storeName || 'SÉSAMO ALIMENTOS'}</Typography>
                 <Typography variant="caption" sx={{ display: 'block' }}>NIT: {storeSettings?.nit || '901.482.930-1'}</Typography>
                 <Typography variant="caption" sx={{ display: 'block' }}>{storeSettings?.address || 'Calle 100 # 15-24, Bogotá D.C.'}</Typography>
@@ -511,18 +525,55 @@ export default function BillingModal({ open, onClose, order, table, onPaymentSuc
               </Box>
 
               <Box sx={{ textAlign: 'center', mt: 2, pt: 1, borderTop: '1px solid #000', fontSize: '0.75rem' }}>
-                {storeSettings?.ticketFooter || '¡Gracias por su visita a Sésamo Alimentos!'}
+                <div>{storeSettings?.ticketFooter || '¡Gracias por su visita a Sésamo Alimentos!'}</div>
+                <div style={{ fontSize: '0.7rem', color: '#555', marginTop: '3px' }}>Síguenos en Instagram: @sesamo_alimentos</div>
               </Box>
             </Paper>
 
-            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1, mt: 2.5 }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                Formato Impresora:
+              </Typography>
+              <Button
+                size="small"
+                variant={ticketWidth === '80mm' ? 'contained' : 'outlined'}
+                onClick={() => setTicketWidth('80mm')}
+                sx={{
+                  borderRadius: 2,
+                  fontWeight: 800,
+                  fontSize: '0.75rem',
+                  textTransform: 'none',
+                  bgcolor: ticketWidth === '80mm' ? '#1e290b' : 'transparent',
+                  color: ticketWidth === '80mm' ? '#ffffff' : '#334155',
+                }}
+              >
+                80mm (Estándar)
+              </Button>
+              <Button
+                size="small"
+                variant={ticketWidth === '58mm' ? 'contained' : 'outlined'}
+                onClick={() => setTicketWidth('58mm')}
+                sx={{
+                  borderRadius: 2,
+                  fontWeight: 800,
+                  fontSize: '0.75rem',
+                  textTransform: 'none',
+                  bgcolor: ticketWidth === '58mm' ? '#1e290b' : 'transparent',
+                  color: ticketWidth === '58mm' ? '#ffffff' : '#334155',
+                }}
+              >
+                58mm (Compacta)
+              </Button>
+            </Box>
+
+            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 2 }}>
               <Button
                 variant="contained"
                 startIcon={<PrintIcon />}
                 onClick={handlePrintReceipt}
                 sx={{ bgcolor: '#0284c7', color: '#fff', borderRadius: '12px', fontWeight: 800, px: 3 }}
               >
-                Imprimir Ticket de Factura
+                Imprimir Ticket de Factura ({ticketWidth})
               </Button>
               <Button
                 variant="outlined"

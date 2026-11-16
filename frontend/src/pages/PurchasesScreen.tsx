@@ -208,19 +208,28 @@ export default function PurchasesScreen() {
     setOpenOrderModal(true);
   };
 
-  // Autocomplete with low-stock items
+  // Autocomplete with low-stock items or smart inventory replenishment
   const handleAutocompleteCriticalItems = () => {
-    if (criticalItems.length === 0) {
+    let itemsToRestock = criticalItems;
+    if (itemsToRestock.length === 0) {
+      // If none strictly below minStock, find items below 60% of maxStock
+      itemsToRestock = inventoryItems.filter((i) => i.currentStock < (i.maxStock || 50) * 0.6);
+    }
+    if (itemsToRestock.length === 0) {
+      itemsToRestock = inventoryItems.slice(0, 4);
+    }
+
+    if (itemsToRestock.length === 0) {
       setNotification({
         open: true,
-        message: 'No hay insumos críticos actualmente bajo el stock mínimo.',
+        message: 'No hay insumos registrados en inventario para sugerir compras.',
         severity: 'info',
       });
       return;
     }
 
-    const suggested = criticalItems.map((item) => {
-      const deficit = Math.max(5, item.maxStock - item.currentStock);
+    const suggested = itemsToRestock.map((item) => {
+      const deficit = Math.max(5, (item.maxStock || 20) - item.currentStock);
       return {
         itemId: item.id,
         quantity: deficit,
@@ -233,6 +242,11 @@ export default function PurchasesScreen() {
       setNewOrderSupplierId(suppliers[0].id);
     }
     setOpenOrderModal(true);
+    setNotification({
+      open: true,
+      message: `Sugeridor Inteligente: Se calcularon ${suggested.length} insumos para reposición según stock máximo y consumo.`,
+      severity: 'success',
+    });
   };
 
   const handleAddItemToOrder = () => {
@@ -434,24 +448,22 @@ export default function PurchasesScreen() {
         </Box>
 
         <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
-          {criticalItems.length > 0 && (
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<AutoAwesomeIcon />}
-              onClick={handleAutocompleteCriticalItems}
-              sx={{
-                fontWeight: 800,
-                borderRadius: '12px',
-                borderColor: '#fca5a5',
-                bgcolor: '#fef2f2',
-                color: '#b91c1c',
-                '&:hover': { bgcolor: '#fee2e2', borderColor: '#ef4444' },
-              }}
-            >
-              Pedir Insumos Bajos ({criticalItems.length})
-            </Button>
-          )}
+          <Button
+            variant="outlined"
+            color={criticalItems.length > 0 ? "error" : "primary"}
+            startIcon={<AutoAwesomeIcon />}
+            onClick={handleAutocompleteCriticalItems}
+            sx={{
+              fontWeight: 800,
+              borderRadius: '12px',
+              borderColor: criticalItems.length > 0 ? '#fca5a5' : '#cbd5e1',
+              bgcolor: criticalItems.length > 0 ? '#fef2f2' : '#f8fafc',
+              color: criticalItems.length > 0 ? '#b91c1c' : '#1e290b',
+              '&:hover': { bgcolor: criticalItems.length > 0 ? '#fee2e2' : '#f1f5f9' },
+            }}
+          >
+            Sugeridor de Compras {criticalItems.length > 0 ? `(${criticalItems.length} alertas)` : ''}
+          </Button>
 
           {tabIndex === 0 ? (
             <Button

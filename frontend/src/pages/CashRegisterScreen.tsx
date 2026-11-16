@@ -1863,6 +1863,12 @@ export default function CashRegisterScreen() {
                 }}
               >
                 <Box sx={{ textAlign: 'center', mb: 2 }}>
+                  <Box
+                    component="img"
+                    src="/logo.png"
+                    alt="Sésamo Logo"
+                    sx={{ width: 100, height: 'auto', mx: 'auto', mb: 1, display: 'block', filter: 'grayscale(100%) contrast(150%)' }}
+                  />
                   <Typography variant="subtitle1" sx={{ fontWeight: 900, fontFamily: 'monospace' }}>
                     RESTAURANTE SÉSAMO
                   </Typography>
