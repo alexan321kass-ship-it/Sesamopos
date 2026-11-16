@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Dialog,
   DialogTitle,
@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import { AccessTime as TimeIcon, LockClock as LockClockIcon } from '@mui/icons-material';
 import { useAuthStore } from '../store/authStore';
+import { subscribeRealtimeEvents } from '../services/eventBus';
 
 // Inactivity timeout: 20 minutes in milliseconds
 const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000; // 20 min = 1,200,000 ms
@@ -23,6 +24,7 @@ const LAST_ACTIVITY_KEY = 'sesamo_last_activity';
 export default function InactivityTracker() {
   const { isAuthenticated, logout, user } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [isWarningOpen, setIsWarningOpen] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(60);
@@ -35,17 +37,17 @@ export default function InactivityTracker() {
     const now = Date.now();
     lastRecordedTimeRef.current = now;
 
-    // Throttle writing to localStorage to once per second
+    // Throttle writing to localStorage to once every 2 seconds
     if (!throttleTimeoutRef.current) {
       throttleTimeoutRef.current = setTimeout(() => {
         try {
           localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
         } catch (e) {}
         throttleTimeoutRef.current = null;
-      }, 1000);
+      }, 2000);
     }
 
-    // If warning dialog was open and user interacts, close warning
+    // If warning dialog was open and user interacts, close warning immediately
     setIsWarningOpen((prev) => {
       if (prev) {
         setSecondsRemaining(60);
@@ -54,6 +56,13 @@ export default function InactivityTracker() {
       return false;
     });
   }, []);
+
+  // Record activity whenever user navigates between screens/routes
+  useEffect(() => {
+    if (isAuthenticated) {
+      recordActivity();
+    }
+  }, [location.pathname, location.search, isAuthenticated, recordActivity]);
 
   // Handle auto logout
   const handleTimeoutLogout = useCallback(() => {
@@ -86,18 +95,35 @@ export default function InactivityTracker() {
         if (now - storedTime >= INACTIVITY_TIMEOUT_MS) {
           handleTimeoutLogout();
           return;
+        } else {
+          // If stored is still fresh, sync ref
+          lastRecordedTimeRef.current = storedTime;
         }
       }
     } catch (e) {}
 
-    // Attach user activity listeners
+    // Attach comprehensive user activity listeners with capture: true
+    // capture: true ensures events are caught before any child calls e.stopPropagation()
     const activityEvents = [
       'mousedown',
+      'mouseup',
       'mousemove',
+      'click',
+      'dblclick',
+      'contextmenu',
       'keydown',
-      'scroll',
+      'keyup',
       'touchstart',
-      'click'
+      'touchend',
+      'touchmove',
+      'pointerdown',
+      'pointerup',
+      'pointermove',
+      'scroll',
+      'wheel',
+      'input',
+      'change',
+      'focus',
     ];
 
     const handleUserEvent = () => {
@@ -105,7 +131,13 @@ export default function InactivityTracker() {
     };
 
     activityEvents.forEach((event) => {
-      window.addEventListener(event, handleUserEvent, { passive: true });
+      document.addEventListener(event, handleUserEvent, { capture: true, passive: true });
+      window.addEventListener(event, handleUserEvent, { capture: true, passive: true });
+    });
+
+    // Also register activity whenever any real-time business action is dispatched
+    const unsubscribeRealtime = subscribeRealtimeEvents(() => {
+      recordActivity();
     });
 
     // Check timer every 1 second
@@ -125,10 +157,10 @@ export default function InactivityTracker() {
       const elapsed = Date.now() - lastActivity;
 
       if (elapsed >= INACTIVITY_TIMEOUT_MS) {
-        // Exceeded 20 minutes -> automatic logout
+        // Exceeded 20 minutes of absolute inactivity -> logout
         handleTimeoutLogout();
       } else if (elapsed >= INACTIVITY_TIMEOUT_MS - WARNING_DURATION_MS) {
-        // In the last 60 seconds -> show warning dialog
+        // In the last 60 seconds of inactivity -> show warning dialog
         const remainingMs = INACTIVITY_TIMEOUT_MS - elapsed;
         const remainingSec = Math.max(1, Math.ceil(remainingMs / 1000));
         setSecondsRemaining(remainingSec);
@@ -152,7 +184,7 @@ export default function InactivityTracker() {
       }
     };
 
-    // When returning to the tab, immediately check if 20 minutes passed
+    // When returning to the tab, check elapsed time
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         let lastActivity = lastRecordedTimeRef.current;
@@ -178,8 +210,10 @@ export default function InactivityTracker() {
 
     return () => {
       activityEvents.forEach((event) => {
-        window.removeEventListener(event, handleUserEvent);
+        document.removeEventListener(event, handleUserEvent, { capture: true });
+        window.removeEventListener(event, handleUserEvent, { capture: true });
       });
+      unsubscribeRealtime();
       window.removeEventListener('storage', handleStorageChange);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleVisibilityChange);
@@ -188,7 +222,7 @@ export default function InactivityTracker() {
         clearTimeout(throttleTimeoutRef.current);
       }
     };
-  }, [isAuthenticated, recordActivity, handleTimeoutLogout, logout]);
+  }, [isAuthenticated, user?.role, recordActivity, handleTimeoutLogout, logout]);
 
   if (!isAuthenticated) return null;
 
