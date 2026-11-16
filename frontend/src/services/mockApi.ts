@@ -130,6 +130,18 @@ export const getStoredInventory = (): InventoryItem[] => {
     try {
       const parsed = JSON.parse(local);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        // Backfill any missing default items from mockInventory
+        const existingIds = new Set(parsed.map((i: any) => i.id));
+        let changed = false;
+        mockInventory.forEach(defItem => {
+          if (!existingIds.has(defItem.id)) {
+            parsed.push(defItem);
+            changed = true;
+          }
+        });
+        if (changed) {
+          try { localStorage.setItem('sesamo_inventory', JSON.stringify(parsed)); } catch (e) {}
+        }
         memoryInventoryCache = parsed.map((item, idx) => normalizeInventoryItem(item, idx));
         return memoryInventoryCache;
       }
@@ -237,8 +249,23 @@ export const getStoredRecipes = (): Recipe[] => {
   const local = localStorage.getItem('sesamo_recipes');
   if (local) {
     try {
-      memoryRecipesCache = JSON.parse(local);
-      return memoryRecipesCache!;
+      const parsed: Recipe[] = JSON.parse(local);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Backfill any missing recipes from mockRecipes
+        const existingProductIds = new Set(parsed.map(r => r.productId));
+        let changed = false;
+        mockRecipes.forEach(rec => {
+          if (!existingProductIds.has(rec.productId)) {
+            parsed.push(rec);
+            changed = true;
+          }
+        });
+        if (changed) {
+          try { localStorage.setItem('sesamo_recipes', JSON.stringify(parsed)); } catch (e) {}
+        }
+        memoryRecipesCache = parsed;
+        return memoryRecipesCache!;
+      }
     } catch (e) {}
   }
   memoryRecipesCache = [...mockRecipes];
@@ -506,7 +533,7 @@ const saveStoredOrders = (orders: Order[]) => {
   notifyRealtimeEvent('sesamo_order_updated');
 };
 
-// Engine de Descargue Automático por Receta Técnica y Extras / Modificadores
+// Engine de Descargue Automático por Receta Técnica, Extras y Venta Directa
 export const deductInventoryByRecipeAndExtras = (
   items: any[],
   orderNumber: string,
@@ -527,9 +554,14 @@ export const deductInventoryByRecipeAndExtras = (
 
   (items || []).forEach(item => {
     const itemQty = Number(item.quantity) || 1;
+    let baseDeducted = false;
 
     // 1. Descargue de ingredientes de la receta base
-    const recipe = recipes.find(r => r.productId === item.productId);
+    const recipe = recipes.find(r => 
+      r.productId === item.productId || 
+      (r.productName && item.productName && r.productName.toLowerCase().trim() === item.productName.toLowerCase().trim())
+    );
+
     if (recipe && recipe.ingredients && recipe.ingredients.length > 0) {
       recipe.ingredients.forEach(ing => {
         const invIndex = inventory.findIndex(inv => inv.id === ing.inventoryItemId || inv.id === `inv-${ing.inventoryItemId}`);
@@ -539,6 +571,7 @@ export const deductInventoryByRecipeAndExtras = (
           if (deductAmount > 0) {
             invItem.currentStock = parseFloat((invItem.currentStock - deductAmount).toFixed(3));
             deductedCount++;
+            baseDeducted = true;
             summary.push(`-${deductAmount} ${invItem.unit || ''} de ${invItem.name} (${itemQty}x ${item.productName})`);
 
             movs.unshift({
@@ -554,6 +587,36 @@ export const deductInventoryByRecipeAndExtras = (
           }
         }
       });
+    }
+
+    // 1.1 Si el producto NO tiene receta con ingredientes, descargar directamente del inventario (ej. Coca-Cola, Cerveza, etc.)
+    if (!baseDeducted) {
+      const pNameLower = (item.productName || '').toLowerCase().trim();
+      const directIndex = inventory.findIndex(inv =>
+        inv.id === item.productId ||
+        (inv.code && item.sku && inv.code.toLowerCase() === item.sku.toLowerCase()) ||
+        inv.name.toLowerCase().trim() === pNameLower ||
+        pNameLower.includes(inv.name.toLowerCase().trim()) ||
+        inv.name.toLowerCase().trim().includes(pNameLower)
+      );
+
+      if (directIndex !== -1) {
+        const invItem = inventory[directIndex];
+        invItem.currentStock = parseFloat((invItem.currentStock - itemQty).toFixed(3));
+        deductedCount++;
+        summary.push(`-${itemQty} ${invItem.unit || 'Unidad'} de ${invItem.name} (${itemQty}x ${item.productName})`);
+
+        movs.unshift({
+          id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          itemId: invItem.id,
+          itemName: invItem.name,
+          type: 'SALIDA',
+          quantity: -itemQty,
+          reason: `Venta Directa POS: ${itemQty}x ${item.productName} (Orden #${orderNumber} [${origin}])`,
+          responsibleName: 'Cocina Automática POS',
+          date: Date.now()
+        });
+      }
     }
 
     // 2. Descargue de Extras / Modificadores (Huevos, Tocineta, Quesos, etc.)
@@ -612,6 +675,86 @@ export const deductInventoryByRecipeAndExtras = (
   return { deductedCount, summary };
 };
 
+// Verificación estricta de disponibilidad de stock antes de crear o actualizar pedidos
+export const checkStockAvailability = (
+  items: any[]
+): { valid: boolean; errors: { productName: string; requested: number; available: number; missingIngredient?: string }[] } => {
+  const inventory = getStoredInventory();
+  const recipes = getStoredRecipes();
+  const errors: { productName: string; requested: number; available: number; missingIngredient?: string }[] = [];
+
+  // Agrupar items por producto
+  const productQuantities: Record<string, { quantity: number; productName: string }> = {};
+  (items || []).forEach(item => {
+    const pId = item.productId || item.id;
+    if (!pId) return;
+    if (!productQuantities[pId]) {
+      productQuantities[pId] = { quantity: 0, productName: item.productName || item.name || 'Producto' };
+    }
+    productQuantities[pId].quantity += Number(item.quantity) || 1;
+  });
+
+  // Validar cada producto respecto a su receta o stock directo
+  Object.entries(productQuantities).forEach(([productId, data]) => {
+    const { quantity, productName } = data;
+    const recipe = recipes.find(r => 
+      r.productId === productId || 
+      (r.productName && r.productName.toLowerCase().trim() === productName.toLowerCase().trim())
+    );
+
+    if (recipe && recipe.ingredients && recipe.ingredients.length > 0) {
+      let maxPortions = Infinity;
+      let limitingIngredient = '';
+
+      for (const ing of recipe.ingredients) {
+        const invItem = inventory.find(inv => inv.id === ing.inventoryItemId || inv.id === `inv-${ing.inventoryItemId}`);
+        if (!invItem) continue;
+        const requiredPerPortion = Number(ing.quantity) || 0;
+        if (requiredPerPortion > 0) {
+          const possible = Math.floor((invItem.currentStock || 0) / requiredPerPortion);
+          if (possible < maxPortions) {
+            maxPortions = possible;
+            limitingIngredient = `${invItem.name} (Quedan: ${invItem.currentStock} ${invItem.unit})`;
+          }
+        }
+      }
+
+      const available = maxPortions === Infinity ? 999 : Math.max(0, maxPortions);
+      if (quantity > available) {
+        errors.push({
+          productName,
+          requested: quantity,
+          available,
+          missingIngredient: limitingIngredient || 'Insumo de receta agotado',
+        });
+      }
+    } else {
+      // Insumo directo en inventario (Bebidas, empaquetados)
+      const pNameLower = productName.toLowerCase().trim();
+      const directItem = inventory.find(inv =>
+        inv.id === productId ||
+        inv.name.toLowerCase().trim() === pNameLower ||
+        pNameLower.includes(inv.name.toLowerCase().trim()) ||
+        inv.name.toLowerCase().trim().includes(pNameLower)
+      );
+
+      if (directItem) {
+        const available = Math.max(0, Math.floor(directItem.currentStock || 0));
+        if (quantity > available) {
+          errors.push({
+            productName,
+            requested: quantity,
+            available,
+            missingIngredient: `Stock en bodega: ${directItem.currentStock} ${directItem.unit}`,
+          });
+        }
+      }
+    }
+  });
+
+  return { valid: errors.length === 0, errors };
+};
+
 export const revertInventoryByRecipeAndExtras = (
   items: any[],
   orderNumber: string
@@ -629,8 +772,14 @@ export const revertInventoryByRecipeAndExtras = (
 
   (items || []).forEach(item => {
     const itemQty = Number(item.quantity) || 1;
-    const recipe = recipes.find(r => r.productId === item.productId);
-    if (recipe && recipe.ingredients) {
+    let baseReverted = false;
+
+    const recipe = recipes.find(r => 
+      r.productId === item.productId || 
+      (r.productName && item.productName && r.productName.toLowerCase().trim() === item.productName.toLowerCase().trim())
+    );
+
+    if (recipe && recipe.ingredients && recipe.ingredients.length > 0) {
       recipe.ingredients.forEach(ing => {
         const invIndex = inventory.findIndex(inv => inv.id === ing.inventoryItemId || inv.id === `inv-${ing.inventoryItemId}`);
         if (invIndex !== -1) {
@@ -639,6 +788,7 @@ export const revertInventoryByRecipeAndExtras = (
           if (restoreAmount > 0) {
             invItem.currentStock = parseFloat((invItem.currentStock + restoreAmount).toFixed(3));
             revertedCount++;
+            baseReverted = true;
             movs.unshift({
               id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
               itemId: invItem.id,
@@ -652,6 +802,33 @@ export const revertInventoryByRecipeAndExtras = (
           }
         }
       });
+    }
+
+    if (!baseReverted) {
+      const pNameLower = (item.productName || '').toLowerCase().trim();
+      const directIndex = inventory.findIndex(inv =>
+        inv.id === item.productId ||
+        (inv.code && item.sku && inv.code.toLowerCase() === item.sku.toLowerCase()) ||
+        inv.name.toLowerCase().trim() === pNameLower ||
+        pNameLower.includes(inv.name.toLowerCase().trim()) ||
+        inv.name.toLowerCase().trim().includes(pNameLower)
+      );
+
+      if (directIndex !== -1) {
+        const invItem = inventory[directIndex];
+        invItem.currentStock = parseFloat((invItem.currentStock + itemQty).toFixed(3));
+        revertedCount++;
+        movs.unshift({
+          id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          itemId: invItem.id,
+          itemName: invItem.name,
+          type: 'ENTRADA',
+          quantity: itemQty,
+          reason: `Reversión por anulación: Orden #${orderNumber}`,
+          responsibleName: 'Sistema POS',
+          date: Date.now()
+        });
+      }
     }
 
     if (item.modifiers && Array.isArray(item.modifiers)) {
@@ -1254,6 +1431,15 @@ export const mockApi = {
       return getStoredOrders();
     },
     create: async (order: Omit<Order, 'id' | 'createdAt'>): Promise<Order> => {
+      // Validar disponibilidad de stock antes de crear pedido
+      const stockCheck = checkStockAvailability(order.items || []);
+      if (!stockCheck.valid) {
+        const details = stockCheck.errors
+          .map(e => `• ${e.productName}: pides ${e.requested}, disponible ${e.available} (${e.missingIngredient || 'Stock'})`)
+          .join('\n');
+        throw new Error(`Stock insuficiente en inventario:\n${details}`);
+      }
+
       const orders = getStoredOrders();
       const newOrder: Order = {
         ...order,
@@ -1363,12 +1549,19 @@ export const mockApi = {
       const index = orders.findIndex(o => o.id === id || o.orderNumber === id);
       if (index === -1) throw new Error('Pedido no encontrado');
 
-      // Descontar inventario para adiciones nuevas
+      // Descontar inventario para adiciones nuevas (validando stock disponible)
       if (updatedData.items) {
         const oldItems = orders[index].items || [];
         const oldItemIds = new Set(oldItems.map(it => it.id));
         const newlyAdded = updatedData.items.filter(it => !oldItemIds.has(it.id));
         if (newlyAdded.length > 0) {
+          const stockCheck = checkStockAvailability(newlyAdded);
+          if (!stockCheck.valid) {
+            const details = stockCheck.errors
+              .map(e => `• ${e.productName}: pides ${e.requested}, disponible ${e.available} (${e.missingIngredient || 'Stock'})`)
+              .join('\n');
+            throw new Error(`Stock insuficiente en inventario para adición:\n${details}`);
+          }
           try {
             deductInventoryByRecipeAndExtras(newlyAdded, orders[index].orderNumber);
           } catch (e) {}
@@ -1569,6 +1762,9 @@ export const mockApi = {
     getMovements: async (): Promise<any[]> => {
       await delay(0);
       return getStoredInventoryMovements();
+    },
+    checkStockAvailability: (items: any[]) => {
+      return checkStockAvailability(items);
     }
   },
   suppliers: {
@@ -1845,6 +2041,15 @@ export const mockApi = {
       return getStoredDeliveries().find(d => d.id === id) || null;
     },
     create: async (data: Omit<DeliveryOrder, 'id' | 'type' | 'createdAt'> & { type?: any; createdAt?: number }): Promise<DeliveryOrder> => {
+      // Validar disponibilidad de stock antes de crear domicilio
+      const stockCheck = checkStockAvailability(data.items || []);
+      if (!stockCheck.valid) {
+        const details = stockCheck.errors
+          .map(e => `• ${e.productName}: pides ${e.requested}, disponible ${e.available} (${e.missingIngredient || 'Stock'})`)
+          .join('\n');
+        throw new Error(`Stock insuficiente en inventario para domicilio:\n${details}`);
+      }
+
       const newDelivery: DeliveryOrder = {
         ...data,
         id: `${Date.now()}`,

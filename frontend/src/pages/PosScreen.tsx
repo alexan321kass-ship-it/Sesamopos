@@ -46,7 +46,7 @@ import {
 import { usePosStore } from '../store/posStore';
 import { useAuthStore } from '../store/authStore';
 import { mockApi } from '../services/mockApi';
-import { Category, Product, OrderItemModifier, ModifierOption, ModifierGroup, Order, Table, Customer } from '../types';
+import { Category, Product, OrderItemModifier, ModifierOption, ModifierGroup, Order, Table, Customer, InventoryItem, Recipe } from '../types';
 import { playKitchenBellSound } from '../utils/audioAlerts';
 import BillingModal from '../components/BillingModal';
 
@@ -101,11 +101,26 @@ export default function PosScreen() {
     notes: '',
   });
 
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+
   const posStore = usePosStore();
   const { user } = useAuthStore();
 
   useEffect(() => {
     loadData();
+
+    const handleInvChange = () => {
+      mockApi.inventory.getAll().then(setInventory);
+      mockApi.recipes.getAll().then(setRecipes);
+    };
+    window.addEventListener('sesamo_inventory_updated', handleInvChange);
+    window.addEventListener('sesamo_recipes_updated', handleInvChange);
+
+    return () => {
+      window.removeEventListener('sesamo_inventory_updated', handleInvChange);
+      window.removeEventListener('sesamo_recipes_updated', handleInvChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -117,20 +132,83 @@ export default function PosScreen() {
   }, [selectedCategoryId]);
 
   const loadData = async () => {
-    const [cats, tbls, custList] = await Promise.all([
+    const [cats, tbls, custList, invList, recList] = await Promise.all([
       mockApi.categories.getAll(),
       mockApi.tables.getAll(),
-      mockApi.customers.getAll()
+      mockApi.customers.getAll(),
+      mockApi.inventory.getAll(),
+      mockApi.recipes.getAll(),
     ]);
     setCategories(cats);
     setTables(tbls);
     setCustomers(custList || []);
+    setInventory(invList || []);
+    setRecipes(recList || []);
     if (!selectedCategoryId) {
       setSelectedCategoryId('ALL');
     }
   };
 
+  // Cálculo de stock disponible real por receta técnica o insumo directo
+  const getProductAvailableStock = (product: Product): { stock: number; isUntracked: boolean; limitingName?: string } => {
+    const recipe = recipes.find(r => 
+      r.productId === product.id || 
+      (r.productName && r.productName.toLowerCase().trim() === product.name.toLowerCase().trim())
+    );
+
+    if (recipe && recipe.ingredients && recipe.ingredients.length > 0) {
+      let minPortions = Infinity;
+      let limiting = '';
+
+      for (const ing of recipe.ingredients) {
+        const invItem = inventory.find(i => i.id === ing.inventoryItemId || i.id === `inv-${ing.inventoryItemId}`);
+        if (!invItem) continue;
+        const reqQty = Number(ing.quantity) || 0;
+        if (reqQty > 0) {
+          const possible = Math.floor((invItem.currentStock || 0) / reqQty);
+          if (possible < minPortions) {
+            minPortions = possible;
+            limiting = `${invItem.name} (${invItem.currentStock} ${invItem.unit})`;
+          }
+        }
+      }
+
+      if (minPortions !== Infinity) {
+        return { stock: Math.max(0, minPortions), isUntracked: false, limitingName: limiting };
+      }
+    }
+
+    // Si no tiene receta técnica con ingredientes, buscar insumo directo en inventario
+    const pNameLower = product.name.toLowerCase().trim();
+    const directInv = inventory.find(i =>
+      i.id === product.id ||
+      (i.code && product.sku && i.code.toLowerCase() === product.sku.toLowerCase()) ||
+      i.name.toLowerCase().trim() === pNameLower ||
+      pNameLower.includes(i.name.toLowerCase().trim()) ||
+      i.name.toLowerCase().trim().includes(pNameLower)
+    );
+
+    if (directInv) {
+      return { stock: Math.max(0, Math.floor(directInv.currentStock || 0)), isUntracked: false, limitingName: `${directInv.name} (${directInv.currentStock} ${directInv.unit})` };
+    }
+
+    return { stock: 999, isUntracked: true };
+  };
+
   const handleProductClick = (product: Product) => {
+    const stockInfo = getProductAvailableStock(product);
+    const inCart = getProductCartCount(product.id);
+
+    if (!stockInfo.isUntracked && stockInfo.stock <= 0) {
+      alert(`⚠️ Producto Agotado:\n\n"${product.name}" no tiene existencias en bodega.\n(${stockInfo.limitingName || 'Stock 0'})\n\nNo es posible agregarlo.`);
+      return;
+    }
+
+    if (!stockInfo.isUntracked && inCart + 1 > stockInfo.stock) {
+      alert(`⚠️ Límite de Inventario Superado:\n\nSolo dispones de ${stockInfo.stock} unidades de "${product.name}" en inventario.\nYa tienes ${inCart} agregadas en la comanda actual.`);
+      return;
+    }
+
     if (!posStore.currentTableId && !posStore.editingOrderId && !hasPromptedForBar && posStore.items.length === 0) {
       setHasPromptedForBar(true);
       setBarPromptOpen(true);
@@ -144,7 +222,6 @@ export default function PosScreen() {
       posStore.addItem(product, 1, []);
     }
   };
-
   const handleModifierChange = (group: ModifierGroup, option: ModifierOption, checked: boolean) => {
     if (checked) {
       setSelectedModifiers([...selectedModifiers, {
@@ -163,6 +240,14 @@ export default function PosScreen() {
 
   const handleAddWithModifiers = () => {
     if (selectedProduct) {
+      const stockInfo = getProductAvailableStock(selectedProduct);
+      const inCart = getProductCartCount(selectedProduct.id);
+
+      if (!stockInfo.isUntracked && (inCart + 1) > stockInfo.stock) {
+        alert(`⚠️ Límite de Inventario:\n\nSolo quedan ${stockInfo.stock} unidades disponibles de "${selectedProduct.name}" (${stockInfo.limitingName || 'Bodega'}).\nNo es posible agregar más.`);
+        return;
+      }
+
       if (!posStore.currentTableId && !posStore.editingOrderId && !hasPromptedForBar && posStore.items.length === 0) {
         setHasPromptedForBar(true);
         setBarPromptOpen(true);
@@ -170,6 +255,19 @@ export default function PosScreen() {
       posStore.addItem(selectedProduct, 1, selectedModifiers, productNotes);
       setSelectedProduct(null);
     }
+  };
+
+  const handleIncreaseItemQty = (item: any) => {
+    const prod = products.find(p => p.id === item.productId) || ({ id: item.productId, name: item.productName } as any);
+    const stockInfo = getProductAvailableStock(prod);
+    const currentInCart = getProductCartCount(item.productId);
+
+    if (!stockInfo.isUntracked && (currentInCart + 1) > stockInfo.stock) {
+      alert(`⚠️ Stock Máximo de Bodega Alcanzado:\n\nNo puedes pedir más de ${stockInfo.stock} unidades de "${item.productName}".\nExistencias actuales en inventario: ${stockInfo.stock} (${stockInfo.limitingName || 'Insumo'}).`);
+      return;
+    }
+
+    posStore.updateQuantity(item.id, item.quantity + 1);
   };
 
   const handleToggleQuickNote = (note: string) => {
@@ -315,6 +413,17 @@ export default function PosScreen() {
 
   const executeSendToKitchen = async (tableId: string | null) => {
     if (posStore.items.length === 0 || isSubmittingKitchen) return;
+
+    // Validación estricta previa de existencias en bodega
+    const stockCheck = mockApi.inventory.checkStockAvailability(posStore.items);
+    if (!stockCheck.valid) {
+      const errorList = stockCheck.errors
+        .map(e => `• ${e.productName}: pides ${e.requested}, disponible ${e.available} (${e.missingIngredient || 'Stock'})`)
+        .join('\n');
+      alert(`❌ No es posible enviar el pedido por falta de inventario:\n\n${errorList}\n\nPor favor ajusta las cantidades en la comanda antes de continuar.`);
+      return;
+    }
+
     setIsSubmittingKitchen(true);
     try {
       const isDelivery = tableId === 'DOMICILIO' || tableId === 'Domicilio';
@@ -416,9 +525,9 @@ export default function PosScreen() {
       }
       posStore.clearOrder();
       setHasPromptedForBar(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert('Error al guardar/enviar pedido');
+      alert(error?.message || 'Error al guardar/enviar pedido');
     } finally {
       setIsSubmittingKitchen(false);
     }
@@ -436,6 +545,17 @@ export default function PosScreen() {
 
   const executeOpenBilling = async (tableId: string | null) => {
     if (posStore.items.length === 0) return;
+
+    // Validación estricta previa de existencias en bodega
+    const stockCheck = mockApi.inventory.checkStockAvailability(posStore.items);
+    if (!stockCheck.valid) {
+      const errorList = stockCheck.errors
+        .map(e => `• ${e.productName}: pides ${e.requested}, disponible ${e.available} (${e.missingIngredient || 'Stock'})`)
+        .join('\n');
+      alert(`❌ No es posible proceder al cobro por falta de inventario:\n\n${errorList}\n\nPor favor ajusta las cantidades en la comanda antes de continuar.`);
+      return;
+    }
+
     const isDelivery = tableId === 'DOMICILIO' || tableId === 'Domicilio';
     const isBarSale = tableId === 'BARRA' || tableId === 'Barra';
 
@@ -650,6 +770,8 @@ export default function PosScreen() {
               {displayedProducts.map((product) => {
                 const inCartCount = getProductCartCount(product.id);
                 const hasModifiers = Boolean(product.modifiers && product.modifiers.length > 0);
+                const stockInfo = getProductAvailableStock(product);
+                const isOutOfStock = !product.isAvailable || (!stockInfo.isUntracked && stockInfo.stock <= 0);
 
                 return (
                   <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={product.id}>
@@ -672,7 +794,7 @@ export default function PosScreen() {
                     >
                       <CardActionArea 
                         onClick={() => handleProductClick(product)}
-                        disabled={!product.isAvailable}
+                        disabled={isOutOfStock}
                         sx={{
                           height: '100%',
                           display: 'flex',
@@ -731,6 +853,29 @@ export default function PosScreen() {
                             ${product.price.toLocaleString()}
                           </Box>
 
+                          {/* Pill Flotante de Stock Disponible */}
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              bottom: 10,
+                              left: 10,
+                              bgcolor: isOutOfStock ? '#dc2626' : stockInfo.stock <= 5 ? '#ea580c' : 'rgba(15, 23, 42, 0.85)',
+                              backdropFilter: 'blur(8px)',
+                              color: '#ffffff',
+                              px: 1.2,
+                              py: 0.4,
+                              borderRadius: '10px',
+                              fontWeight: 900,
+                              fontSize: '0.74rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.5,
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                            }}
+                          >
+                            {isOutOfStock ? '🔴 Agotado' : stockInfo.isUntracked ? '🟢 Disponible' : `📦 ${stockInfo.stock} disp.`}
+                          </Box>
+
                           {/* Badge de cantidad agregada a la comanda */}
                           {inCartCount > 0 && (
                             <Box
@@ -778,23 +923,31 @@ export default function PosScreen() {
                           )}
 
                           {/* Overlay Agotado */}
-                          {!product.isAvailable && (
+                          {isOutOfStock && (
                             <Box
                               sx={{
                                 position: 'absolute',
                                 inset: 0,
-                                bgcolor: 'rgba(0,0,0,0.6)',
+                                bgcolor: 'rgba(0,0,0,0.68)',
                                 display: 'flex',
+                                flexDirection: 'column',
                                 alignItems: 'center',
-                                justifyContent: 'center'
+                                justifyContent: 'center',
+                                gap: 0.5,
+                                p: 1,
                               }}
                             >
                               <Chip
-                                label="Agotado"
+                                label="Agotado (0 Stock)"
                                 size="small"
                                 color="error"
                                 sx={{ fontWeight: 900, borderRadius: '8px' }}
                               />
+                              {stockInfo.limitingName && (
+                                <Typography variant="caption" sx={{ color: '#fca5a5', fontWeight: 700, fontSize: '0.72rem', textAlign: 'center' }}>
+                                  {stockInfo.limitingName}
+                                </Typography>
+                              )}
                             </Box>
                           )}
                         </Box>
@@ -1282,7 +1435,7 @@ export default function PosScreen() {
 
                     <IconButton 
                       size="small" 
-                      onClick={() => posStore.updateQuantity(item.id, item.quantity + 1)}
+                      onClick={() => handleIncreaseItemQty(item)}
                       sx={{
                         width: 28,
                         height: 28,

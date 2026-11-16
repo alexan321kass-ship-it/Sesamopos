@@ -747,6 +747,11 @@ export const mockInventory: InventoryItem[] = [
   { id: '9', code: 'INS-09', name: 'Coca-Cola Zero 400ml', category: 'Bebidas', unit: 'Unidad', currentStock: 18, minStock: 48, maxStock: 200, unitCost: 2200, isActive: true }, // Stock crítico
   { id: '10', code: 'INS-10', name: 'Huevos Tipo AA de Campo', category: 'Huevos & Granja', unit: 'Unidad', currentStock: 80, minStock: 30, maxStock: 180, unitCost: 750, isActive: true },
   { id: '11', code: 'INS-11', name: 'Tocineta Ahumada en Tiras', category: 'Carnes', unit: 'Kg', currentStock: 9.5, minStock: 4, maxStock: 25, unitCost: 32000, isActive: true },
+  { id: '12', code: 'INS-12', name: 'Jugo Natural Mango & Maracuyá', category: 'Bebidas', unit: 'Unidad', currentStock: 35, minStock: 10, maxStock: 60, unitCost: 2800, isActive: true },
+  { id: '13', code: 'INS-13', name: 'Cerveza Artesanal IPA 330ml', category: 'Bebidas', unit: 'Unidad', currentStock: 24, minStock: 12, maxStock: 72, unitCost: 4500, isActive: true },
+  { id: '14', code: 'INS-14', name: 'Brownie Fudge de Chocolate con Helado', category: 'Postres', unit: 'Unidad', currentStock: 15, minStock: 5, maxStock: 40, unitCost: 3500, isActive: true },
+  { id: '15', code: 'INS-15', name: 'Cheesecake de Frutos Rojos', category: 'Postres', unit: 'Unidad', currentStock: 12, minStock: 4, maxStock: 30, unitCost: 4000, isActive: true },
+  { id: '16', code: 'INS-16', name: 'Aros de Cebolla para Freír', category: 'Verduras', unit: 'Kg', currentStock: 15.0, minStock: 5, maxStock: 30, unitCost: 8000, isActive: true },
 ];
 
 export const mockSuppliers: Supplier[] = [
@@ -1211,5 +1216,164 @@ export const mockRecipes: Recipe[] = [
     chefNotes: 'Doble fritura: primera a 140°C para cocer interior, segunda a 180°C para piel ultra crocante.',
     preparationInstructions: '1. Blanquear las papas rústicas en agua con sal marina.\n2. Fritura inicial a 140°C por 3 minutos.\n3. Fritura final a 180°C por 2 minutos hasta color dorado intenso.\n4. Espolvorear sal marina, ajo tostado picado y hojas de romero fresco.',
     updatedAt: Date.now() - 86400000 * 5
+  },
+  {
+    id: 'rec-6',
+    productId: '3', // Hamburguesa Doble Trufa
+    productName: 'Hamburguesa Doble Trufa',
+    category: 'Hamburguesas',
+    ingredients: [
+      { inventoryItemId: '1', quantity: 0.30, unit: 'Kg', notes: 'Doble medallón Angus' },
+      { inventoryItemId: '2', quantity: 1, unit: 'Unidad', notes: 'Pan brioche' },
+      { inventoryItemId: '3', quantity: 0.1, unit: 'Paquete', notes: 'Cheddar fundido' },
+    ],
+    preparationTimeMinutes: 14,
+    portions: 1,
+    wasteMarginPercentage: 5,
+    packagingCost: 700,
+    allergens: ['Gluten', 'Lácteos'],
+    station: 'PARRILLA',
+    difficulty: 'MEDIA',
+    chefNotes: 'Sellar ambos medallones a término 3/4 jugoso.',
+    updatedAt: Date.now() - 86400000
+  },
+  {
+    id: 'rec-7',
+    productId: '4', // Hamburguesa Veggie Portobello
+    productName: 'Hamburguesa Veggie Portobello',
+    category: 'Hamburguesas',
+    ingredients: [
+      { inventoryItemId: '2', quantity: 1, unit: 'Unidad', notes: 'Pan brioche artesanal' },
+      { inventoryItemId: '3', quantity: 0.1, unit: 'Paquete', notes: 'Queso cheddar' },
+    ],
+    preparationTimeMinutes: 10,
+    portions: 1,
+    wasteMarginPercentage: 4,
+    packagingCost: 600,
+    allergens: ['Gluten', 'Lácteos'],
+    station: 'PARRILLA',
+    difficulty: 'FÁCIL',
+    updatedAt: Date.now() - 86400000
+  },
+  {
+    id: 'rec-8',
+    productId: '7', // Pizza Cuatro Quesos
+    productName: 'Pizza Cuatro Quesos',
+    category: 'Pizzas',
+    ingredients: [
+      { inventoryItemId: '5', quantity: 1, unit: 'Unidad', notes: 'Masa precocida 30cm' },
+      { inventoryItemId: '4', quantity: 0.20, unit: 'Kg', notes: 'Mozzarella de búfala' },
+      { inventoryItemId: '3', quantity: 0.10, unit: 'Paquete', notes: 'Queso cheddar' },
+    ],
+    preparationTimeMinutes: 9,
+    portions: 1,
+    wasteMarginPercentage: 4,
+    packagingCost: 1400,
+    allergens: ['Gluten', 'Lácteos'],
+    station: 'HORNO',
+    difficulty: 'FÁCIL',
+    updatedAt: Date.now() - 86400000
+  },
+  {
+    id: 'rec-9',
+    productId: '9', // Aros de Cebolla Crocantes
+    productName: 'Aros de Cebolla Crocantes',
+    category: 'Acompañamientos',
+    ingredients: [
+      { inventoryItemId: '16', quantity: 0.25, unit: 'Kg', notes: 'Aros de cebolla para freír' }
+    ],
+    preparationTimeMinutes: 6,
+    portions: 1,
+    wasteMarginPercentage: 5,
+    packagingCost: 400,
+    allergens: ['Gluten'],
+    station: 'COCINA',
+    difficulty: 'FÁCIL',
+    updatedAt: Date.now() - 86400000
+  },
+  {
+    id: 'rec-10',
+    productId: '10', // Coca-Cola Zero 400ml
+    productName: 'Coca-Cola Zero 400ml',
+    category: 'Bebidas',
+    ingredients: [
+      { inventoryItemId: '9', quantity: 1, unit: 'Unidad', notes: 'Botella Coca-Cola Zero 400ml' }
+    ],
+    preparationTimeMinutes: 1,
+    portions: 1,
+    wasteMarginPercentage: 0,
+    packagingCost: 0,
+    allergens: [],
+    station: 'BAR',
+    difficulty: 'FÁCIL',
+    updatedAt: Date.now() - 86400000
+  },
+  {
+    id: 'rec-11',
+    productId: '11', // Jugo Natural Mango & Maracuyá
+    productName: 'Jugo Natural Mango & Maracuyá',
+    category: 'Bebidas',
+    ingredients: [
+      { inventoryItemId: '12', quantity: 1, unit: 'Unidad', notes: 'Porción pulpa / botella preparada' }
+    ],
+    preparationTimeMinutes: 3,
+    portions: 1,
+    wasteMarginPercentage: 0,
+    packagingCost: 200,
+    allergens: [],
+    station: 'BAR',
+    difficulty: 'FÁCIL',
+    updatedAt: Date.now() - 86400000
+  },
+  {
+    id: 'rec-12',
+    productId: '12', // Cerveza Artesanal IPA 330ml
+    productName: 'Cerveza Artesanal IPA 330ml',
+    category: 'Bebidas',
+    ingredients: [
+      { inventoryItemId: '13', quantity: 1, unit: 'Unidad', notes: 'Botella fría 330ml' }
+    ],
+    preparationTimeMinutes: 1,
+    portions: 1,
+    wasteMarginPercentage: 0,
+    packagingCost: 0,
+    allergens: ['Gluten'],
+    station: 'BAR',
+    difficulty: 'FÁCIL',
+    updatedAt: Date.now() - 86400000
+  },
+  {
+    id: 'rec-13',
+    productId: '13', // Brownie Fudge de Chocolate con Helado
+    productName: 'Brownie Fudge de Chocolate con Helado',
+    category: 'Postres',
+    ingredients: [
+      { inventoryItemId: '14', quantity: 1, unit: 'Unidad', notes: 'Porción brownie con helado' }
+    ],
+    preparationTimeMinutes: 4,
+    portions: 1,
+    wasteMarginPercentage: 2,
+    packagingCost: 400,
+    allergens: ['Gluten', 'Lácteos', 'Huevo'],
+    station: 'COCINA',
+    difficulty: 'FÁCIL',
+    updatedAt: Date.now() - 86400000
+  },
+  {
+    id: 'rec-14',
+    productId: '14', // Cheesecake de Frutos Rojos
+    productName: 'Cheesecake de Frutos Rojos',
+    category: 'Postres',
+    ingredients: [
+      { inventoryItemId: '15', quantity: 1, unit: 'Unidad', notes: 'Porción cheesecake' }
+    ],
+    preparationTimeMinutes: 2,
+    portions: 1,
+    wasteMarginPercentage: 2,
+    packagingCost: 400,
+    allergens: ['Gluten', 'Lácteos'],
+    station: 'COCINA',
+    difficulty: 'FÁCIL',
+    updatedAt: Date.now() - 86400000
   }
 ];
