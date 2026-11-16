@@ -51,6 +51,7 @@ import {
 import { mockApi } from '../services/mockApi';
 import { DeliveryOrder, DeliveryStatus, Product, Customer, StaffMember } from '../types';
 import { useAuthStore } from '../store/authStore';
+import { parseDateOrTimestamp } from '../utils/timeUtils';
 
 // Status color and styling configuration
 const STATUS_CONFIG: Record<
@@ -277,7 +278,7 @@ export default function DeliveryScreen() {
 
         return true;
       })
-      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      .sort((a, b) => (parseDateOrTimestamp(b.createdAt) || 0) - (parseDateOrTimestamp(a.createdAt) || 0));
   }, [deliveries, searchQuery, activeTab, statusFilter]);
 
   // Open Create Modal
@@ -577,7 +578,7 @@ export default function DeliveryScreen() {
   // Render Single Delivery Card
   const renderDeliveryCard = (delivery: DeliveryOrder) => {
     const statusCfg = STATUS_CONFIG[delivery.deliveryStatus] || STATUS_CONFIG.PENDIENTE;
-    const timeDiffMin = Math.round((Date.now() - (delivery.createdAt || Date.now())) / 60000);
+    const timeDiffMin = Math.round((Date.now() - parseDateOrTimestamp(delivery.createdAt)) / 60000);
     const changeRequired =
       delivery.paymentMethod === 'EFECTIVO' && delivery.cashAmountPaidWith
         ? Math.max(0, delivery.cashAmountPaidWith - delivery.total)
@@ -1821,7 +1822,7 @@ export default function DeliveryScreen() {
               <Divider sx={{ my: 1, borderColor: '#000' }} />
 
               <Typography variant="body2"><strong>ORDEN:</strong> #{printModalOrder.orderNumber}</Typography>
-              <Typography variant="body2"><strong>FECHA:</strong> {new Date(printModalOrder.createdAt).toLocaleString('es-CO')}</Typography>
+              <Typography variant="body2"><strong>FECHA:</strong> {new Date(parseDateOrTimestamp(printModalOrder.createdAt)).toLocaleString('es-CO')}</Typography>
               <Typography variant="body2"><strong>CLIENTE:</strong> {printModalOrder.customer.name}</Typography>
               <Typography variant="body2"><strong>TELÉFONO:</strong> {printModalOrder.customer.phone}</Typography>
               <Typography variant="body2"><strong>DIRECCIÓN:</strong> {printModalOrder.deliveryAddress}</Typography>

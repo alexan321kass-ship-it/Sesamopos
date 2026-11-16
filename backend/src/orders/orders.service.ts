@@ -96,7 +96,16 @@ export class OrdersService {
   }
 
   async update(id: string, updateData: any) {
-    const updated = await this.db.updateOne<any>('orders', id, item => ({ ...item, ...updateData, updatedAt: Date.now() }));
+    const updated = await this.db.updateOne<any>('orders', id, item => {
+      const isPaid = updateData.status === 'PAGADO';
+      const paidAt = isPaid ? (updateData.paidAt || item.paidAt || Date.now()) : (updateData.paidAt !== undefined ? updateData.paidAt : item.paidAt);
+      return {
+        ...item,
+        ...updateData,
+        paidAt,
+        updatedAt: Date.now(),
+      };
+    });
     if (updated && updated.tableId && updateData.status) {
       const tables = await this.db.getAll<any>('tables');
       const tIndex = tables.findIndex(t => t.id === updated.tableId || t.number.toString() === updated.tableId);

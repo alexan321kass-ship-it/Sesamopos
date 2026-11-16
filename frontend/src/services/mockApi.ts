@@ -53,7 +53,7 @@ export const saveStoredShifts = (shifts: StaffShiftRecord[]) => {
 let memoryShiftLogsCache: ShiftAuditLog[] | null = null;
 export const getStoredShiftLogs = (): ShiftAuditLog[] => {
   if (memoryShiftLogsCache) return memoryShiftLogsCache;
-  const today = new Date().toISOString().split('T')[0];
+  const today = getColombiaDateStr();
   memoryShiftLogsCache = [
     {
       id: 'log-init-1',

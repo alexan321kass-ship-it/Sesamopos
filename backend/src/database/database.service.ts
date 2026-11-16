@@ -4,6 +4,7 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 import * as fsSync from 'fs';
 import { hashPassword, isPasswordHashed } from '../common/utils/hash.util.js';
+import { getColombiaDateStr, parseDateOrTimestamp } from '../common/utils/time.util.js';
 
 @Injectable()
 export class DatabaseService implements OnModuleInit {
@@ -383,7 +384,7 @@ export class DatabaseService implements OnModuleInit {
             customerPhone: r.phone || (r as any).customerPhone || '',
             guestCount: r.pax || (r as any).guestCount || 2,
             timeSlot: r.time || (r as any).timeSlot || '19:00',
-            date: r.date && !isNaN(Number(r.date)) ? Number(r.date) : (r.date ? new Date(r.date).getTime() : (r.createdAt || Date.now())),
+            date: parseDateOrTimestamp(r.date || (r as any).createdAt),
             tableName: (r as any).tableName || (r.tableId ? `Mesa ${r.tableId}` : 'Sin Asignar'),
           })) as unknown as T[];
         } catch (err: any) {
@@ -433,7 +434,7 @@ export class DatabaseService implements OnModuleInit {
             staffId: String(item.staffId),
             staffName: item.staffName || '',
             role: item.role || '',
-            date: item.date || new Date().toISOString().split('T')[0],
+            date: item.date || getColombiaDateStr(),
             checkIn: item.checkIn || '',
             checkOut: item.checkOut ?? null,
             status: item.status || 'ACTIVO',

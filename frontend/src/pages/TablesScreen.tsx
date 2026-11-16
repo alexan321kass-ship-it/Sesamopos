@@ -59,6 +59,7 @@ import { usePosStore } from '../store/posStore';
 import { useAuthStore } from '../store/authStore';
 import { subscribeRealtimeEvents } from '../services/eventBus';
 import BillingModal from '../components/BillingModal';
+import { parseDateOrTimestamp } from '../utils/timeUtils';
 
 const AVAILABLE_WAITERS = [
   { id: '2', name: 'Carlos Ruiz', color: '#0284c7' },
@@ -283,9 +284,10 @@ export default function TablesScreen() {
     };
   };
 
-  const getOccupiedTimeDetails = (time?: number) => {
+  const getOccupiedTimeDetails = (time?: number | string) => {
     if (!time) return null;
-    const mins = Math.max(1, Math.floor((Date.now() - time) / 60000));
+    const ts = parseDateOrTimestamp(time);
+    const mins = Math.max(1, Math.floor((Date.now() - ts) / 60000));
     let color = '#15803d'; // Verde < 20m
     let bg = '#dcfce7';
     let borderColor = '#86efac';
@@ -458,9 +460,10 @@ export default function TablesScreen() {
     }
   };
 
-  const getTimeElapsed = (time?: number) => {
+  const getTimeElapsed = (time?: number | string) => {
     if (!time) return '';
-    const mins = Math.max(1, Math.floor((Date.now() - time) / 60000));
+    const ts = parseDateOrTimestamp(time);
+    const mins = Math.max(1, Math.floor((Date.now() - ts) / 60000));
     return `${mins}m`;
   };
 

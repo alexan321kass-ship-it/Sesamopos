@@ -49,6 +49,7 @@ import { mockApi } from '../services/mockApi';
 import { Order } from '../types';
 import { playKitchenBellSound, playOrderReadySound } from '../utils/audioAlerts';
 import { subscribeRealtimeEvents } from '../services/eventBus';
+import { parseDateOrTimestamp } from '../utils/timeUtils';
 
 export type KitchenDisplayOrder = Order & {
   deliveryOriginalId?: string;
@@ -128,6 +129,7 @@ export default function KitchenScreen() {
         )
         .map((o) => ({
           ...o,
+          createdAt: parseDateOrTimestamp(o.createdAt),
           items: Array.isArray(o.items) ? o.items : [],
         }));
 
@@ -154,7 +156,7 @@ export default function KitchenScreen() {
             ((d.deliveryStatus as any) === 'LISTO' || d.status === 'LISTO') ? 'LISTO' : 'EN_PREPARACION'
           ) as any,
           type: 'DOMICILIO' as any,
-          createdAt: d.createdAt || Date.now(),
+          createdAt: parseDateOrTimestamp(d.createdAt),
           customerName: d.customer?.name || 'Cliente Domicilio',
           deliveryOriginalId: d.id,
           deliveryAddress: d.deliveryAddress || d.customer?.address || '',
@@ -170,6 +172,7 @@ export default function KitchenScreen() {
         .filter((o) => ['ENTREGADO', 'COMPLETADO', 'PAGADO'].includes(o.status))
         .map((o) => ({
           ...o,
+          createdAt: parseDateOrTimestamp(o.createdAt),
           items: Array.isArray(o.items) ? o.items : [],
         }));
 
@@ -189,7 +192,7 @@ export default function KitchenScreen() {
           total: d.total || 0,
           status: 'ENTREGADO' as any,
           type: 'DOMICILIO' as any,
-          createdAt: d.createdAt || Date.now(),
+          createdAt: parseDateOrTimestamp(d.createdAt),
           customerName: d.customer?.name || 'Cliente Domicilio',
           deliveryOriginalId: d.id,
           deliveryAddress: d.deliveryAddress || d.customer?.address || '',
@@ -365,9 +368,10 @@ export default function KitchenScreen() {
   }, [orders, filterMode, selectedStation, searchQuery]);
 
   // Urgency time semaphore
-  const getUrgency = (createdAt: number, isFinished: boolean) => {
-    const mins = Math.max(0, Math.floor((now - createdAt) / 60000));
-    const secs = Math.floor(((now - createdAt) % 60000) / 1000);
+  const getUrgency = (createdAt: number | string, isFinished: boolean) => {
+    const ts = parseDateOrTimestamp(createdAt);
+    const mins = Math.max(0, Math.floor((now - ts) / 60000));
+    const secs = Math.floor(((now - ts) % 60000) / 1000);
     const formattedTime = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 
     if (isFinished) {

@@ -401,7 +401,10 @@ export default function StaffScreen() {
       const memberShifts = shiftsList.filter(
         (sh) => String(sh.staffId) === String(member.id) && sh.status === 'COMPLETADO'
       );
-      const totalHours = memberShifts.reduce((sum, sh) => sum + (sh.hoursWorked || 0), 0);
+      const totalHours = memberShifts.reduce(
+        (sum, sh) => sum + (sh.effectiveHoursWorked !== undefined ? sh.effectiveHoursWorked : (sh.hoursWorked || 0)),
+        0
+      );
       const hourlyRate = member.hourlyRate || 9000;
       const baseSalary = Math.round(totalHours * hourlyRate);
       const bonus = 0;
@@ -410,7 +413,7 @@ export default function StaffScreen() {
 
       return {
         member,
-        totalHours: Math.round(totalHours * 10) / 10,
+        totalHours: parseFloat(totalHours.toFixed(2)),
         hourlyRate,
         baseSalary,
         bonus,
@@ -596,7 +599,7 @@ export default function StaffScreen() {
           password: formPassword.trim() || 'password123',
           hourlyRate: Number(formHourlyRate),
           isActive: formIsActive,
-          hireDate: new Date().toISOString().split('T')[0],
+          hireDate: getColombiaDateStr(),
           shiftStatus: 'FUERA_DE_TURNO',
           permissions: formPermissions,
           stats: {

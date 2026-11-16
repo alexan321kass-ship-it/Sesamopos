@@ -58,6 +58,7 @@ import { mockApi } from '../services/mockApi';
 import { useAuthStore } from '../store/authStore';
 import { CashRegister, Order, DeliveryOrder, Table as RestaurantTable } from '../types';
 import BillingModal from '../components/BillingModal';
+import { parseDateOrTimestamp } from '../utils/timeUtils';
 
 export default function CashRegisterScreen() {
   const { user } = useAuthStore();
@@ -273,7 +274,7 @@ export default function CashRegisterScreen() {
       .sort((a, b) => {
         if (a.isBillRequested && !b.isBillRequested) return -1;
         if (!a.isBillRequested && b.isBillRequested) return 1;
-        return (b.order.createdAt || 0) - (a.order.createdAt || 0);
+        return (parseDateOrTimestamp(b.order.createdAt) || 0) - (parseDateOrTimestamp(a.order.createdAt) || 0);
       });
   }, [orders, tables, pendingSearch]);
 
@@ -288,8 +289,8 @@ export default function CashRegisterScreen() {
     return orders.filter(o =>
       o.status === 'PAGADO' && (
         o.registerId === currentRegister?.id ||
-        (o.paidAt && o.paidAt >= shiftStart) ||
-        (o.createdAt && o.createdAt >= shiftStart)
+        (o.paidAt && parseDateOrTimestamp(o.paidAt) >= shiftStart) ||
+        (o.createdAt && parseDateOrTimestamp(o.createdAt) >= shiftStart)
       )
     );
   }, [orders, currentRegister, shiftStart]);
@@ -298,8 +299,8 @@ export default function CashRegisterScreen() {
     return deliveries.filter(d =>
       d.status !== 'CANCELADO' &&
       d.deliveryStatus !== 'CANCELADO' && (
-        (d.deliveredAt && d.deliveredAt >= shiftStart) ||
-        (d.createdAt && d.createdAt >= shiftStart)
+        (d.deliveredAt && parseDateOrTimestamp(d.deliveredAt) >= shiftStart) ||
+        (d.createdAt && parseDateOrTimestamp(d.createdAt) >= shiftStart)
       )
     );
   }, [deliveries, shiftStart]);
@@ -389,7 +390,7 @@ export default function CashRegisterScreen() {
     const list: MovementItem[] = [
       ...manualMovements.map(m => ({
         id: m.id,
-        date: m.date,
+        date: parseDateOrTimestamp(m.date),
         type: m.type === 'INGRESO' ? 'INGRESO MANUAL' : 'GASTO / CAJA MENOR',
         category: 'MANUAL',
         reason: m.reason,
@@ -398,7 +399,7 @@ export default function CashRegisterScreen() {
       })),
       ...paidOrders.map(o => ({
         id: o.id,
-        date: o.paidAt || o.createdAt,
+        date: parseDateOrTimestamp(o.paidAt || o.createdAt),
         type: 'VENTA SALÓN',
         category: 'SALON',
         reason: `Mesa ${o.tableId || 'Barra'} • Orden #${o.orderNumber}${o.invoiceNumber ? ` • ${o.invoiceNumber}` : ''}`,
@@ -408,7 +409,7 @@ export default function CashRegisterScreen() {
       })),
       ...completedDeliveries.map(d => ({
         id: d.id,
-        date: d.deliveredAt || d.createdAt,
+        date: parseDateOrTimestamp(d.deliveredAt || d.createdAt),
         type: 'VENTA DOMICILIO',
         category: 'DOMICILIO',
         reason: `Domicilio #${d.orderNumber} • ${d.customer?.name || 'Cliente'} (${d.deliveryAddress || 'Domicilio'})`,
@@ -1159,7 +1160,7 @@ export default function CashRegisterScreen() {
               {pendingAccounts.map(({ order, table, isBillRequested }) => {
                 const tableName = table ? `Mesa ${table.number}` : (order.tableName || `Orden #${order.orderNumber || order.id.slice(-4)}`);
                 const waiterName = order.waiterName || table?.currentWaiterName || 'Mesero Asignado';
-                const timeMinutes = order.createdAt ? Math.round((Date.now() - order.createdAt) / 60000) : 0;
+                const timeMinutes = order.createdAt ? Math.round((Date.now() - parseDateOrTimestamp(order.createdAt)) / 60000) : 0;
                 const itemsCount = (order.items || []).reduce((acc: number, it: any) => acc + (it.quantity || 1), 0);
 
                 return (

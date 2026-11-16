@@ -61,6 +61,7 @@ import {
 } from '@mui/icons-material';
 import { mockApi } from '../services/mockApi';
 import { Reservation, ReservationStatus, Table as RestaurantTable, Customer } from '../types';
+import { parseDateOrTimestamp, getColombiaDateStr } from '../utils/timeUtils';
 
 // Status styling configuration
 const STATUS_CONFIG: Record<ReservationStatus, { label: string; color: 'warning' | 'info' | 'success' | 'error' | 'default' | 'primary'; bg: string; text: string }> = {
@@ -153,23 +154,14 @@ export default function ReservationsScreen() {
   // Helper date matchers (safe with timestamp number, string and timezone)
   const isToday = (val: number | string | undefined) => {
     if (!val) return false;
-    const d = new Date(val);
-    if (isNaN(d.getTime())) return false;
-    const today = new Date();
-    return d.getDate() === today.getDate() &&
-      d.getMonth() === today.getMonth() &&
-      d.getFullYear() === today.getFullYear();
+    return getColombiaDateStr(val) === getColombiaDateStr();
   };
 
   const isTomorrow = (val: number | string | undefined) => {
     if (!val) return false;
-    const d = new Date(val);
-    if (isNaN(d.getTime())) return false;
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    return d.getDate() === tomorrow.getDate() &&
-      d.getMonth() === tomorrow.getMonth() &&
-      d.getFullYear() === tomorrow.getFullYear();
+    return getColombiaDateStr(val) === getColombiaDateStr(tomorrow);
   };
 
   // KPIs
@@ -222,19 +214,19 @@ export default function ReservationsScreen() {
       if (selectedStatus !== 'TODOS' && r.status !== selectedStatus) return false;
 
       return true;
-    }).sort((a, b) => a.date - b.date);
+    }).sort((a, b) => parseDateOrTimestamp(a.date) - parseDateOrTimestamp(b.date));
   }, [reservations, searchQuery, selectedDayFilter, selectedStatus]);
 
   // Celebrations filtered (Birthdays, Anniversaries, Business)
   const celebrationReservations = useMemo(() => {
     return reservations.filter(r => r.occasion && r.occasion !== 'OTRO' && r.status !== 'CANCELADA')
-      .sort((a, b) => a.date - b.date);
+      .sort((a, b) => parseDateOrTimestamp(a.date) - parseDateOrTimestamp(b.date));
   }, [reservations]);
 
   // Deposit reservations list
   const depositReservations = useMemo(() => {
     return reservations.filter(r => r.depositAmount && r.depositAmount > 0)
-      .sort((a, b) => b.date - a.date);
+      .sort((a, b) => parseDateOrTimestamp(b.date) - parseDateOrTimestamp(a.date));
   }, [reservations]);
 
   // Open Create Modal
@@ -1891,13 +1883,7 @@ export default function ReservationsScreen() {
                       fullWidth
                       type="date"
                       label="Fecha de la Reserva"
-                      value={(() => {
-                        const d = new Date(editingReservation.date || Date.now());
-                        const y = d.getFullYear();
-                        const m = String(d.getMonth() + 1).padStart(2, '0');
-                        const day = String(d.getDate()).padStart(2, '0');
-                        return `${y}-${m}-${day}`;
-                      })()}
+                      value={getColombiaDateStr(editingReservation.date || Date.now())}
                       onChange={(e) => {
                         if (!e.target.value) return;
                         const [y, m, day] = e.target.value.split('-').map(Number);
