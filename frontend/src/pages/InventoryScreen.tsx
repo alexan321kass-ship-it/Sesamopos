@@ -60,7 +60,7 @@ import {
   NotificationsActive as NotificationIcon,
   DeleteOutlined as DeleteOutlineIcon,
 } from '@mui/icons-material';
-import { mockApi } from '../services/mockApi';
+import { mockApi, memoryInventoryAlertsCache } from '../services/mockApi';
 import { InventoryItem, MeasurementUnit } from '../types';
 import { useAuthStore } from '../store/authStore';
 
@@ -162,11 +162,8 @@ export default function InventoryScreen() {
       setInventory(items || []);
       setMovements(movs || []);
 
-      // Load pending recipe alerts
-      try {
-        const stored = JSON.parse(localStorage.getItem('sesamo_inventory_pending_alerts') || '[]');
-        setPendingRecipeAlerts(stored);
-      } catch (e) {}
+      // Load pending recipe alerts (en memoria)
+      setPendingRecipeAlerts([...memoryInventoryAlertsCache]);
     } catch (e) {
       console.error(e);
     } finally {
@@ -177,9 +174,8 @@ export default function InventoryScreen() {
   const handleDismissRecipeAlert = (alertId: string) => {
     const updated = pendingRecipeAlerts.filter(a => a.id !== alertId);
     setPendingRecipeAlerts(updated);
-    try {
-      localStorage.setItem('sesamo_inventory_pending_alerts', JSON.stringify(updated));
-    } catch (e) {}
+    const idx = memoryInventoryAlertsCache.findIndex(a => a.id === alertId);
+    if (idx !== -1) memoryInventoryAlertsCache.splice(idx, 1);
   };
 
   useEffect(() => {

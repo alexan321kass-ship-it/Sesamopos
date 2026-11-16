@@ -19,63 +19,28 @@ const getStoredUserRole = (): string | undefined => {
   return undefined;
 };
 
-// Persistent Staff & Shifts storage helpers
+// Staff & Shifts storage helpers (en memoria)
 let memoryStaffCache: StaffMember[] | null = null;
 export const getStoredStaff = (): StaffMember[] => {
   if (memoryStaffCache) return memoryStaffCache;
-  const local = localStorage.getItem('sesamo_staff');
-  if (local) {
-    try {
-      const parsed: StaffMember[] = JSON.parse(local);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        memoryStaffCache = parsed.map(s => {
-          if (s.assignedArea && (s.assignedArea.includes('Terraza') || s.assignedArea.includes('VIP'))) {
-            return { ...s, assignedArea: 'Salón Comedor' };
-          }
-          return s;
-        });
-        localStorage.setItem('sesamo_staff', JSON.stringify(memoryStaffCache));
-        return memoryStaffCache;
-      }
-    } catch (e) {}
-  }
   memoryStaffCache = [...mockStaffMembers];
-  try {
-    localStorage.setItem('sesamo_staff', JSON.stringify(memoryStaffCache));
-  } catch (e) {}
   return memoryStaffCache;
 };
 
 export const saveStoredStaff = (staff: StaffMember[]) => {
   memoryStaffCache = staff;
-  try {
-    localStorage.setItem('sesamo_staff', JSON.stringify(staff));
-  } catch (e) {}
   notifyRealtimeEvent('sesamo_staff_updated');
 };
 
 let memoryShiftsCache: StaffShiftRecord[] | null = null;
 export const getStoredShifts = (): StaffShiftRecord[] => {
   if (memoryShiftsCache) return memoryShiftsCache;
-  const local = localStorage.getItem('sesamo_staff_shifts');
-  if (local) {
-    try {
-      memoryShiftsCache = JSON.parse(local);
-      return memoryShiftsCache!;
-    } catch (e) {}
-  }
   memoryShiftsCache = [...mockStaffShifts];
-  try {
-    localStorage.setItem('sesamo_staff_shifts', JSON.stringify(memoryShiftsCache));
-  } catch (e) {}
   return memoryShiftsCache;
 };
 
 export const saveStoredShifts = (shifts: StaffShiftRecord[]) => {
   memoryShiftsCache = shifts;
-  try {
-    localStorage.setItem('sesamo_staff_shifts', JSON.stringify(shifts));
-  } catch (e) {}
   notifyRealtimeEvent('sesamo_shifts_updated');
 };
 
@@ -125,270 +90,114 @@ export const getStoredInventory = (): InventoryItem[] => {
   if (memoryInventoryCache) {
     return memoryInventoryCache.map((item, idx) => normalizeInventoryItem(item, idx));
   }
-  const local = localStorage.getItem('sesamo_inventory');
-  if (local) {
-    try {
-      const parsed = JSON.parse(local);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        // Backfill any missing default items from mockInventory
-        const existingIds = new Set(parsed.map((i: any) => i.id));
-        let changed = false;
-        mockInventory.forEach(defItem => {
-          if (!existingIds.has(defItem.id)) {
-            parsed.push(defItem);
-            changed = true;
-          }
-        });
-        if (changed) {
-          try { localStorage.setItem('sesamo_inventory', JSON.stringify(parsed)); } catch (e) {}
-        }
-        memoryInventoryCache = parsed.map((item, idx) => normalizeInventoryItem(item, idx));
-        return memoryInventoryCache;
-      }
-    } catch (e) {}
-  }
   memoryInventoryCache = mockInventory.map((item, idx) => normalizeInventoryItem(item, idx));
-  try {
-    localStorage.setItem('sesamo_inventory', JSON.stringify(memoryInventoryCache));
-  } catch (e) {}
   return memoryInventoryCache;
 };
 
 export const saveStoredInventory = (items: InventoryItem[]) => {
   const normalized = (items || []).map((item, idx) => normalizeInventoryItem(item, idx));
   memoryInventoryCache = normalized;
-  try {
-    localStorage.setItem('sesamo_inventory', JSON.stringify(normalized));
-  } catch (e) {}
   notifyRealtimeEvent('sesamo_inventory_updated');
 };
 
 let memorySuppliersCache: Supplier[] | null = null;
 export const getStoredSuppliers = (): Supplier[] => {
   if (memorySuppliersCache) return memorySuppliersCache;
-  const local = localStorage.getItem('sesamo_suppliers');
-  if (local) {
-    try {
-      memorySuppliersCache = JSON.parse(local);
-      return memorySuppliersCache!;
-    } catch (e) {}
-  }
   memorySuppliersCache = [...mockSuppliers];
-  try {
-    localStorage.setItem('sesamo_suppliers', JSON.stringify(memorySuppliersCache));
-  } catch (e) {}
   return memorySuppliersCache;
 };
 
 export const saveStoredSuppliers = (suppliers: Supplier[]) => {
   memorySuppliersCache = suppliers;
-  try {
-    localStorage.setItem('sesamo_suppliers', JSON.stringify(suppliers));
-  } catch (e) {}
   notifyRealtimeEvent('sesamo_suppliers_updated');
 };
 
 let memoryPurchasesCache: PurchaseOrder[] | null = null;
 export const getStoredPurchases = (): PurchaseOrder[] => {
   if (memoryPurchasesCache) return memoryPurchasesCache;
-  const local = localStorage.getItem('sesamo_purchases');
-  if (local) {
-    try {
-      memoryPurchasesCache = JSON.parse(local);
-      return memoryPurchasesCache!;
-    } catch (e) {}
-  }
   memoryPurchasesCache = [...mockPurchaseOrders];
-  try {
-    localStorage.setItem('sesamo_purchases', JSON.stringify(memoryPurchasesCache));
-  } catch (e) {}
   return memoryPurchasesCache;
 };
 
 export const saveStoredPurchases = (orders: PurchaseOrder[]) => {
   memoryPurchasesCache = orders;
-  try {
-    localStorage.setItem('sesamo_purchases', JSON.stringify(orders));
-  } catch (e) {}
   notifyRealtimeEvent('sesamo_purchases_updated');
 };
 
 let memoryMovementsCache: any[] | null = null;
 export const getStoredInventoryMovements = (): any[] => {
   if (memoryMovementsCache) return memoryMovementsCache;
-  const local = localStorage.getItem('sesamo_inventory_movements');
-  if (local) {
-    try {
-      memoryMovementsCache = JSON.parse(local);
-      return memoryMovementsCache!;
-    } catch (e) {}
-  }
   memoryMovementsCache = [
     { id: 'mov-1', itemId: '1', itemName: 'Carne de Res Molida (Angus)', type: 'ENTRADA', quantity: 25, reason: 'Compra PO-0001', responsibleName: 'Mateo Díaz', date: Date.now() - 86400000 * 2 },
     { id: 'mov-2', itemId: '6', itemName: 'Pepperoni Italiano Tajado', type: 'ENTRADA', quantity: 4, reason: 'Compra PO-0001', responsibleName: 'Mateo Díaz', date: Date.now() - 86400000 * 2 },
     { id: 'mov-3', itemId: '3', itemName: 'Queso Cheddar Tajado', type: 'MERMA', quantity: -1.5, reason: 'Fecha de vencimiento en frío', responsibleName: 'Juan Chef', date: Date.now() - 86400000 },
     { id: 'mov-4', itemId: '9', itemName: 'Coca-Cola Zero 400ml', type: 'AJUSTE', quantity: -2, reason: 'Avería de transporte', responsibleName: 'Mateo Díaz', date: Date.now() - 43200000 },
   ];
-  try {
-    localStorage.setItem('sesamo_inventory_movements', JSON.stringify(memoryMovementsCache));
-  } catch (e) {}
   return memoryMovementsCache;
 };
 
 export const saveStoredInventoryMovements = (movs: any[]) => {
   memoryMovementsCache = movs;
-  try {
-    localStorage.setItem('sesamo_inventory_movements', JSON.stringify(movs));
-  } catch (e) {}
   notifyRealtimeEvent('sesamo_inventory_updated');
 };
 
 let memoryRecipesCache: Recipe[] | null = null;
 export const getStoredRecipes = (): Recipe[] => {
   if (memoryRecipesCache) return memoryRecipesCache;
-  const local = localStorage.getItem('sesamo_recipes');
-  if (local) {
-    try {
-      const parsed: Recipe[] = JSON.parse(local);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        // Backfill any missing recipes from mockRecipes
-        const existingProductIds = new Set(parsed.map(r => r.productId));
-        let changed = false;
-        mockRecipes.forEach(rec => {
-          if (!existingProductIds.has(rec.productId)) {
-            parsed.push(rec);
-            changed = true;
-          }
-        });
-        if (changed) {
-          try { localStorage.setItem('sesamo_recipes', JSON.stringify(parsed)); } catch (e) {}
-        }
-        memoryRecipesCache = parsed;
-        return memoryRecipesCache!;
-      }
-    } catch (e) {}
-  }
   memoryRecipesCache = [...mockRecipes];
-  try {
-    localStorage.setItem('sesamo_recipes', JSON.stringify(memoryRecipesCache));
-  } catch (e) {}
   return memoryRecipesCache;
 };
 
 export const saveStoredRecipes = (recipes: Recipe[]) => {
   memoryRecipesCache = recipes;
-  try {
-    localStorage.setItem('sesamo_recipes', JSON.stringify(recipes));
-  } catch (e) {}
   notifyRealtimeEvent('sesamo_recipes_updated');
 };
 
 let memoryCustomersCache: Customer[] | null = null;
 export const getStoredCustomers = (): Customer[] => {
   if (memoryCustomersCache) return memoryCustomersCache;
-  const local = localStorage.getItem('sesamo_customers');
-  if (local) {
-    try {
-      memoryCustomersCache = JSON.parse(local);
-      return memoryCustomersCache!;
-    } catch (e) {}
-  }
   memoryCustomersCache = [...mockCustomers];
-  try {
-    localStorage.setItem('sesamo_customers', JSON.stringify(memoryCustomersCache));
-  } catch (e) {}
   return memoryCustomersCache;
 };
 
 export const saveStoredCustomers = (customers: Customer[]) => {
   memoryCustomersCache = customers;
-  try {
-    localStorage.setItem('sesamo_customers', JSON.stringify(customers));
-  } catch (e) {}
   notifyRealtimeEvent('sesamo_customers_updated');
 };
 
 let memorySettingsCache: StoreSettings | null = null;
 export const getStoredSettings = (): StoreSettings => {
   if (memorySettingsCache) return memorySettingsCache;
-  const local = localStorage.getItem('sesamo_settings');
-  if (local) {
-    try {
-      memorySettingsCache = JSON.parse(local);
-      if (memorySettingsCache) return memorySettingsCache;
-    } catch (e) {}
-  }
   memorySettingsCache = { ...mockSettings };
-  try {
-    localStorage.setItem('sesamo_settings', JSON.stringify(memorySettingsCache));
-  } catch (e) {}
-  return memorySettingsCache ?? { ...mockSettings };
+  return memorySettingsCache;
 };
 
 export const saveStoredSettings = (settings: StoreSettings) => {
   memorySettingsCache = settings;
-  try {
-    localStorage.setItem('sesamo_settings', JSON.stringify(settings));
-  } catch (e) {}
   notifyRealtimeEvent('sesamo_settings_updated');
 };
 
 let memoryReservationsCache: Reservation[] | null = null;
 export const getStoredReservations = (): Reservation[] => {
   if (memoryReservationsCache) return memoryReservationsCache;
-  const local = localStorage.getItem('sesamo_reservations');
-  if (local) {
-    try {
-      memoryReservationsCache = JSON.parse(local);
-      return memoryReservationsCache!;
-    } catch (e) {}
-  }
   memoryReservationsCache = [...mockReservations];
-  try {
-    localStorage.setItem('sesamo_reservations', JSON.stringify(memoryReservationsCache));
-  } catch (e) {}
   return memoryReservationsCache;
 };
 
 export const saveStoredReservations = (reservations: Reservation[]) => {
   memoryReservationsCache = reservations;
-  try {
-    localStorage.setItem('sesamo_reservations', JSON.stringify(reservations));
-  } catch (e) {}
   notifyRealtimeEvent('sesamo_reservations_updated');
 };
 
 let memoryDeliveriesCache: DeliveryOrder[] | null = null;
 export const getStoredDeliveries = (): DeliveryOrder[] => {
   if (memoryDeliveriesCache) return memoryDeliveriesCache;
-  const local = localStorage.getItem('sesamo_deliveries');
-  if (local) {
-    try {
-      const parsed = JSON.parse(local);
-      if (Array.isArray(parsed)) {
-        memoryDeliveriesCache = parsed.map(d => ({
-          ...d,
-          items: Array.isArray(d.items) ? d.items.map((it: any) => ({
-            ...it,
-            modifiers: Array.isArray(it.modifiers) ? it.modifiers : []
-          })) : []
-        }));
-        return memoryDeliveriesCache;
-      }
-    } catch (e) {}
-  }
   memoryDeliveriesCache = [...mockDeliveries];
-  try {
-    localStorage.setItem('sesamo_deliveries', JSON.stringify(memoryDeliveriesCache));
-  } catch (e) {}
   return memoryDeliveriesCache;
 };
 
 export const saveStoredDeliveries = (deliveries: DeliveryOrder[]) => {
   memoryDeliveriesCache = deliveries;
-  try {
-    localStorage.setItem('sesamo_deliveries', JSON.stringify(deliveries));
-  } catch (e) {}
   notifyRealtimeEvent('sesamo_deliveries_updated');
 };
 
@@ -409,42 +218,31 @@ const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutM
   }
 };
 
-// Persistent state helpers for sync between Admin Catalog and Customer Public Menu
+export let memoryInventoryAlertsCache: any[] = [];
+
+// State helpers for sync between Admin Catalog and Customer Public Menu (en memoria)
 let memoryProductsCache: Product[] | null = null;
 
 const getStoredProducts = (): Product[] => {
   if (memoryProductsCache) return memoryProductsCache;
-  const local = localStorage.getItem('sesamo_products');
-  if (local) {
-    try {
-      memoryProductsCache = JSON.parse(local);
-      return memoryProductsCache!;
-    } catch (e) {}
-  }
   memoryProductsCache = [...mockProducts];
   return memoryProductsCache;
 };
 
 const saveStoredProducts = (products: Product[]) => {
   memoryProductsCache = products;
-  try {
-    localStorage.setItem('sesamo_products', JSON.stringify(products));
-  } catch (e) {
-    console.warn('Subida multimedia almacenada en memoria de sesión activa.');
-  }
   notifyRealtimeEvent('sesamo_catalog_updated');
 };
 
+let memoryCategoriesCache: Category[] | null = null;
 const getStoredCategories = (): Category[] => {
-  const local = localStorage.getItem('sesamo_categories');
-  if (local) {
-    try { return JSON.parse(local); } catch (e) {}
-  }
-  return mockCategories;
+  if (memoryCategoriesCache) return memoryCategoriesCache;
+  memoryCategoriesCache = [...mockCategories];
+  return memoryCategoriesCache;
 };
 
 const saveStoredCategories = (categories: Category[]) => {
-  localStorage.setItem('sesamo_categories', JSON.stringify(categories));
+  memoryCategoriesCache = categories;
   notifyRealtimeEvent('sesamo_catalog_updated');
 };
 
@@ -452,28 +250,12 @@ let memoryTablesCache: Table[] | null = null;
 
 const getStoredTables = (): Table[] => {
   if (memoryTablesCache && memoryTablesCache.length > 0) return memoryTablesCache;
-  const local = localStorage.getItem('sesamo_tables');
-  if (local) {
-    try {
-      const parsed: Table[] = JSON.parse(local);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        memoryTablesCache = parsed.map(t => ({ ...t, location: t.location || 'Salón Principal' }));
-        return memoryTablesCache!;
-      }
-    } catch (e) {}
-  }
   memoryTablesCache = [...mockTables];
-  try {
-    localStorage.setItem('sesamo_tables', JSON.stringify(memoryTablesCache));
-  } catch (e) {}
   return memoryTablesCache;
 };
 
 const saveStoredTables = (tables: Table[]) => {
   memoryTablesCache = tables;
-  try {
-    localStorage.setItem('sesamo_tables', JSON.stringify(tables));
-  } catch (e) {}
   notifyRealtimeEvent('sesamo_tables_updated');
 };
 
@@ -500,35 +282,12 @@ const deduplicateOrders = (rawList: Order[]): Order[] => {
 
 const getStoredOrders = (): Order[] => {
   if (memoryOrdersCache) return deduplicateOrders(memoryOrdersCache);
-  const local = localStorage.getItem('sesamo_orders');
-  if (local) {
-    try {
-      const parsed = JSON.parse(local);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const mapped = parsed.map(o => ({
-          ...o,
-          items: Array.isArray(o.items) ? o.items.map((it: any) => ({
-            ...it,
-            modifiers: Array.isArray(it.modifiers) ? it.modifiers : []
-          })) : []
-        }));
-        memoryOrdersCache = deduplicateOrders(mapped);
-        return memoryOrdersCache;
-      }
-    } catch (e) {}
-  }
   memoryOrdersCache = deduplicateOrders([...mockOrders]);
-  try {
-    localStorage.setItem('sesamo_orders', JSON.stringify(memoryOrdersCache));
-  } catch (e) {}
   return memoryOrdersCache;
 };
 
 const saveStoredOrders = (orders: Order[]) => {
   memoryOrdersCache = orders;
-  try {
-    localStorage.setItem('sesamo_orders', JSON.stringify(orders));
-  } catch (e) {}
   notifyRealtimeEvent('sesamo_order_created');
   notifyRealtimeEvent('sesamo_order_updated');
 };
@@ -912,6 +671,10 @@ export const revertInventoryByRecipeAndExtras = (
   return { revertedCount };
 };
 
+let memoryActiveCashRegister: CashRegister | null | undefined = undefined;
+let memoryCashRegistersHistory: any[] | null = null;
+let memoryCashMovements: any[] | null = null;
+
 export const mockApi = {
   auth: {
     login: async (email: string, password?: string): Promise<User> => {
@@ -1042,7 +805,6 @@ export const mockApi = {
           const data = await response.json();
           if (Array.isArray(data)) {
             memoryProductsCache = data;
-            try { localStorage.setItem('sesamo_products', JSON.stringify(data)); } catch (e) {}
             return data;
           }
         }
@@ -1174,7 +936,6 @@ export const mockApi = {
             }));
             formatted.sort((a, b) => a.number - b.number);
             memoryTablesCache = formatted;
-            try { localStorage.setItem('sesamo_tables', JSON.stringify(formatted)); } catch (e) {}
             return formatted;
           }
         }
@@ -1459,7 +1220,6 @@ export const mockApi = {
           if (Array.isArray(data)) {
             const clean = deduplicateOrders(data);
             memoryOrdersCache = clean;
-            try { localStorage.setItem('sesamo_orders', JSON.stringify(clean)); } catch (e) {}
             return clean;
           }
         }
@@ -1684,7 +1444,6 @@ export const mockApi = {
             });
 
             memoryInventoryCache = merged;
-            try { localStorage.setItem('sesamo_inventory', JSON.stringify(merged)); } catch (e) {}
             return merged;
           }
         }
@@ -1938,12 +1697,8 @@ export const mockApi = {
         }
       } catch (e) {}
 
-      const local = localStorage.getItem('sesamo_active_cash_register');
-      if (local) {
-        try {
-          const parsed = JSON.parse(local);
-          if (parsed && parsed.isOpen) return parsed;
-        } catch (e) {}
+      if (memoryActiveCashRegister !== undefined) {
+        return memoryActiveCashRegister && memoryActiveCashRegister.isOpen ? memoryActiveCashRegister : undefined;
       }
       return mockCashRegisters.find(c => c.isOpen);
     },
@@ -1971,7 +1726,7 @@ export const mockApi = {
           isOpen: true
         };
       }
-      localStorage.setItem('sesamo_active_cash_register', JSON.stringify(newReg));
+      memoryActiveCashRegister = newReg;
       notifyRealtimeEvent('sesamo_cash_updated', newReg);
       notifyRealtimeEvent('sesamo_order_updated');
       return newReg;
@@ -1987,10 +1742,8 @@ export const mockApi = {
 
       // Guardar en historial de turnos cerrados (Reportes Z)
       try {
-        const rawHistory = localStorage.getItem('sesamo_cash_registers_history');
-        const historyList = rawHistory ? JSON.parse(rawHistory) : [];
-        const activeRaw = localStorage.getItem('sesamo_active_cash_register');
-        const activeReg = activeRaw ? JSON.parse(activeRaw) : mockCashRegisters[0];
+        const historyList = memoryCashRegistersHistory || [];
+        const activeReg = memoryActiveCashRegister || mockCashRegisters[0];
 
         const historyRecord = {
           id: `closure-${Date.now()}`,
@@ -2007,10 +1760,10 @@ export const mockApi = {
         };
 
         historyList.unshift(historyRecord);
-        localStorage.setItem('sesamo_cash_registers_history', JSON.stringify(historyList));
+        memoryCashRegistersHistory = historyList;
       } catch (e) {}
 
-      localStorage.removeItem('sesamo_active_cash_register');
+      memoryActiveCashRegister = null;
       mockCashRegisters[0].isOpen = false;
       notifyRealtimeEvent('sesamo_cash_updated', { isOpen: false });
       notifyRealtimeEvent('sesamo_order_updated');
@@ -2037,10 +1790,9 @@ export const mockApi = {
           date: Date.now()
         };
       }
-      const localMovs = localStorage.getItem('sesamo_cash_movements');
-      const movs = localMovs ? JSON.parse(localMovs) : [];
+      const movs = memoryCashMovements || [];
       const updated = [newMov, ...movs];
-      localStorage.setItem('sesamo_cash_movements', JSON.stringify(updated));
+      memoryCashMovements = updated;
       notifyRealtimeEvent('sesamo_cash_updated', newMov);
       notifyRealtimeEvent('sesamo_order_updated');
       return newMov;
@@ -2051,8 +1803,7 @@ export const mockApi = {
         if (response.ok) return await response.json();
       } catch (e) {}
 
-      const localMovs = localStorage.getItem('sesamo_cash_movements');
-      return localMovs ? JSON.parse(localMovs) : [];
+      return memoryCashMovements || [];
     },
     getHistory: async (): Promise<any[]> => {
       try {
@@ -2060,9 +1811,8 @@ export const mockApi = {
         if (response.ok) return await response.json();
       } catch (e) {}
 
-      const rawHistory = localStorage.getItem('sesamo_cash_registers_history');
-      if (rawHistory) {
-        try { return JSON.parse(rawHistory); } catch (e) {}
+      if (memoryCashRegistersHistory && memoryCashRegistersHistory.length > 0) {
+        return memoryCashRegistersHistory;
       }
 
       return [
@@ -2099,7 +1849,6 @@ export const mockApi = {
           const data = await response.json();
           if (Array.isArray(data)) {
             memoryDeliveriesCache = data;
-            try { localStorage.setItem('sesamo_deliveries', JSON.stringify(data)); } catch (e) {}
             return data;
           }
         }
@@ -2384,7 +2133,6 @@ export const mockApi = {
           }
         }
         memoryReservationsCache = merged;
-        try { localStorage.setItem('sesamo_reservations', JSON.stringify(merged)); } catch (e) {}
         return merged;
       }
 
@@ -2609,16 +2357,12 @@ export const mockApi = {
         notifyRealtimeEvent('sesamo_inventory_updated');
 
         // Registrar alerta pendiente para el banner de Almacén / Inventario
-        try {
-          const prevAlerts = JSON.parse(localStorage.getItem('sesamo_inventory_pending_alerts') || '[]');
-          prevAlerts.unshift({
-            id: `alert-${Date.now()}`,
-            date: Date.now(),
-            recipeName: recipe.productName || 'Nueva Receta',
-            ingredients: newlyCreatedIngredients,
-          });
-          localStorage.setItem('sesamo_inventory_pending_alerts', JSON.stringify(prevAlerts));
-        } catch (e) {}
+        memoryInventoryAlertsCache.unshift({
+          id: `alert-${Date.now()}`,
+          date: Date.now(),
+          recipeName: recipe.productName || 'Nueva Receta',
+          ingredients: newlyCreatedIngredients,
+        });
       }
 
       const list = getStoredRecipes();
