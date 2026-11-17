@@ -331,36 +331,10 @@ export default function Login() {
               fullWidth
               variant="text"
               onClick={() => navigate('/menu')}
-              sx={{ color: '#65a30d', fontWeight: 700, textTransform: 'none', mb: 1 }}
+              sx={{ color: '#65a30d', fontWeight: 700, textTransform: 'none', mt: 1 }}
             >
               ← Volver al Menú Digital Público
             </Button>
-
-            <Box sx={{ mt: 2, pt: 2, borderTop: '1px dashed #cbd5e1' }}>
-              <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', fontWeight: 800, color: '#64748b', mb: 1, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Accesos rápidos por rol:
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center' }}>
-                <Button size="small" variant="outlined" onClick={() => { setEmail('admin@sesamo.com'); setPassword('password123'); setPin(''); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 800, color: '#16a34a', borderColor: '#bbf7d0', bgcolor: '#f0fdf4' }}>
-                  👑 Admin (Sin PIN)
-                </Button>
-                <Button size="small" variant="outlined" onClick={() => { setEmail('cocina@sesamo.com'); setPassword('password123'); setPin('1234'); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#ea580c', borderColor: '#fdba74' }}>
-                  👨‍🍳 Cocina
-                </Button>
-                <Button size="small" variant="outlined" onClick={() => { setEmail('carlos@sesamo.com'); setPassword('password123'); setPin('1234'); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#65a30d', borderColor: '#bef264' }}>
-                  🛎️ Mesero
-                </Button>
-                <Button size="small" variant="outlined" onClick={() => { setEmail('laura@sesamo.com'); setPassword('password123'); setPin('1234'); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#0284c7', borderColor: '#bae6fd' }}>
-                  💵 Cajero
-                </Button>
-                <Button size="small" variant="outlined" onClick={() => { setEmail('kevin@sesamo.com'); setPassword('password123'); setPin('1234'); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#d97706', borderColor: '#fde68a' }}>
-                  🛵 Repartidor
-                </Button>
-                <Button size="small" variant="outlined" onClick={() => { setEmail('mateo@sesamo.com'); setPassword('password123'); setPin('1234'); }} sx={{ fontSize: '0.72rem', borderRadius: 2, textTransform: 'none', fontWeight: 700, color: '#7c3aed', borderColor: '#ddd6fe' }}>
-                  📦 Inventario
-                </Button>
-              </Box>
-            </Box>
           </form>
         </CardContent>
       </Card>
