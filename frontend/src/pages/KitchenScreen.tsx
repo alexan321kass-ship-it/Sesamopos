@@ -122,14 +122,11 @@ export default function KitchenScreen() {
         mockApi.deliveries.getAll(),
       ]);
 
-      // 1. Active table orders (En autoservicio estricto, cocina SOLO recibe y prepara pedidos con pago confirmado)
+      // 1. Active table orders (En autoservicio los pedidos pagados y en cocina entran a preparar)
       const salonKitchenOrders: KitchenDisplayOrder[] = (allOrders || [])
-        .filter((o) => {
-          // Filtrado estricto de Autoservicio: No permitir órdenes no pagadas en cocina
-          const isPaid = o.status === 'PAGADO' || Boolean(o.paidAt) || Boolean((o as any).invoiceNumber) || Boolean((o as any).isPaid);
-          if (!isPaid) return false;
-          return ['PAGADO', 'EN_COCINA', 'EN_PREPARACION', 'LISTO'].includes(o.status);
-        })
+        .filter((o) =>
+          ['CREADO', 'CONFIRMADO', 'EN_COCINA', 'EN_PREPARACION', 'LISTO', 'PAGADO'].includes(o.status)
+        )
         .map((o) => ({
           ...o,
           createdAt: parseDateOrTimestamp(o.createdAt),
@@ -207,12 +204,12 @@ export default function KitchenScreen() {
       );
       setDeliveredHistory(historyList.slice(0, 50));
 
-      // Detect incoming new orders and sound chime (solo pedidos pagados en autoservicio o domicilios)
+      // Detect incoming new orders and sound chime
       if (!isInitialLoad && knownOrderIdsRef.current.size > 0 && soundEnabled) {
         const hasNewIncoming = combinedOrders.some(
           (o) =>
             !knownOrderIdsRef.current.has(o.id) &&
-            ['PAGADO', 'EN_COCINA', 'EN_PREPARACION'].includes(o.status)
+            ['CREADO', 'CONFIRMADO', 'EN_COCINA', 'EN_PREPARACION', 'PAGADO'].includes(o.status)
         );
         if (hasNewIncoming) {
           playKitchenBellSound();
@@ -435,7 +432,7 @@ export default function KitchenScreen() {
 
   // KPI counters
   const totalActive = orders.length;
-  const newOrdersCount = orders.filter((o) => ['CREADO', 'CONFIRMADO', 'EN_COCINA'].includes(o.status)).length;
+  const newOrdersCount = orders.filter((o) => ['CREADO', 'CONFIRMADO', 'EN_COCINA', 'PAGADO'].includes(o.status)).length;
   const inPrepCount = orders.filter((o) => o.status === 'EN_PREPARACION').length;
   const readyCount = orders.filter((o) => o.status === 'LISTO').length;
   const deliveryCount = orders.filter((o) => o.type === 'DOMICILIO').length;
@@ -1206,8 +1203,8 @@ export default function KitchenScreen() {
       <Grid container spacing={2.5}>
         <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: activeMobileColumn === 'ALL' || activeMobileColumn === 'NEW' ? 'block' : 'none', md: 'block' } }}>
           {renderColumn(
-            'NUEVOS ENTRANTES (PAGADOS)',
-            ['PAGADO', 'EN_COCINA'],
+            'NUEVOS ENTRANTES',
+            ['CREADO', 'CONFIRMADO', 'EN_COCINA', 'PAGADO'],
             '🔥 Iniciar Preparación',
             'EN_PREPARACION',
             {

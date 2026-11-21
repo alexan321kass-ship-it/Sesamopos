@@ -81,11 +81,7 @@ export class OrdersService {
       if (tIndex !== -1) {
         if (status === 'LISTO') {
           tables[tIndex].status = 'PEDIDO_LISTO';
-        } else if (status === 'PAGADO') {
-          tables[tIndex].status = 'DISPONIBLE';
-          tables[tIndex].currentOrderId = undefined;
-          tables[tIndex].timeOccupied = undefined;
-        } else if (status === 'ENTREGADO' || status === 'EN_COCINA' || status === 'EN_PREPARACION' || status === 'CREADO') {
+        } else if (status === 'PAGADO' || status === 'ENTREGADO' || status === 'EN_COCINA' || status === 'EN_PREPARACION' || status === 'CREADO') {
           tables[tIndex].status = 'OCUPADA';
         }
         await this.db.setAll('tables', tables);
@@ -112,11 +108,7 @@ export class OrdersService {
       if (tIndex !== -1) {
         if (updateData.status === 'LISTO') {
           tables[tIndex].status = 'PEDIDO_LISTO';
-        } else if (updateData.status === 'PAGADO') {
-          tables[tIndex].status = 'DISPONIBLE';
-          tables[tIndex].currentOrderId = undefined;
-          tables[tIndex].timeOccupied = undefined;
-        } else if (updateData.status === 'ENTREGADO' || updateData.status === 'EN_COCINA' || updateData.status === 'EN_PREPARACION') {
+        } else if (updateData.status === 'PAGADO' || updateData.status === 'ENTREGADO' || updateData.status === 'EN_COCINA' || updateData.status === 'EN_PREPARACION') {
           tables[tIndex].status = 'OCUPADA';
         }
         await this.db.setAll('tables', tables);
