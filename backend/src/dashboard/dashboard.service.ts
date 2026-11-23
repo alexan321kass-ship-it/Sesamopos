@@ -34,7 +34,7 @@ export class DashboardService {
     // 3. Operational Counts
     const criticalStockItems = inventory.filter(i => Number(i.currentStock) <= Number(i.minStock));
     const pendingReservations = reservations.filter(r => r.status === 'PENDIENTE');
-    const activeKitchenOrders = orders.filter(o => ['CREADO', 'EN_PREPARACION', 'LISTO'].includes(o.status));
+    const activeKitchenOrders = orders.filter(o => ['CREADO', 'CONFIRMADO', 'EN_COCINA', 'EN_PREPARACION', 'LISTO', 'PAGADO'].includes(o.status));
     const activeDeliveries = deliveries.filter(d => ['EN_PREPARACION', 'EN_CAMINO'].includes(d.deliveryStatus));
     const staffOnDuty = users.filter(u => u.isActive);
 

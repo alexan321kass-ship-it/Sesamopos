@@ -164,7 +164,7 @@ export default function Dashboard() {
     };
   }, []);
 
-  // Find active order for a table
+  // Find active order for a table (En autoservicio, PAGADO sigue activo mientras están en mesa)
   const getActiveOrderForTable = (table: Table): Order | undefined => {
     return orders.find(
       (o) =>
@@ -172,7 +172,7 @@ export default function Dashboard() {
           o.orderNumber === table.currentOrderId ||
           o.tableId === table.id ||
           o.tableId === table.number.toString()) &&
-        !['CANCELADO', 'PAGADO'].includes(o.status)
+        o.status !== 'CANCELADO'
     );
   };
 
@@ -575,7 +575,7 @@ export default function Dashboard() {
     }[] = [];
 
     orders.forEach((o) => {
-      if (['CREADO', 'CONFIRMADO', 'EN_COCINA', 'EN_PREPARACION', 'LISTO'].includes(o.status)) {
+      if (['CREADO', 'CONFIRMADO', 'EN_COCINA', 'EN_PREPARACION', 'LISTO', 'PAGADO'].includes(o.status)) {
         const wait = Math.round((Date.now() - (o.createdAt || Date.now())) / 60000);
         const itemNames = (o.items || []).map((it) => `${it.quantity}x ${it.productName}`).slice(0, 2).join(', ');
         list.push({
