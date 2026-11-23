@@ -258,15 +258,19 @@ export const getStoredSettings = (): StoreSettings => {
   return memorySettingsCache;
 };
 
-export const saveStoredSettings = (settings: StoreSettings) => {
+export const writeStoredSettings = (settings: StoreSettings) => {
   memorySettingsCache = settings;
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
     }
   } catch (e) {
-    console.warn('Error saving sesamo_settings to localStorage:', e);
+    console.warn('Error writing sesamo_settings to localStorage:', e);
   }
+};
+
+export const saveStoredSettings = (settings: StoreSettings) => {
+  writeStoredSettings(settings);
   notifyRealtimeEvent('sesamo_settings_updated', settings);
 };
 
@@ -2203,7 +2207,7 @@ export const mockApi = {
           const remoteSettings = await res.json();
           if (remoteSettings && typeof remoteSettings === 'object' && remoteSettings.storeName) {
             const merged = { ...getStoredSettings(), ...remoteSettings };
-            saveStoredSettings(merged);
+            writeStoredSettings(merged);
             return merged;
           }
         }

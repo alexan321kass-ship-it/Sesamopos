@@ -73,16 +73,6 @@ export default function SettingsScreen() {
     }
     loadSettings();
     checkDatabaseHealth();
-
-    const handleRemoteUpdate = () => {
-      mockApi.settings.get().then(data => {
-        if (data) setFormData(data);
-      });
-    };
-    window.addEventListener('sesamo_settings_updated', handleRemoteUpdate);
-    return () => {
-      window.removeEventListener('sesamo_settings_updated', handleRemoteUpdate);
-    };
   }, []);
 
   const checkDatabaseHealth = async () => {
