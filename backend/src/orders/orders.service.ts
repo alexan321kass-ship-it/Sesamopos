@@ -9,6 +9,15 @@ export class OrdersService {
     return this.db.getAll<any>('orders');
   }
 
+  async findOne(id: string): Promise<any> {
+    const orders = await this.findAll();
+    return orders.find(o => String(o.id) === String(id) || String(o.orderNumber) === String(id)) || null;
+  }
+
+  async delete(id: string): Promise<any> {
+    return this.db.deleteOne('orders', id);
+  }
+
   async create(orderData: any): Promise<any> {
     const newOrder = {
       ...orderData,
