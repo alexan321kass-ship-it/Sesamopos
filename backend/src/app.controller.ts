@@ -76,5 +76,21 @@ export class AppController {
   deleteReservation(@Param('id') id: string) {
     return this.db.deleteOne('reservations', id);
   }
+
+  // Settings
+  @Get('settings')
+  getSettings() {
+    return this.db.getSettings();
+  }
+
+  @Patch('settings')
+  updateSettings(@Body() body: any) {
+    return this.db.updateSettings(body);
+  }
+
+  @Post('settings')
+  saveSettings(@Body() body: any) {
+    return this.db.updateSettings(body);
+  }
 }
 

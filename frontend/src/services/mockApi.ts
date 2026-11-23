@@ -235,16 +235,39 @@ export const saveStoredCustomers = (customers: Customer[]) => {
   notifyRealtimeEvent('sesamo_customers_updated');
 };
 
+const SETTINGS_STORAGE_KEY = 'sesamo_settings';
+
 let memorySettingsCache: StoreSettings | null = null;
 export const getStoredSettings = (): StoreSettings => {
   if (memorySettingsCache) return memorySettingsCache;
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          memorySettingsCache = { ...mockSettings, ...parsed };
+          return memorySettingsCache!;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Error reading sesamo_settings from localStorage:', e);
+  }
   memorySettingsCache = { ...mockSettings };
   return memorySettingsCache;
 };
 
 export const saveStoredSettings = (settings: StoreSettings) => {
   memorySettingsCache = settings;
-  notifyRealtimeEvent('sesamo_settings_updated');
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    }
+  } catch (e) {
+    console.warn('Error saving sesamo_settings to localStorage:', e);
+  }
+  notifyRealtimeEvent('sesamo_settings_updated', settings);
 };
 
 let memoryReservationsCache: Reservation[] | null = null;
@@ -2174,12 +2197,43 @@ export const mockApi = {
   },
   settings: {
     get: async (): Promise<StoreSettings> => {
+      try {
+        const res = await fetchWithTimeout(`${getApiUrl()}/settings`, {}, 3000);
+        if (res.ok) {
+          const remoteSettings = await res.json();
+          if (remoteSettings && typeof remoteSettings === 'object' && remoteSettings.storeName) {
+            const merged = { ...getStoredSettings(), ...remoteSettings };
+            saveStoredSettings(merged);
+            return merged;
+          }
+        }
+      } catch (err) {
+        // Fallback to local storage
+      }
       return getStoredSettings();
     },
     update: async (updates: Partial<StoreSettings>): Promise<StoreSettings> => {
       const current = getStoredSettings();
       const updated: StoreSettings = { ...current, ...updates };
       saveStoredSettings(updated);
+
+      try {
+        const res = await fetchWithTimeout(`${getApiUrl()}/settings`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updated),
+        }, 4000);
+        if (res.ok) {
+          const serverUpdated = await res.json();
+          if (serverUpdated && typeof serverUpdated === 'object') {
+            const merged = { ...updated, ...serverUpdated };
+            saveStoredSettings(merged);
+            return merged;
+          }
+        }
+      } catch (err) {
+        console.warn('Could not sync settings to backend, saved locally:', err);
+      }
       return updated;
     }
   },

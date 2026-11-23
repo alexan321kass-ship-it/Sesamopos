@@ -58,6 +58,7 @@ export default function SettingsScreen() {
   });
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -81,6 +82,16 @@ export default function SettingsScreen() {
     }
     loadSettings();
     checkDatabaseHealth();
+
+    const handleRemoteUpdate = () => {
+      mockApi.settings.get().then(data => {
+        if (data) setFormData(data);
+      });
+    };
+    window.addEventListener('sesamo_settings_updated', handleRemoteUpdate);
+    return () => {
+      window.removeEventListener('sesamo_settings_updated', handleRemoteUpdate);
+    };
   }, []);
 
   const checkDatabaseHealth = async () => {
@@ -131,7 +142,11 @@ export default function SettingsScreen() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => {
-      const updated = { ...prev, [name]: value };
+      let parsedValue: any = value;
+      if (name === 'defaultTipPercentage') {
+        parsedValue = value === '' ? 0 : Number(value);
+      }
+      const updated = { ...prev, [name]: parsedValue };
       if (name === 'taxType') {
         if (value === 'IMPOCONSUMO_8') updated.taxRate = 8;
         else if (value === 'IVA_19') updated.taxRate = 19;
@@ -151,11 +166,15 @@ export default function SettingsScreen() {
       return;
     }
     try {
+      setIsSaving(true);
       setSaveError(null);
-      await mockApi.settings.update(formData);
+      const saved = await mockApi.settings.update(formData);
+      setFormData(saved);
       setSaveSuccess(true);
     } catch (err: any) {
       setSaveError(err?.message || 'Error al guardar la configuración.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -194,6 +213,7 @@ export default function SettingsScreen() {
             size="large"
             startIcon={<SaveIcon />}
             onClick={handleSave}
+            disabled={isSaving}
             sx={{
               bgcolor: '#16a34a',
               color: '#ffffff',
@@ -201,10 +221,11 @@ export default function SettingsScreen() {
               borderRadius: '12px',
               px: 3,
               boxShadow: '0 4px 14px rgba(22, 163, 74, 0.3)',
-              '&:hover': { bgcolor: '#15803d' }
+              '&:hover': { bgcolor: '#15803d' },
+              '&.Mui-disabled': { bgcolor: '#94a3b8', color: '#ffffff' }
             }}
           >
-            Guardar Cambios
+            {isSaving ? 'Guardando...' : 'Guardar Cambios'}
           </Button>
         )}
       </Box>

@@ -60,8 +60,10 @@ export default function PublicMenu() {
     loadData();
     const handleUpdate = () => { loadData(); };
     window.addEventListener('sesamo_catalog_updated', handleUpdate);
+    window.addEventListener('sesamo_settings_updated', handleUpdate);
     return () => {
       window.removeEventListener('sesamo_catalog_updated', handleUpdate);
+      window.removeEventListener('sesamo_settings_updated', handleUpdate);
     };
   }, []);
 

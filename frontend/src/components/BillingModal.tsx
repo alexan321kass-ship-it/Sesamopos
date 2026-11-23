@@ -78,6 +78,18 @@ export default function BillingModal({ open, onClose, order, table, onPaymentSuc
   const [ticketWidth, setTicketWidth] = useState<'80mm' | '58mm'>('80mm');
 
   useEffect(() => {
+    const handleSettingsUpdate = () => {
+      mockApi.settings.get().then((s) => {
+        setStoreSettings(s);
+      });
+    };
+    window.addEventListener('sesamo_settings_updated', handleSettingsUpdate);
+    return () => {
+      window.removeEventListener('sesamo_settings_updated', handleSettingsUpdate);
+    };
+  }, []);
+
+  useEffect(() => {
     if (open) {
       setIsSplitMode(false);
       setSplitDiners(2);

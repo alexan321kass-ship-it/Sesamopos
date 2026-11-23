@@ -1028,5 +1028,48 @@ export class DatabaseService implements OnModuleInit {
       return false;
     }
   }
+
+  async getSettings() {
+    try {
+      if (fsSync.existsSync(this.dbJsonPath)) {
+        const raw = await fs.readFile(this.dbJsonPath, 'utf-8');
+        const db = JSON.parse(raw);
+        if (db.settings) {
+          return db.settings;
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Error leyendo settings de database.json: ${err?.message}`);
+    }
+    return {
+      storeName: 'Sésamo Alimentos & Bebidas',
+      nit: '901.458.732-1',
+      currency: 'COP',
+      taxType: 'EXENTO',
+      taxRate: 0,
+      defaultTipPercentage: 10,
+      address: 'Calle 10 # 40-20, El Poblado, Medellín',
+      phone: '+57 (604) 444 8899',
+      ticketFooter: '¡Gracias por disfrutar en Sésamo! Vuelve pronto.',
+      autoPrintReceipt: false,
+      logoUrl: '',
+    };
+  }
+
+  async updateSettings(updates: any) {
+    try {
+      let db: any = {};
+      if (fsSync.existsSync(this.dbJsonPath)) {
+        const raw = await fs.readFile(this.dbJsonPath, 'utf-8');
+        db = JSON.parse(raw);
+      }
+      db.settings = { ...(db.settings || {}), ...updates };
+      await fs.writeFile(this.dbJsonPath, JSON.stringify(db, null, 2), 'utf-8');
+      return db.settings;
+    } catch (err: any) {
+      this.logger.error(`Error guardando settings en database.json: ${err?.message}`);
+      throw err;
+    }
+  }
 }
 
