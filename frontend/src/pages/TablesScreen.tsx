@@ -168,14 +168,14 @@ export default function TablesScreen() {
     };
   }, [user]);
 
-  // Find active order for a table (ENTREGADO is active; only PAGADO and CANCELADO are finished)
+  // Find active order for a table (En autoservicio, PAGADO sigue activo hasta que se desocupa la mesa)
   const getActiveOrderForTable = (table: Table): Order | undefined => {
     return orders.find(o =>
       (o.id === table.currentOrderId ||
        o.orderNumber === table.currentOrderId ||
        o.tableId === table.id ||
        o.tableId === table.number.toString()) &&
-      !['CANCELADO', 'PAGADO'].includes(o.status)
+      o.status !== 'CANCELADO'
     );
   };
 
@@ -225,9 +225,11 @@ export default function TablesScreen() {
       };
     }
 
+    const isPaid = activeOrder?.status === 'PAGADO' || Boolean(activeOrder?.paidAt);
+
     if (activeOrder?.status === 'ENTREGADO') {
       return {
-        label: 'Comiendo',
+        label: isPaid ? '🍽️ Comiendo (Pagado)' : 'Comiendo',
         color: '#7c3aed',
         bgColor: '#faf5ff',
         borderColor: '#ddd6fe',
@@ -242,7 +244,7 @@ export default function TablesScreen() {
 
     if (table.status === 'OCUPADA' || activeOrder) {
       return {
-        label: 'En Cocina',
+        label: isPaid ? '🍳 En Cocina (Pagado)' : 'En Cocina',
         color: '#c2410c',
         bgColor: '#fff7ed',
         borderColor: '#fed7aa',
@@ -1238,25 +1240,52 @@ export default function TablesScreen() {
                       /* Action for Occupied / Eating Table: Fast Cobrar + Fast Adicionar */
                       <Stack direction="row" spacing={1}>
                         {canProcessPayment && (
-                          <Button
-                            fullWidth
-                            variant="contained"
-                            size="medium"
-                            startIcon={<CashIcon />}
-                            onClick={(e) => handleQuickPay(table, activeOrder, e)}
-                            sx={{
-                              bgcolor: '#0284c7',
-                              color: '#ffffff',
-                              borderRadius: '12px',
-                              fontWeight: 800,
-                              py: 0.9,
-                              fontSize: '0.82rem',
-                              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
-                              '&:hover': { bgcolor: '#0369a1' }
-                            }}
-                          >
-                            Cobrar
-                          </Button>
+                          (activeOrder?.status === 'PAGADO' || Boolean(activeOrder?.paidAt)) ? (
+                            <Button
+                              fullWidth
+                              variant="contained"
+                              size="medium"
+                              startIcon={<CheckIcon />}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                await handleUpdateStatus(table.id, 'DISPONIBLE');
+                                if (activeOrder) {
+                                  await mockApi.orders.updateStatus(activeOrder.id, 'ENTREGADO');
+                                }
+                              }}
+                              sx={{
+                                bgcolor: '#16a34a',
+                                color: '#ffffff',
+                                borderRadius: '12px',
+                                fontWeight: 800,
+                                py: 0.9,
+                                fontSize: '0.82rem',
+                                '&:hover': { bgcolor: '#15803d' }
+                              }}
+                            >
+                              🧹 Liberar
+                            </Button>
+                          ) : (
+                            <Button
+                              fullWidth
+                              variant="contained"
+                              size="medium"
+                              startIcon={<CashIcon />}
+                              onClick={(e) => handleQuickPay(table, activeOrder, e)}
+                              sx={{
+                                bgcolor: '#0284c7',
+                                color: '#ffffff',
+                                borderRadius: '12px',
+                                fontWeight: 800,
+                                py: 0.9,
+                                fontSize: '0.82rem',
+                                boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
+                                '&:hover': { bgcolor: '#0369a1' }
+                              }}
+                            >
+                              Cobrar
+                            </Button>
+                          )
                         )}
                         <Button
                           fullWidth
@@ -1518,8 +1547,8 @@ export default function TablesScreen() {
                     </Button>
                   )}
 
-                  {/* DIRECT COBRAR BUTTON: Immediate payment for Cashier / Admin */}
-                  {canProcessPayment && (
+                  {/* DIRECT COBRAR BUTTON: Immediate payment for Cashier / Admin (Solo si no está pagada) */}
+                  {canProcessPayment && drawerActiveOrder.status !== 'PAGADO' && !drawerActiveOrder.paidAt && (
                     <Button
                       fullWidth
                       variant="contained"
@@ -1539,6 +1568,42 @@ export default function TablesScreen() {
                     >
                       💵 Cobrar Cuenta (${drawerActiveOrder.total.toLocaleString()})
                     </Button>
+                  )}
+
+                  {/* VISTA AUTOSERVICIO: Cuenta ya pagada en mostrador */}
+                  {(drawerActiveOrder.status === 'PAGADO' || Boolean(drawerActiveOrder.paidAt)) && (
+                    <Box sx={{ p: 2, bgcolor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '14px', textAlign: 'center' }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#15803d' }}>
+                        ✅ Cuenta Pagada en Caja • Turno #{drawerActiveOrder.orderNumber}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#166534', fontWeight: 600, display: 'block', my: 0.8 }}>
+                        El pedido fue cobrado previamente bajo modalidad autoservicio.
+                      </Typography>
+                      <Button
+                        fullWidth
+                        variant="contained"
+                        size="medium"
+                        startIcon={<CheckIcon />}
+                        onClick={async () => {
+                          await handleUpdateStatus(selectedTable.id, 'DISPONIBLE');
+                          await mockApi.orders.updateStatus(drawerActiveOrder.id, 'ENTREGADO');
+                          setActionNotice({
+                            type: 'success',
+                            message: `Mesa ${selectedTable.number} desocupada y disponible para nuevos comensales.`
+                          });
+                        }}
+                        sx={{
+                          bgcolor: '#16a34a',
+                          color: '#ffffff',
+                          fontWeight: 800,
+                          borderRadius: '10px',
+                          py: 1,
+                          '&:hover': { bgcolor: '#15803d' }
+                        }}
+                      >
+                        🧹 Desocupar y Liberar Mesa
+                      </Button>
+                    </Box>
                   )}
 
                   {/* REQUEST BILL BUTTON FOR WAITERS: Delegate payment to Caja */}
