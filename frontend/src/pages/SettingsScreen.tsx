@@ -32,17 +32,8 @@ import {
 } from '@mui/icons-material';
 import { mockApi, getApiUrl } from '../services/mockApi';
 import { StoreSettings } from '../types';
-import { useAuthStore } from '../store/authStore';
-import { Navigate } from 'react-router-dom';
 
 export default function SettingsScreen() {
-  const { user } = useAuthStore();
-  const isAdminOrManager = ['ADMINISTRADOR', 'GERENTE'].includes(user?.role || '');
-
-  if (user && !isAdminOrManager) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   const [formData, setFormData] = useState<StoreSettings>({
     storeName: '',
     nit: '',
@@ -161,10 +152,6 @@ export default function SettingsScreen() {
   };
 
   const handleSave = async () => {
-    if (!isAdminOrManager) {
-      setSaveError('Acceso denegado: solo Administradores y Gerentes pueden modificar la configuración.');
-      return;
-    }
     try {
       setIsSaving(true);
       setSaveError(null);
@@ -196,9 +183,9 @@ export default function SettingsScreen() {
               Configuración del Sistema & Restaurante
             </Typography>
             <Chip
-              label={isAdminOrManager ? 'Modo Administración' : 'Solo Lectura'}
+              label="Edición Habilitada"
               size="small"
-              color={isAdminOrManager ? 'success' : 'default'}
+              color="success"
               sx={{ fontWeight: 800 }}
             />
           </Box>
@@ -207,27 +194,25 @@ export default function SettingsScreen() {
           </Typography>
         </Box>
 
-        {isAdminOrManager && (
-          <Button
-            variant="contained"
-            size="large"
-            startIcon={<SaveIcon />}
-            onClick={handleSave}
-            disabled={isSaving}
-            sx={{
-              bgcolor: '#16a34a',
-              color: '#ffffff',
-              fontWeight: 800,
-              borderRadius: '12px',
-              px: 3,
-              boxShadow: '0 4px 14px rgba(22, 163, 74, 0.3)',
-              '&:hover': { bgcolor: '#15803d' },
-              '&.Mui-disabled': { bgcolor: '#94a3b8', color: '#ffffff' }
-            }}
-          >
-            {isSaving ? 'Guardando...' : 'Guardar Cambios'}
-          </Button>
-        )}
+        <Button
+          variant="contained"
+          size="large"
+          startIcon={<SaveIcon />}
+          onClick={handleSave}
+          disabled={isSaving}
+          sx={{
+            bgcolor: '#16a34a',
+            color: '#ffffff',
+            fontWeight: 800,
+            borderRadius: '12px',
+            px: 3,
+            boxShadow: '0 4px 14px rgba(22, 163, 74, 0.3)',
+            '&:hover': { bgcolor: '#15803d' },
+            '&.Mui-disabled': { bgcolor: '#94a3b8', color: '#ffffff' }
+          }}
+        >
+          {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+        </Button>
       </Box>
 
       {saveError && (
@@ -260,9 +245,9 @@ export default function SettingsScreen() {
                 fullWidth
                 label="Nombre Comercial del Restaurante"
                 name="storeName"
-                value={formData.storeName}
+                value={formData.storeName || ''}
                 onChange={handleChange}
-                disabled={!isAdminOrManager}
+                disabled={isSaving}
                 slotProps={{ input: { sx: { borderRadius: '12px', fontWeight: 700 } } }}
               />
             </Grid>
@@ -271,9 +256,9 @@ export default function SettingsScreen() {
                 fullWidth
                 label="NIT o Documento Fiscal"
                 name="nit"
-                value={formData.nit}
+                value={formData.nit || ''}
                 onChange={handleChange}
-                disabled={!isAdminOrManager}
+                disabled={isSaving}
                 placeholder="Ej: 901.458.732-1"
                 slotProps={{ input: { sx: { borderRadius: '12px', fontWeight: 700 } } }}
               />
@@ -283,9 +268,9 @@ export default function SettingsScreen() {
                 fullWidth
                 label="Dirección Principal"
                 name="address"
-                value={formData.address}
+                value={formData.address || ''}
                 onChange={handleChange}
-                disabled={!isAdminOrManager}
+                disabled={isSaving}
                 slotProps={{ input: { sx: { borderRadius: '12px' } } }}
               />
             </Grid>
@@ -294,9 +279,9 @@ export default function SettingsScreen() {
                 fullWidth
                 label="Teléfono de Contacto"
                 name="phone"
-                value={formData.phone}
+                value={formData.phone || ''}
                 onChange={handleChange}
-                disabled={!isAdminOrManager}
+                disabled={isSaving}
                 slotProps={{ input: { sx: { borderRadius: '12px' } } }}
               />
             </Grid>
@@ -327,9 +312,9 @@ export default function SettingsScreen() {
                 fullWidth
                 label="Régimen de Impuesto"
                 name="taxType"
-                value={formData.taxType}
+                value={formData.taxType || 'EXENTO'}
                 onChange={handleChange}
-                disabled={!isAdminOrManager}
+                disabled={isSaving}
                 slotProps={{ input: { sx: { borderRadius: '12px', fontWeight: 700 } } }}
               >
                 <MenuItem value="EXENTO">Exento / Sin Impuesto (0%)</MenuItem>
@@ -344,12 +329,13 @@ export default function SettingsScreen() {
                 label="Tasa Aplicada de Impuesto"
                 name="taxRate"
                 type="number"
-                value={formData.taxRate}
-                disabled
+                value={formData.taxRate ?? 0}
+                onChange={handleChange}
+                disabled={isSaving || formData.taxType === 'EXENTO'}
                 slotProps={{
                   input: {
                     endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                    sx: { borderRadius: '12px', fontWeight: 800, bgcolor: '#f8fafc' }
+                    sx: { borderRadius: '12px', fontWeight: 800, bgcolor: formData.taxType === 'EXENTO' ? '#f8fafc' : 'inherit' }
                   }
                 }}
               />
@@ -361,9 +347,9 @@ export default function SettingsScreen() {
                 label="Propina Voluntaria Sugerida"
                 name="defaultTipPercentage"
                 type="number"
-                value={formData.defaultTipPercentage}
+                value={formData.defaultTipPercentage ?? 10}
                 onChange={handleChange}
-                disabled={!isAdminOrManager}
+                disabled={isSaving}
                 helperText="Porcentaje estándar sugerido en pre-cuenta (por ley voluntario)"
                 slotProps={{
                   input: {
@@ -401,9 +387,9 @@ export default function SettingsScreen() {
                 rows={2}
                 label="Mensaje al Pie del Ticket"
                 name="ticketFooter"
-                value={formData.ticketFooter}
+                value={formData.ticketFooter || ''}
                 onChange={handleChange}
-                disabled={!isAdminOrManager}
+                disabled={isSaving}
                 placeholder="Ej: ¡Gracias por su visita! Propina voluntaria. Régimen Simple de Tributación."
                 slotProps={{ input: { sx: { borderRadius: '12px' } } }}
               />
@@ -414,9 +400,9 @@ export default function SettingsScreen() {
                 <FormControlLabel
                   control={
                     <Switch
-                      checked={formData.autoPrintReceipt}
+                      checked={Boolean(formData.autoPrintReceipt)}
                       onChange={handleSwitchChange('autoPrintReceipt')}
-                      disabled={!isAdminOrManager}
+                      disabled={isSaving}
                       color="primary"
                     />
                   }
