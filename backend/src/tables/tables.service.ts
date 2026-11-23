@@ -11,7 +11,7 @@ export class TablesService {
 
   async assignWaiter(id: string, waiterId?: string, waiterName?: string) {
     const tables = await this.db.getAll<any>('tables');
-    const index = tables.findIndex(t => t.id === id);
+    const index = tables.findIndex(t => t.id === id || String(t.number) === String(id));
     if (index !== -1) {
       tables[index].currentWaiterId = waiterId;
       tables[index].currentWaiterName = waiterName;
@@ -23,7 +23,7 @@ export class TablesService {
 
   async updateStatus(id: string, status: string) {
     const tables = await this.db.getAll<any>('tables');
-    const index = tables.findIndex(t => t.id === id);
+    const index = tables.findIndex(t => t.id === id || String(t.number) === String(id));
     if (index !== -1) {
       tables[index].status = status;
       if (status === 'DISPONIBLE') {

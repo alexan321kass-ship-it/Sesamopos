@@ -1502,11 +1502,7 @@ export const mockApi = {
         if (tIndex !== -1) {
           if (updatedData.status === 'LISTO') {
             tables[tIndex].status = 'PEDIDO_LISTO';
-          } else if (updatedData.status === 'PAGADO') {
-            tables[tIndex].status = 'DISPONIBLE';
-            tables[tIndex].currentOrderId = undefined;
-            tables[tIndex].timeOccupied = undefined;
-          } else if (updatedData.status === 'ENTREGADO' || updatedData.status === 'EN_COCINA' || updatedData.status === 'EN_PREPARACION' || updatedData.status === 'CREADO') {
+          } else if (updatedData.status === 'PAGADO' || updatedData.status === 'ENTREGADO' || updatedData.status === 'EN_COCINA' || updatedData.status === 'EN_PREPARACION' || updatedData.status === 'CREADO') {
             tables[tIndex].status = 'OCUPADA';
           }
           saveStoredTables(tables);
