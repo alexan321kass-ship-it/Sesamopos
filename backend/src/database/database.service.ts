@@ -28,15 +28,48 @@ export class DatabaseService implements OnModuleInit {
       const userCount = await this.prisma.user.count();
       const productCount = await this.prisma.product.count();
       this.logger.log(`🐘 Conectado a PostgreSQL en sesamo DB (${userCount} usuarios, ${productCount} productos registrados).`);
-      if (userCount === 0 || productCount === 0) {
-        this.logger.log('🌱 Inicializando o completando siembra de datos desde database.json...');
-        await this.seedFromDatabaseJson();
-      } else {
-        this.logger.log('✨ Base de datos ya inicializada con datos. Omitiendo sobrescritura de seed.');
+      if (userCount === 0) {
+        this.logger.log('🌱 Inicializando usuario administrador por defecto...');
+        await this.seedDefaultAdmin();
       }
       await this.upgradePlainTextPasswords();
     } catch (err: any) {
       this.logger.warn(`⚠️ Error conectando a PostgreSQL en onModuleInit: ${err?.message}`);
+    }
+  }
+
+  private async seedDefaultAdmin() {
+    try {
+      const hashedPassword = await hashPassword('password123');
+      await this.prisma.user.upsert({
+        where: { email: 'admin@sesamo.com' },
+        update: {},
+        create: {
+          id: '1',
+          name: 'Administrador General',
+          email: 'admin@sesamo.com',
+          password: hashedPassword,
+          role: 'ADMINISTRADOR',
+          isActive: true,
+          phone: '+57 300 000 0001',
+          documentId: '1000000001',
+          pin: '1111',
+          shiftStatus: 'EN_TURNO',
+          assignedArea: 'Dirección General',
+          permissions: {
+            canOpenCloseCash: true,
+            canApplyDiscounts: true,
+            canVoidItems: true,
+            canAccessReports: true,
+            canManageInventory: true,
+            canManageStaff: true,
+          },
+          stats: { ordersServed: 0, salesVolume: 0, tipsAccumulated: 0, rating: 5.0 },
+        },
+      });
+      this.logger.log('✅ Usuario Administrador inicializado exitosamente.');
+    } catch (e: any) {
+      this.logger.warn(`Error inicializando admin por defecto: ${e?.message}`);
     }
   }
 

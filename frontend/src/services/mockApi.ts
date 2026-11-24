@@ -1,4 +1,4 @@
-import { mockUsers, mockStaffMembers, mockStaffShifts, mockCategories, mockProducts, mockTables, mockInventory, mockSuppliers, mockCashRegisters, mockCustomers, mockSettings, mockRecipes } from '../mocks/db';
+import { mockUsers, mockCashRegisters, mockSettings } from '../mocks/db';
 import { User, StaffMember, StaffShiftRecord, ShiftAuditLog, Category, Product, Table, Order, InventoryItem, MeasurementUnit, Supplier, PurchaseOrder, PurchaseOrderStatus, CashRegister, Customer, DeliveryOrder, StoreSettings, Reservation, Recipe } from '../types';
 import { playKitchenBellSound } from '../utils/audioAlerts';
 import { notifyRealtimeEvent } from './eventBus';
@@ -29,7 +29,7 @@ const getStoredUserRole = (): string | undefined => {
 let memoryStaffCache: StaffMember[] | null = null;
 export const getStoredStaff = (): StaffMember[] => {
   if (memoryStaffCache) return memoryStaffCache;
-  memoryStaffCache = [...mockStaffMembers];
+  memoryStaffCache = [];
   return memoryStaffCache;
 };
 
@@ -41,7 +41,7 @@ export const saveStoredStaff = (staff: StaffMember[]) => {
 let memoryShiftsCache: StaffShiftRecord[] | null = null;
 export const getStoredShifts = (): StaffShiftRecord[] => {
   if (memoryShiftsCache) return memoryShiftsCache;
-  memoryShiftsCache = [...mockStaffShifts];
+  memoryShiftsCache = [];
   return memoryShiftsCache;
 };
 
@@ -165,7 +165,7 @@ export const getStoredInventory = (): InventoryItem[] => {
   if (memoryInventoryCache) {
     return memoryInventoryCache.map((item, idx) => normalizeInventoryItem(item, idx));
   }
-  memoryInventoryCache = mockInventory.map((item, idx) => normalizeInventoryItem(item, idx));
+  memoryInventoryCache = [];
   return memoryInventoryCache;
 };
 
@@ -182,13 +182,13 @@ export const getStoredSuppliers = (): Supplier[] => {
     const raw = localStorage.getItem('sesamo_suppliers');
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         memorySuppliersCache = parsed;
         return memorySuppliersCache;
       }
     }
   } catch (e) {}
-  memorySuppliersCache = [...mockSuppliers];
+  memorySuppliersCache = [];
   return memorySuppliersCache;
 };
 
@@ -257,13 +257,13 @@ export const getStoredRecipes = (): Recipe[] => {
     const raw = localStorage.getItem('sesamo_recipes');
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         memoryRecipesCache = parsed;
         return memoryRecipesCache;
       }
     }
   } catch (e) {}
-  memoryRecipesCache = [...mockRecipes];
+  memoryRecipesCache = [];
   return memoryRecipesCache;
 };
 
@@ -282,13 +282,13 @@ export const getStoredCustomers = (): Customer[] => {
     const raw = localStorage.getItem('sesamo_customers');
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         memoryCustomersCache = parsed;
         return memoryCustomersCache;
       }
     }
   } catch (e) {}
-  memoryCustomersCache = [...mockCustomers];
+  memoryCustomersCache = [];
   return memoryCustomersCache;
 };
 
@@ -386,8 +386,8 @@ export let memoryInventoryAlertsCache: any[] = [];
 let memoryProductsCache: Product[] | null = null;
 
 const getStoredProducts = (): Product[] => {
-  if (memoryProductsCache) return memoryProductsCache;
-  memoryProductsCache = [...mockProducts];
+  if (memoryProductsCache !== null) return memoryProductsCache;
+  memoryProductsCache = [];
   return memoryProductsCache;
 };
 
@@ -398,8 +398,8 @@ const saveStoredProducts = (products: Product[]) => {
 
 let memoryCategoriesCache: Category[] | null = null;
 const getStoredCategories = (): Category[] => {
-  if (memoryCategoriesCache) return memoryCategoriesCache;
-  memoryCategoriesCache = [...mockCategories];
+  if (memoryCategoriesCache !== null) return memoryCategoriesCache;
+  memoryCategoriesCache = [];
   return memoryCategoriesCache;
 };
 
@@ -411,8 +411,8 @@ const saveStoredCategories = (categories: Category[]) => {
 let memoryTablesCache: Table[] | null = null;
 
 const getStoredTables = (): Table[] => {
-  if (memoryTablesCache && memoryTablesCache.length > 0) return memoryTablesCache;
-  memoryTablesCache = [...mockTables];
+  if (memoryTablesCache !== null) return memoryTablesCache;
+  memoryTablesCache = [];
   return memoryTablesCache;
 };
 
@@ -933,7 +933,13 @@ export const mockApi = {
     getAll: async (): Promise<Category[]> => {
       try {
         const response = await fetchWithTimeout(`${getApiUrl()}/categories`);
-        if (response.ok) return await response.json();
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data)) {
+            memoryCategoriesCache = data;
+            return data;
+          }
+        }
       } catch (e) {}
       return getStoredCategories();
     },
@@ -1623,32 +1629,10 @@ export const mockApi = {
         const response = await fetchWithTimeout(`${getApiUrl()}/inventory`);
         if (response.ok) {
           const data = await response.json();
-          if (Array.isArray(data) && data.length > 0) {
+          if (Array.isArray(data)) {
             const normalized = data.map((item: any, idx: number) => normalizeInventoryItem(item, idx));
-            
-            // Reconciliación bidireccional inteligente:
-            // Si en localStorage/memoria local el stock fue descargado por una orden reciente y el servidor aún tiene el stock anterior (mayor),
-            // conservamos el stock descargado y actualizamos al servidor en segundo plano.
-            const localItems = getStoredInventory();
-            const merged = normalized.map(srvItem => {
-              const locItem = localItems.find(l => 
-                String(l.id) === String(srvItem.id) || 
-                (l.code && srvItem.code && l.code.toLowerCase() === srvItem.code.toLowerCase()) ||
-                (l.name && srvItem.name && l.name.toLowerCase().trim() === srvItem.name.toLowerCase().trim())
-              );
-              if (locItem && typeof locItem.currentStock === 'number' && locItem.currentStock < srvItem.currentStock) {
-                srvItem.currentStock = locItem.currentStock;
-                fetchWithTimeout(`${getApiUrl()}/inventory/${srvItem.id}`, {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ currentStock: locItem.currentStock })
-                }).catch(() => {});
-              }
-              return srvItem;
-            });
-
-            memoryInventoryCache = merged;
-            return merged;
+            memoryInventoryCache = normalized;
+            return normalized;
           }
         }
       } catch (e) {}
@@ -2491,21 +2475,12 @@ export const mockApi = {
         }
       } catch (e) {}
 
-      const localList = getStoredReservations();
-
-      if (backendData && backendData.length > 0) {
-        // Combinar datos del servidor con los almacenados localmente para nunca perder reservas recién creadas
-        const merged = [...backendData];
-        for (const loc of localList) {
-          if (!merged.some(b => b.id === loc.id)) {
-            merged.push(loc);
-          }
-        }
-        memoryReservationsCache = merged;
-        return merged;
+      if (backendData !== null && Array.isArray(backendData)) {
+        memoryReservationsCache = backendData;
+        return backendData;
       }
 
-      return localList;
+      return getStoredReservations();
     },
     getById: async (id: string): Promise<Reservation | null> => {
       await delay(0);
@@ -2823,29 +2798,6 @@ export const mockApi = {
         if (response.ok) {
           const dbStaff = await response.json();
           if (Array.isArray(dbStaff)) {
-            // Sincronizar automáticamente colaboradores de localStorage que aún no estén en la base de datos PostgreSQL
-            const localStaff = getStoredStaff();
-            for (const localMember of localStaff) {
-              const alreadyInDb = dbStaff.some(
-                s => String(s.id) === String(localMember.id) ||
-                     (s.email && localMember.email && s.email.toLowerCase().trim() === localMember.email.toLowerCase().trim())
-              );
-              if (!alreadyInDb && localMember.name && localMember.email) {
-                try {
-                  const syncRes = await fetchWithTimeout(`${getApiUrl()}/staff`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(localMember),
-                  });
-                  if (syncRes.ok) {
-                    const savedInDb = await syncRes.json();
-                    dbStaff.unshift(savedInDb);
-                  }
-                } catch (e) {
-                  console.warn('Error sincronizando colaborador local con PostgreSQL:', e);
-                }
-              }
-            }
             saveStoredStaff(dbStaff);
             return dbStaff;
           }
