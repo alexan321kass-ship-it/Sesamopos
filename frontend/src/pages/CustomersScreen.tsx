@@ -133,9 +133,9 @@ export default function CustomersScreen() {
     severity: 'success',
   });
 
-  const loadData = async () => {
+  const loadData = async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) setLoading(true);
       const [custList, ordList] = await Promise.all([
         mockApi.customers.getAll(),
         mockApi.orders.getAll(),
@@ -145,14 +145,14 @@ export default function CustomersScreen() {
     } catch (err) {
       console.error('Error cargando clientes:', err);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadData(true);
 
-    const handleUpdate = () => loadData();
+    const handleUpdate = () => loadData(false);
     window.addEventListener('sesamo_customers_updated', handleUpdate);
     return () => {
       window.removeEventListener('sesamo_customers_updated', handleUpdate);
@@ -521,7 +521,7 @@ export default function CustomersScreen() {
             variant="outlined"
             size="small"
             startIcon={<RefreshIcon sx={{ fontSize: 18 }} />}
-            onClick={loadData}
+            onClick={() => loadData(true)}
             sx={{
               borderRadius: 2,
               fontWeight: 800,

@@ -1805,7 +1805,7 @@ export const mockApi = {
               taxId: s.taxId || '',
               notes: s.notes || '',
             }));
-            saveStoredSuppliers(mapped);
+            memorySuppliersCache = mapped;
             return mapped;
           }
         }
@@ -1883,7 +1883,7 @@ export const mockApi = {
               notes: p.notes || '',
               invoiceNumber: p.invoiceNumber || '',
             }));
-            saveStoredPurchases(mapped);
+            memoryPurchasesCache = mapped;
             return mapped;
           }
         }
@@ -2314,7 +2314,7 @@ export const mockApi = {
               lastVisit: c.lastVisit ? Number(c.lastVisit) : Date.now(),
               isActive: c.isActive !== undefined ? Boolean(c.isActive) : true,
             }));
-            saveStoredCustomers(mapped);
+            memoryCustomersCache = mapped;
             return mapped;
           }
         }
@@ -2646,7 +2646,7 @@ export const mockApi = {
               wastePercentage: Number(r.wastePercentage || r.wasteMarginPercentage) || 0,
               lastUpdated: Number(r.lastUpdated || r.updatedAt) || Date.now(),
             }));
-            saveStoredRecipes(mapped);
+            memoryRecipesCache = mapped;
             return mapped;
           }
         }
@@ -2798,7 +2798,7 @@ export const mockApi = {
         if (response.ok) {
           const dbStaff = await response.json();
           if (Array.isArray(dbStaff)) {
-            saveStoredStaff(dbStaff);
+            memoryStaffCache = dbStaff;
             return dbStaff;
           }
         }

@@ -171,9 +171,9 @@ export default function RecipesScreen() {
     severity: 'success',
   });
 
-  const loadData = async () => {
+  const loadData = async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) setLoading(true);
       const [recList, prodList, invList] = await Promise.all([
         mockApi.recipes.getAll(),
         mockApi.products.getAll(),
@@ -185,14 +185,14 @@ export default function RecipesScreen() {
     } catch (err) {
       console.error('Error cargando recetas:', err);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadData(true);
 
-    const handleUpdate = () => loadData();
+    const handleUpdate = () => loadData(false);
     window.addEventListener('sesamo_recipes_updated', handleUpdate);
     window.addEventListener('sesamo_inventory_updated', handleUpdate);
     window.addEventListener('sesamo_order_created', handleUpdate);
@@ -579,7 +579,7 @@ export default function RecipesScreen() {
             variant="outlined"
             size="small"
             startIcon={<RefreshIcon sx={{ fontSize: 18 }} />}
-            onClick={loadData}
+            onClick={() => loadData(true)}
             sx={{
               borderRadius: 2,
               fontWeight: 800,
