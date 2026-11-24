@@ -343,6 +343,112 @@ export class DatabaseService implements OnModuleInit {
         }
       }
 
+      if (Array.isArray(db.suppliers)) {
+        for (const s of db.suppliers) {
+          await this.prisma.supplier.upsert({
+            where: { id: String(s.id) },
+            update: {
+              name: s.name,
+              contactName: s.contactName ?? null,
+              phone: s.phone ?? null,
+              email: s.email ?? null,
+              category: s.category ?? 'General',
+              leadTimeDays: Number(s.leadTimeDays) || 1,
+              isActive: s.isActive !== undefined ? Boolean(s.isActive) : true,
+              address: s.address ?? null,
+              taxId: s.taxId || s.nit || null,
+              notes: s.notes ?? null,
+            },
+            create: {
+              id: String(s.id),
+              name: s.name,
+              contactName: s.contactName ?? null,
+              phone: s.phone ?? null,
+              email: s.email ?? null,
+              category: s.category ?? 'General',
+              leadTimeDays: Number(s.leadTimeDays) || 1,
+              isActive: s.isActive !== undefined ? Boolean(s.isActive) : true,
+              address: s.address ?? null,
+              taxId: s.taxId || s.nit || null,
+              notes: s.notes ?? null,
+            },
+          });
+        }
+      }
+
+      if (Array.isArray(db.recipes)) {
+        for (const rec of db.recipes) {
+          await this.prisma.recipe.upsert({
+            where: { productId: String(rec.productId) },
+            update: {
+              productName: rec.productName || '',
+              costTotal: Number(rec.costTotal) || 0,
+              portionCount: Number(rec.portionCount || rec.portions) || 1,
+              preparationMinutes: Number(rec.preparationMinutes || rec.preparationTimeMinutes) || 15,
+              difficulty: rec.difficulty || 'MEDIA',
+              station: rec.station || 'COCINA',
+              steps: rec.steps || (rec.preparationInstructions ? [rec.preparationInstructions] : []),
+              ingredients: rec.ingredients || [],
+              wastePercentage: Number(rec.wastePercentage || rec.wasteMarginPercentage) || 0,
+              lastUpdated: Number(rec.lastUpdated || rec.updatedAt) || Date.now(),
+            },
+            create: {
+              id: String(rec.id),
+              productId: String(rec.productId),
+              productName: rec.productName || '',
+              costTotal: Number(rec.costTotal) || 0,
+              portionCount: Number(rec.portionCount || rec.portions) || 1,
+              preparationMinutes: Number(rec.preparationMinutes || rec.preparationTimeMinutes) || 15,
+              difficulty: rec.difficulty || 'MEDIA',
+              station: rec.station || 'COCINA',
+              steps: rec.steps || (rec.preparationInstructions ? [rec.preparationInstructions] : []),
+              ingredients: rec.ingredients || [],
+              wastePercentage: Number(rec.wastePercentage || rec.wasteMarginPercentage) || 0,
+              lastUpdated: Number(rec.lastUpdated || rec.updatedAt) || Date.now(),
+            },
+          });
+        }
+      }
+
+      if (Array.isArray(db.customers)) {
+        for (const c of db.customers) {
+          await this.prisma.customer.upsert({
+            where: { id: String(c.id) },
+            update: {
+              name: c.name,
+              email: c.email ?? null,
+              phone: c.phone || '',
+              documentId: c.documentId ?? null,
+              address: c.address ?? null,
+              loyaltyPoints: Number(c.loyaltyPoints) || 0,
+              totalOrders: Number(c.totalOrders) || 0,
+              totalSpent: Number(c.totalSpent) || 0,
+              lastVisit: c.lastVisit ? Number(c.lastVisit) : null,
+              notes: c.notes ?? null,
+              favoriteDishes: c.favoriteDishes || [],
+              tier: c.tier || 'BRONCE',
+              createdAt: Number(c.createdAt) || Date.now(),
+            },
+            create: {
+              id: String(c.id),
+              name: c.name,
+              email: c.email ?? null,
+              phone: c.phone || '',
+              documentId: c.documentId ?? null,
+              address: c.address ?? null,
+              loyaltyPoints: Number(c.loyaltyPoints) || 0,
+              totalOrders: Number(c.totalOrders) || 0,
+              totalSpent: Number(c.totalSpent) || 0,
+              lastVisit: c.lastVisit ? Number(c.lastVisit) : null,
+              notes: c.notes ?? null,
+              favoriteDishes: c.favoriteDishes || [],
+              tier: c.tier || 'BRONCE',
+              createdAt: Number(c.createdAt) || Date.now(),
+            },
+          });
+        }
+      }
+
       this.logger.log('✅ Siembra completada exitosamente.');
     } catch (err: any) {
       this.logger.error(`Error en seed: ${err?.message}`, err?.stack);
@@ -376,6 +482,14 @@ export class DatabaseService implements OnModuleInit {
         return (await this.prisma.delivery.findMany({ orderBy: { createdAt: 'desc' } })) as unknown as T[];
       case 'inventory':
         return (await this.prisma.inventoryItem.findMany({ orderBy: { name: 'asc' } })) as unknown as T[];
+      case 'suppliers':
+        return (await this.prisma.supplier.findMany({ orderBy: { name: 'asc' } })) as unknown as T[];
+      case 'purchases':
+        return (await this.prisma.purchaseOrder.findMany({ orderBy: { createdAt: 'desc' } })) as unknown as T[];
+      case 'recipes':
+        return (await this.prisma.recipe.findMany({ orderBy: { productName: 'asc' } })) as unknown as T[];
+      case 'customers':
+        return (await this.prisma.customer.findMany({ orderBy: { name: 'asc' } })) as unknown as T[];
       case 'reservations': {
         try {
           const list = await this.prisma.reservation.findMany();
@@ -552,6 +666,90 @@ export class DatabaseService implements OnModuleInit {
             id,
             currentStock: Number(item.currentStock) || 0,
             minStock: Number(item.minStock) || 0,
+          },
+        })) as unknown as T;
+      case 'suppliers':
+        return (await this.prisma.supplier.create({
+          data: {
+            id,
+            name: item.name,
+            contactName: item.contactName ?? null,
+            phone: item.phone ?? null,
+            email: item.email ?? null,
+            category: item.category ?? 'General',
+            leadTimeDays: Number(item.leadTimeDays) || 1,
+            isActive: item.isActive !== undefined ? Boolean(item.isActive) : true,
+            address: item.address ?? null,
+            taxId: item.taxId ?? null,
+            notes: item.notes ?? null,
+          },
+        })) as unknown as T;
+      case 'purchases':
+        return (await this.prisma.purchaseOrder.create({
+          data: {
+            id,
+            orderNumber: item.orderNumber || `OC-${Date.now().toString().slice(-6)}`,
+            supplierId: String(item.supplierId || ''),
+            supplierName: item.supplierName || '',
+            items: item.items || [],
+            subtotal: Number(item.subtotal) || 0,
+            tax: Number(item.tax) || 0,
+            total: Number(item.total) || 0,
+            status: item.status || 'BORRADOR',
+            createdAt: Number(item.createdAt) || Date.now(),
+            expectedDeliveryDate: item.expectedDeliveryDate ? Number(item.expectedDeliveryDate) : null,
+            receivedAt: item.receivedAt ? Number(item.receivedAt) : null,
+            notes: item.notes ?? null,
+            invoiceNumber: item.invoiceNumber ?? null,
+          },
+        })) as unknown as T;
+      case 'recipes':
+        return (await this.prisma.recipe.upsert({
+          where: { productId: String(item.productId) },
+          update: {
+            productName: item.productName || '',
+            costTotal: Number(item.costTotal) || 0,
+            portionCount: Number(item.portionCount || item.portions) || 1,
+            preparationMinutes: Number(item.preparationMinutes || item.preparationTimeMinutes) || 15,
+            difficulty: item.difficulty || 'MEDIA',
+            station: item.station || 'COCINA',
+            steps: item.steps || (item.preparationInstructions ? [item.preparationInstructions] : []),
+            ingredients: item.ingredients || [],
+            wastePercentage: Number(item.wastePercentage || item.wasteMarginPercentage) || 0,
+            lastUpdated: Number(item.lastUpdated || item.updatedAt) || Date.now(),
+          },
+          create: {
+            id,
+            productId: String(item.productId),
+            productName: item.productName || '',
+            costTotal: Number(item.costTotal) || 0,
+            portionCount: Number(item.portionCount || item.portions) || 1,
+            preparationMinutes: Number(item.preparationMinutes || item.preparationTimeMinutes) || 15,
+            difficulty: item.difficulty || 'MEDIA',
+            station: item.station || 'COCINA',
+            steps: item.steps || (item.preparationInstructions ? [item.preparationInstructions] : []),
+            ingredients: item.ingredients || [],
+            wastePercentage: Number(item.wastePercentage || item.wasteMarginPercentage) || 0,
+            lastUpdated: Number(item.lastUpdated || item.updatedAt) || Date.now(),
+          },
+        })) as unknown as T;
+      case 'customers':
+        return (await this.prisma.customer.create({
+          data: {
+            id,
+            name: item.name,
+            email: item.email ?? null,
+            phone: item.phone || '',
+            documentId: item.documentId ?? null,
+            address: item.address ?? null,
+            loyaltyPoints: Number(item.loyaltyPoints) || 0,
+            totalOrders: Number(item.totalOrders) || 0,
+            totalSpent: Number(item.totalSpent) || 0,
+            lastVisit: item.lastVisit ? Number(item.lastVisit) : null,
+            notes: item.notes ?? null,
+            favoriteDishes: item.favoriteDishes || [],
+            tier: item.tier || 'BRONCE',
+            createdAt: Number(item.createdAt) || Date.now(),
           },
         })) as unknown as T;
       case 'reservations': {
@@ -765,6 +963,45 @@ export class DatabaseService implements OnModuleInit {
         if (!current) return null;
         const updated = updater(current as unknown as T) as any;
         return (await this.prisma.inventoryItem.update({
+          where: { id: strId },
+          data: updated,
+        })) as unknown as T;
+      }
+      case 'suppliers': {
+        const current = await this.prisma.supplier.findUnique({ where: { id: strId } });
+        if (!current) return null;
+        const updated = updater(current as unknown as T) as any;
+        return (await this.prisma.supplier.update({
+          where: { id: strId },
+          data: updated,
+        })) as unknown as T;
+      }
+      case 'purchases': {
+        const current = await this.prisma.purchaseOrder.findUnique({ where: { id: strId } });
+        if (!current) return null;
+        const updated = updater(current as unknown as T) as any;
+        return (await this.prisma.purchaseOrder.update({
+          where: { id: strId },
+          data: updated,
+        })) as unknown as T;
+      }
+      case 'recipes': {
+        let current = await this.prisma.recipe.findUnique({ where: { id: strId } });
+        if (!current) {
+          current = await this.prisma.recipe.findUnique({ where: { productId: strId } });
+        }
+        if (!current) return null;
+        const updated = updater(current as unknown as T) as any;
+        return (await this.prisma.recipe.update({
+          where: { id: current.id },
+          data: updated,
+        })) as unknown as T;
+      }
+      case 'customers': {
+        const current = await this.prisma.customer.findUnique({ where: { id: strId } });
+        if (!current) return null;
+        const updated = updater(current as unknown as T) as any;
+        return (await this.prisma.customer.update({
           where: { id: strId },
           data: updated,
         })) as unknown as T;
@@ -1019,6 +1256,18 @@ export class DatabaseService implements OnModuleInit {
         }
         case 'deliveries':
           await this.prisma.delivery.delete({ where: { id: strId } });
+          return true;
+        case 'suppliers':
+          await this.prisma.supplier.delete({ where: { id: strId } });
+          return true;
+        case 'purchases':
+          await this.prisma.purchaseOrder.delete({ where: { id: strId } });
+          return true;
+        case 'recipes':
+          await this.prisma.recipe.delete({ where: { id: strId } });
+          return true;
+        case 'customers':
+          await this.prisma.customer.delete({ where: { id: strId } });
           return true;
         default:
           return false;

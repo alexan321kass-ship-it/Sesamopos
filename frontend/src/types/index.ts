@@ -266,11 +266,20 @@ export interface PurchaseOrderItem {
 
 export interface PurchaseOrder {
   id: string;
+  orderNumber?: string;
   supplierId: string;
+  supplierName?: string;
   date: number;
   items: PurchaseOrderItem[];
+  subtotal?: number;
+  tax?: number;
   total: number;
   status: PurchaseOrderStatus;
+  createdAt?: number;
+  expectedDeliveryDate?: number;
+  receivedAt?: number;
+  notes?: string;
+  invoiceNumber?: string;
 }
 
 // PHASE 2 - CASH REGISTER

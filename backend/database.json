@@ -666,5 +666,209 @@
       "tax": 0,
       "total": 66000
     }
+  ],
+  "suppliers": [
+    {
+      "id": "1",
+      "name": "Distribuidora Carnes Premium S.A.S",
+      "nit": "900.123.456-7",
+      "phone": "3001234567",
+      "email": "ventas@carnespremium.com",
+      "address": "Calle 10 # 20-30, Medellín",
+      "isActive": true,
+      "category": "Carnes",
+      "leadTimeDays": 1
+    },
+    {
+      "id": "2",
+      "name": "Panadería Artesanal El Buen Trigo",
+      "nit": "901.987.654-3",
+      "phone": "3109876543",
+      "email": "pedidos@elbuentrigo.com",
+      "address": "Cra 15 # 45-60, Envigado",
+      "isActive": true,
+      "category": "Panadería",
+      "leadTimeDays": 1
+    },
+    {
+      "id": "3",
+      "name": "Lácteos & Quesos del Valle",
+      "nit": "890.334.120-1",
+      "phone": "3187766554",
+      "email": "contacto@lacteosvalle.com",
+      "address": "Calle 50 # 12-88, Itagüí",
+      "isActive": true,
+      "category": "Lácteos",
+      "leadTimeDays": 2
+    },
+    {
+      "id": "4",
+      "name": "Distribuidora Central de Bebidas",
+      "nit": "900.555.777-9",
+      "phone": "3014433221",
+      "email": "ventas@centralbebidas.com",
+      "address": "Av. Las Vegas # 10-10",
+      "isActive": true,
+      "category": "Bebidas",
+      "leadTimeDays": 1
+    }
+  ],
+  "customers": [
+    {
+      "id": "1",
+      "name": "Andrés López",
+      "documentId": "1020456789",
+      "phone": "3201234567",
+      "address": "Calle 45 # 10-20, Apto 501",
+      "email": "andres.lopez@gmail.com",
+      "loyaltyPoints": 240,
+      "totalOrders": 8,
+      "totalSpent": 420000,
+      "tier": "ORO",
+      "createdAt": 1787702708172
+    },
+    {
+      "id": "2",
+      "name": "María Camila Gómez",
+      "documentId": "1035678901",
+      "phone": "3159876543",
+      "address": "Cra 12 # 80-15, Poblado",
+      "email": "m.gomez@hotmail.com",
+      "loyaltyPoints": 510,
+      "totalOrders": 15,
+      "totalSpent": 890000,
+      "tier": "PLATINUM",
+      "createdAt": 1785110708172
+    },
+    {
+      "id": "3",
+      "name": "Carlos Eduardo Restrepo",
+      "documentId": "9876543210",
+      "phone": "3007654321",
+      "address": "Calle 33 # 75-12, Laureles",
+      "email": "carlos.restrepo@empresa.com",
+      "loyaltyPoints": 80,
+      "totalOrders": 3,
+      "totalSpent": 165000,
+      "tier": "PLATA",
+      "createdAt": 1791590708172
+    },
+    {
+      "id": "4",
+      "name": "Valentina Duque",
+      "documentId": "1017894561",
+      "phone": "3112345678",
+      "address": "Transversal 39 # 1-50, Envigado",
+      "email": "vale.duque@outlook.com",
+      "loyaltyPoints": 30,
+      "totalOrders": 1,
+      "totalSpent": 75000,
+      "tier": "BRONCE",
+      "createdAt": 1794614708172
+    }
+  ],
+  "recipes": [
+    {
+      "id": "rec-1",
+      "productId": "1",
+      "productName": "Hamburguesa Clásica",
+      "costTotal": 6900,
+      "portionCount": 1,
+      "preparationMinutes": 12,
+      "difficulty": "FÁCIL",
+      "station": "PARRILLA",
+      "ingredients": [
+        {
+          "inventoryItemId": "1",
+          "quantity": 0.15,
+          "unit": "Kg",
+          "notes": "Carne Angus 80/20 molida fresca"
+        },
+        {
+          "inventoryItemId": "2",
+          "quantity": 1,
+          "unit": "Unidad",
+          "notes": "Pan brioche artesanal sellado"
+        },
+        {
+          "inventoryItemId": "3",
+          "quantity": 0.1,
+          "unit": "Paquete",
+          "notes": "2 lonchas de cheddar fundido"
+        }
+      ],
+      "wastePercentage": 5,
+      "lastUpdated": 1795478708172
+    },
+    {
+      "id": "rec-2",
+      "productId": "2",
+      "productName": "Hamburguesa BBQ Smoked",
+      "costTotal": 8340,
+      "portionCount": 1,
+      "preparationMinutes": 15,
+      "difficulty": "MEDIA",
+      "station": "PARRILLA",
+      "ingredients": [
+        {
+          "inventoryItemId": "1",
+          "quantity": 0.18,
+          "unit": "Kg",
+          "notes": "Carne Angus gruesa 180g"
+        },
+        {
+          "inventoryItemId": "2",
+          "quantity": 1,
+          "unit": "Unidad",
+          "notes": "Pan brioche con ajonjolí"
+        },
+        {
+          "inventoryItemId": "3",
+          "quantity": 0.1,
+          "unit": "Paquete",
+          "notes": "Cheddar americano"
+        },
+        {
+          "inventoryItemId": "8",
+          "quantity": 0.05,
+          "unit": "Litro",
+          "notes": "Salsa BBQ ahumada artesanal"
+        }
+      ],
+      "wastePercentage": 6,
+      "lastUpdated": 1795478708172
+    },
+    {
+      "id": "rec-3",
+      "productId": "5",
+      "productName": "Pizza Pepperoni Suprema",
+      "costTotal": 14400,
+      "portionCount": 1,
+      "preparationMinutes": 10,
+      "difficulty": "MEDIA",
+      "station": "HORNO",
+      "ingredients": [
+        {
+          "inventoryItemId": "5",
+          "quantity": 1,
+          "unit": "Unidad",
+          "notes": "Masa precocida masa madre 30cm"
+        },
+        {
+          "inventoryItemId": "4",
+          "quantity": 0.2,
+          "unit": "Kg",
+          "notes": "Mozzarella de búfala rallada"
+        },
+        {
+          "inventoryItemId": "6",
+          "quantity": 0.1,
+          "unit": "Kg",
+          "notes": "Pepperoni italiano madurado"
+        }
+      ],
+      "wastePercentage": 4,
+      "lastUpdated": 1795478708172
+    }
   ]
 }

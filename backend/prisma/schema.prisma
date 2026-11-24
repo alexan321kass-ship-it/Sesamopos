@@ -198,3 +198,66 @@ model Reservation {
   notes        String?
   createdAt    Float?
 }
+
+model Supplier {
+  id           String   @id @default(uuid())
+  name         String
+  contactName  String?
+  phone        String?
+  email        String?
+  category     String?  @default("General")
+  leadTimeDays Int?     @default(1)
+  isActive     Boolean  @default(true)
+  address      String?
+  taxId        String?
+  notes        String?
+}
+
+model PurchaseOrder {
+  id                   String  @id @default(uuid())
+  orderNumber          String
+  supplierId           String
+  supplierName         String
+  items                Json    @default("[]")
+  subtotal             Float   @default(0)
+  tax                  Float   @default(0)
+  total                Float   @default(0)
+  status               String  @default("BORRADOR")
+  createdAt            Float
+  expectedDeliveryDate Float?
+  receivedAt           Float?
+  notes                String?
+  invoiceNumber        String?
+}
+
+model Recipe {
+  id                 String  @id @default(uuid())
+  productId          String  @unique
+  productName        String
+  costTotal          Float   @default(0)
+  portionCount       Float   @default(1)
+  preparationMinutes Float   @default(15)
+  difficulty         String? @default("MEDIA")
+  station            String? @default("COCINA")
+  steps              Json?   @default("[]")
+  ingredients        Json    @default("[]")
+  wastePercentage    Float?  @default(0)
+  lastUpdated        Float?
+}
+
+model Customer {
+  id             String  @id @default(uuid())
+  name           String
+  email          String?
+  phone          String
+  documentId     String?
+  address        String?
+  loyaltyPoints  Float   @default(0)
+  totalOrders    Int     @default(0)
+  totalSpent     Float   @default(0)
+  lastVisit      Float?
+  notes          String?
+  favoriteDishes Json?   @default("[]")
+  tier           String? @default("BRONCE")
+  createdAt      Float
+}

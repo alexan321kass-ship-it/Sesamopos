@@ -178,60 +178,125 @@ export const saveStoredInventory = (items: InventoryItem[]) => {
 let memorySuppliersCache: Supplier[] | null = null;
 export const getStoredSuppliers = (): Supplier[] => {
   if (memorySuppliersCache) return memorySuppliersCache;
+  try {
+    const raw = localStorage.getItem('sesamo_suppliers');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        memorySuppliersCache = parsed;
+        return memorySuppliersCache;
+      }
+    }
+  } catch (e) {}
   memorySuppliersCache = [...mockSuppliers];
   return memorySuppliersCache;
 };
 
 export const saveStoredSuppliers = (suppliers: Supplier[]) => {
   memorySuppliersCache = suppliers;
+  try {
+    localStorage.setItem('sesamo_suppliers', JSON.stringify(suppliers));
+  } catch (e) {}
   notifyRealtimeEvent('sesamo_suppliers_updated');
 };
 
 let memoryPurchasesCache: PurchaseOrder[] | null = null;
 export const getStoredPurchases = (): PurchaseOrder[] => {
   if (memoryPurchasesCache) return memoryPurchasesCache;
+  try {
+    const raw = localStorage.getItem('sesamo_purchases');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        memoryPurchasesCache = parsed;
+        return memoryPurchasesCache;
+      }
+    }
+  } catch (e) {}
   memoryPurchasesCache = [];
   return memoryPurchasesCache;
 };
 
 export const saveStoredPurchases = (orders: PurchaseOrder[]) => {
   memoryPurchasesCache = orders;
+  try {
+    localStorage.setItem('sesamo_purchases', JSON.stringify(orders));
+  } catch (e) {}
   notifyRealtimeEvent('sesamo_purchases_updated');
 };
 
 let memoryMovementsCache: any[] | null = null;
 export const getStoredInventoryMovements = (): any[] => {
   if (memoryMovementsCache) return memoryMovementsCache;
+  try {
+    const raw = localStorage.getItem('sesamo_inventory_movements');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        memoryMovementsCache = parsed;
+        return memoryMovementsCache;
+      }
+    }
+  } catch (e) {}
   memoryMovementsCache = [];
   return memoryMovementsCache;
 };
 
 export const saveStoredInventoryMovements = (movs: any[]) => {
   memoryMovementsCache = movs;
+  try {
+    localStorage.setItem('sesamo_inventory_movements', JSON.stringify(movs));
+  } catch (e) {}
   notifyRealtimeEvent('sesamo_inventory_updated');
 };
 
 let memoryRecipesCache: Recipe[] | null = null;
 export const getStoredRecipes = (): Recipe[] => {
   if (memoryRecipesCache) return memoryRecipesCache;
+  try {
+    const raw = localStorage.getItem('sesamo_recipes');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        memoryRecipesCache = parsed;
+        return memoryRecipesCache;
+      }
+    }
+  } catch (e) {}
   memoryRecipesCache = [...mockRecipes];
   return memoryRecipesCache;
 };
 
 export const saveStoredRecipes = (recipes: Recipe[]) => {
   memoryRecipesCache = recipes;
+  try {
+    localStorage.setItem('sesamo_recipes', JSON.stringify(recipes));
+  } catch (e) {}
   notifyRealtimeEvent('sesamo_recipes_updated');
 };
 
 let memoryCustomersCache: Customer[] | null = null;
 export const getStoredCustomers = (): Customer[] => {
   if (memoryCustomersCache) return memoryCustomersCache;
+  try {
+    const raw = localStorage.getItem('sesamo_customers');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        memoryCustomersCache = parsed;
+        return memoryCustomersCache;
+      }
+    }
+  } catch (e) {}
   memoryCustomersCache = [...mockCustomers];
   return memoryCustomersCache;
 };
 
 export const saveStoredCustomers = (customers: Customer[]) => {
   memoryCustomersCache = customers;
+  try {
+    localStorage.setItem('sesamo_customers', JSON.stringify(customers));
+  } catch (e) {}
   notifyRealtimeEvent('sesamo_customers_updated');
 };
 
@@ -1737,66 +1802,162 @@ export const mockApi = {
   },
   suppliers: {
     getAll: async (): Promise<Supplier[]> => {
-      await delay(0);
+      try {
+        const response = await fetchWithTimeout(`${getApiUrl()}/suppliers`);
+        if (response.ok) {
+          const raw = await response.json();
+          if (Array.isArray(raw)) {
+            const mapped: Supplier[] = raw.map((s: any) => ({
+              ...s,
+              id: String(s.id),
+              name: s.name,
+              contactName: s.contactName || '',
+              phone: s.phone || '',
+              email: s.email || '',
+              category: s.category || 'General',
+              leadTimeDays: Number(s.leadTimeDays) || 1,
+              isActive: s.isActive !== undefined ? Boolean(s.isActive) : true,
+              address: s.address || '',
+              taxId: s.taxId || '',
+              notes: s.notes || '',
+            }));
+            saveStoredSuppliers(mapped);
+            return mapped;
+          }
+        }
+      } catch (err) {}
       return getStoredSuppliers();
     },
     create: async (supplier: Omit<Supplier, 'id'>): Promise<Supplier> => {
-      await delay(0);
       const list = getStoredSuppliers();
-      const newSupp: Supplier = {
-        ...supplier,
-        id: 'sup-' + Date.now(),
-      };
-      saveStoredSuppliers([newSupp, ...list]);
+      const tempId = 'sup-' + Date.now();
+      const newSupp: Supplier = { ...supplier, id: tempId };
+      try {
+        const res = await fetchWithTimeout(`${getApiUrl()}/suppliers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(supplier),
+        });
+        if (res.ok) {
+          const created = await res.json();
+          if (created && created.id) {
+            newSupp.id = String(created.id);
+          }
+        }
+      } catch (e) {}
+      saveStoredSuppliers([newSupp, ...list.filter(s => s.id !== newSupp.id)]);
       return newSupp;
     },
     update: async (id: string, updates: Partial<Supplier>): Promise<Supplier> => {
-      await delay(0);
       const list = getStoredSuppliers();
       const idx = list.findIndex(s => s.id === id);
       if (idx === -1) throw new Error('Proveedor no encontrado');
       const updated = { ...list[idx], ...updates };
+      try {
+        await fetchWithTimeout(`${getApiUrl()}/suppliers/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
+        });
+      } catch (e) {}
       list[idx] = updated;
       saveStoredSuppliers([...list]);
       return updated;
     },
     delete: async (id: string): Promise<void> => {
-      await delay(0);
+      try {
+        await fetchWithTimeout(`${getApiUrl()}/suppliers/${id}`, {
+          method: 'DELETE',
+        });
+      } catch (e) {}
       const list = getStoredSuppliers().filter(s => s.id !== id);
       saveStoredSuppliers(list);
     }
   },
   purchases: {
     getAll: async (): Promise<PurchaseOrder[]> => {
-      await delay(0);
+      try {
+        const response = await fetchWithTimeout(`${getApiUrl()}/purchases`);
+        if (response.ok) {
+          const raw = await response.json();
+          if (Array.isArray(raw)) {
+            const mapped: PurchaseOrder[] = raw.map((p: any) => ({
+              ...p,
+              id: String(p.id),
+              orderNumber: p.orderNumber || `OC-${String(p.id).slice(-4)}`,
+              supplierId: String(p.supplierId || ''),
+              supplierName: p.supplierName || '',
+              items: Array.isArray(p.items) ? p.items : [],
+              date: Number(p.date || p.createdAt) || Date.now(),
+              subtotal: Number(p.subtotal) || 0,
+              tax: Number(p.tax) || 0,
+              total: Number(p.total) || 0,
+              status: p.status || 'BORRADOR',
+              createdAt: Number(p.createdAt) || Date.now(),
+              expectedDeliveryDate: p.expectedDeliveryDate ? Number(p.expectedDeliveryDate) : undefined,
+              receivedAt: p.receivedAt ? Number(p.receivedAt) : undefined,
+              notes: p.notes || '',
+              invoiceNumber: p.invoiceNumber || '',
+            }));
+            saveStoredPurchases(mapped);
+            return mapped;
+          }
+        }
+      } catch (err) {}
       return getStoredPurchases();
     },
     create: async (order: Omit<PurchaseOrder, 'id'>): Promise<PurchaseOrder> => {
-      await delay(0);
       const list = getStoredPurchases();
+      const tempId = `po-${Date.now()}`;
       const newPO: PurchaseOrder = {
         ...order,
-        id: (list.length + 1).toString(),
+        id: tempId,
       };
-      saveStoredPurchases([newPO, ...list]);
+      try {
+        const res = await fetchWithTimeout(`${getApiUrl()}/purchases`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(order),
+        });
+        if (res.ok) {
+          const created = await res.json();
+          if (created && created.id) {
+            newPO.id = String(created.id);
+          }
+        }
+      } catch (e) {}
+      saveStoredPurchases([newPO, ...list.filter(p => p.id !== newPO.id)]);
       return newPO;
     },
     updateStatus: async (id: string, status: PurchaseOrderStatus): Promise<PurchaseOrder> => {
-      await delay(0);
       const list = getStoredPurchases();
       const idx = list.findIndex(p => p.id === id);
       if (idx === -1) throw new Error('Orden no encontrada');
       list[idx].status = status;
+      try {
+        await fetchWithTimeout(`${getApiUrl()}/purchases/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+        });
+      } catch (e) {}
       saveStoredPurchases([...list]);
       return list[idx];
     },
     receiveOrder: async (id: string): Promise<PurchaseOrder> => {
-      await delay(0);
       const list = getStoredPurchases();
       const idx = list.findIndex(p => p.id === id);
       if (idx === -1) throw new Error('Orden no encontrada');
       const po = list[idx];
       po.status = 'RECIBIDA';
+      po.receivedAt = Date.now();
+      try {
+        await fetchWithTimeout(`${getApiUrl()}/purchases/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'RECIBIDA', receivedAt: po.receivedAt }),
+        });
+      } catch (e) {}
       saveStoredPurchases([...list]);
 
       const invItems = getStoredInventory();
@@ -1808,18 +1969,25 @@ export const mockApi = {
         if (target) {
           target.currentStock += poItem.quantity;
           target.unitCost = poItem.unitCost || target.unitCost;
+          fetchWithTimeout(`${getApiUrl()}/inventory/${target.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentStock: target.currentStock, unitCost: target.unitCost }),
+          }).catch(() => {});
+
           movs.unshift({
             id: 'mov-' + now + '-' + poItem.itemId,
             itemId: target.id,
             itemName: target.name,
             type: 'ENTRADA',
             quantity: poItem.quantity,
-            reason: `Recepción Orden PO-${po.id.padStart(4, '0')}`,
+            reason: `Recepción Orden ${po.orderNumber || ('PO-' + po.id)}`,
             responsibleName: 'Almacén / Compras',
             date: now,
           });
         }
       });
+
       saveStoredInventory([...invItems]);
       saveStoredInventoryMovements([...movs]);
       return po;
@@ -2138,15 +2306,41 @@ export const mockApi = {
   },
   customers: {
     getAll: async (): Promise<Customer[]> => {
-      await delay(0);
+      try {
+        const response = await fetchWithTimeout(`${getApiUrl()}/customers`);
+        if (response.ok) {
+          const raw = await response.json();
+          if (Array.isArray(raw)) {
+            const mapped: Customer[] = raw.map((c: any) => ({
+              ...c,
+              id: String(c.id),
+              name: c.name,
+              email: c.email || '',
+              phone: c.phone || '',
+              documentId: c.documentId || '',
+              address: c.address || '',
+              loyaltyPoints: Number(c.loyaltyPoints) || 0,
+              totalOrders: Number(c.totalOrders) || 0,
+              totalSpent: Number(c.totalSpent) || 0,
+              averageTicket: c.totalOrders > 0 ? Math.round(c.totalSpent / c.totalOrders) : (c.averageTicket || 0),
+              tier: c.tier || 'BRONCE',
+              notes: c.notes || '',
+              favoriteDishes: Array.isArray(c.favoriteDishes) ? c.favoriteDishes : [],
+              createdAt: Number(c.createdAt) || Date.now(),
+              lastVisit: c.lastVisit ? Number(c.lastVisit) : Date.now(),
+              isActive: c.isActive !== undefined ? Boolean(c.isActive) : true,
+            }));
+            saveStoredCustomers(mapped);
+            return mapped;
+          }
+        }
+      } catch (err) {}
       return getStoredCustomers();
     },
     getById: async (id: string): Promise<Customer | null> => {
-      await delay(0);
       return getStoredCustomers().find(c => c.id === id) || null;
     },
     getByDocumentOrPhone: async (query: string): Promise<Customer | null> => {
-      await delay(0);
       const clean = query.trim().toLowerCase();
       return getStoredCustomers().find(c =>
         (c.documentId && c.documentId.toLowerCase() === clean) ||
@@ -2154,7 +2348,6 @@ export const mockApi = {
       ) || null;
     },
     create: async (data: Omit<Customer, 'id'>): Promise<Customer> => {
-      await delay(0);
       const list = getStoredCustomers();
       const newCustomer: Customer = {
         ...data,
@@ -2168,33 +2361,62 @@ export const mockApi = {
         lastVisit: Date.now(),
         isActive: true,
       };
+      try {
+        const res = await fetchWithTimeout(`${getApiUrl()}/customers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newCustomer),
+        });
+        if (res.ok) {
+          const created = await res.json();
+          if (created && created.id) {
+            newCustomer.id = String(created.id);
+          }
+        }
+      } catch (e) {}
       list.unshift(newCustomer);
       saveStoredCustomers(list);
       return newCustomer;
     },
     update: async (id: string, data: Partial<Customer>): Promise<Customer> => {
-      await delay(0);
       const list = getStoredCustomers();
       const idx = list.findIndex(c => c.id === id);
       if (idx === -1) throw new Error('Cliente no encontrado');
       list[idx] = { ...list[idx], ...data };
+      try {
+        await fetchWithTimeout(`${getApiUrl()}/customers/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+      } catch (e) {}
       saveStoredCustomers(list);
       return list[idx];
     },
     delete: async (id: string): Promise<boolean> => {
-      await delay(0);
+      try {
+        await fetchWithTimeout(`${getApiUrl()}/customers/${id}`, {
+          method: 'DELETE',
+        });
+      } catch (e) {}
       const list = getStoredCustomers();
       const filtered = list.filter(c => c.id !== id);
       saveStoredCustomers(filtered);
       return true;
     },
     adjustPoints: async (id: string, pointsDelta: number): Promise<Customer> => {
-      await delay(0);
       const list = getStoredCustomers();
       const idx = list.findIndex(c => c.id === id);
       if (idx === -1) throw new Error('Cliente no encontrado');
       const current = list[idx].loyaltyPoints || 0;
       list[idx].loyaltyPoints = Math.max(0, current + pointsDelta);
+      try {
+        await fetchWithTimeout(`${getApiUrl()}/customers/${id}/loyalty`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pointsDelta }),
+        });
+      } catch (e) {}
       saveStoredCustomers(list);
       return list[idx];
     }
@@ -2429,16 +2651,44 @@ export const mockApi = {
   },
   recipes: {
     getAll: async (): Promise<Recipe[]> => {
-      await delay(0);
+      try {
+        const response = await fetchWithTimeout(`${getApiUrl()}/recipes`);
+        if (response.ok) {
+          const raw = await response.json();
+          if (Array.isArray(raw)) {
+            const mapped: Recipe[] = raw.map((r: any) => ({
+              ...r,
+              id: String(r.id),
+              productId: String(r.productId),
+              productName: r.productName,
+              costTotal: Number(r.costTotal) || 0,
+              portionCount: Number(r.portionCount || r.portions) || 1,
+              preparationMinutes: Number(r.preparationMinutes || r.preparationTimeMinutes) || 15,
+              difficulty: r.difficulty || 'MEDIA',
+              station: r.station || 'COCINA',
+              steps: Array.isArray(r.steps) ? r.steps : [],
+              ingredients: Array.isArray(r.ingredients) ? r.ingredients : [],
+              wastePercentage: Number(r.wastePercentage || r.wasteMarginPercentage) || 0,
+              lastUpdated: Number(r.lastUpdated || r.updatedAt) || Date.now(),
+            }));
+            saveStoredRecipes(mapped);
+            return mapped;
+          }
+        }
+      } catch (err) {}
       return getStoredRecipes();
     },
     getByProductId: async (productId: string): Promise<Recipe | null> => {
-      await delay(0);
-      return getStoredRecipes().find(r => r.productId === productId) || null;
+      try {
+        const res = await fetchWithTimeout(`${getApiUrl()}/recipes/${productId}`);
+        if (res.ok) {
+          const rec = await res.json();
+          if (rec && rec.productId) return rec;
+        }
+      } catch (e) {}
+      return getStoredRecipes().find(r => r.productId === productId || r.id === productId) || null;
     },
     save: async (recipe: Recipe): Promise<Recipe> => {
-      await delay(0);
-
       // Sincronizar y crear automáticamente ingredientes que no estén en inventario
       const inventoryList = getStoredInventory();
       let inventoryUpdated = false;
@@ -2479,6 +2729,12 @@ export const mockApi = {
                 ing.inventoryItemId = newId;
                 inventoryUpdated = true;
                 newlyCreatedIngredients.push(cleanName);
+
+                fetchWithTimeout(`${getApiUrl()}/inventory`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(newInvItem),
+                }).catch(() => {});
 
                 // Registrar en el Kardex de inventario como creación pendiente
                 const movs = getStoredInventoryMovements();
@@ -2530,11 +2786,30 @@ export const mockApi = {
         };
         list.push(updatedRecipe);
       }
+
+      try {
+        const res = await fetchWithTimeout(`${getApiUrl()}/recipes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedRecipe),
+        });
+        if (res.ok) {
+          const savedServer = await res.json();
+          if (savedServer && savedServer.id) {
+            updatedRecipe.id = String(savedServer.id);
+          }
+        }
+      } catch (e) {}
+
       saveStoredRecipes(list);
       return updatedRecipe;
     },
     delete: async (productId: string): Promise<boolean> => {
-      await delay(0);
+      try {
+        await fetchWithTimeout(`${getApiUrl()}/recipes/${productId}`, {
+          method: 'DELETE',
+        });
+      } catch (e) {}
       const list = getStoredRecipes();
       const filtered = list.filter(r => r.productId !== productId && r.id !== productId);
       saveStoredRecipes(filtered);
