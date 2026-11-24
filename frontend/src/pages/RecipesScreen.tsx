@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -223,6 +224,59 @@ export default function RecipesScreen() {
     message: '',
     severity: 'success',
   });
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const configureProductId = searchParams.get('configureProduct');
+
+  // Compute products from catalog that do NOT yet have an associated recipe
+  const pendingProducts = useMemo(() => {
+    const configuredProductIds = new Set(recipes.map(r => String(r.productId)));
+    return products.filter(p => !configuredProductIds.has(String(p.id)));
+  }, [products, recipes]);
+
+  const handleConfigurePendingProduct = useCallback((product: Product) => {
+    setIsNewProductMode(false);
+    const defaultFirstInv = inventory[0];
+    setEditingRecipe({
+      productId: String(product.id),
+      productName: product.name,
+      category: 'Platos Fuertes',
+      recipeType: 'PLATO_MENU',
+      preparationTimeMinutes: 15,
+      portions: 1,
+      wasteMarginPercentage: 5,
+      packagingCost: 500,
+      station: 'COCINA',
+      difficulty: 'MEDIA',
+      allergens: [],
+      salePriceManual: product.price,
+      ingredients: defaultFirstInv ? [
+        {
+          inventoryItemId: String(defaultFirstInv.id),
+          customIngredientName: defaultFirstInv.name,
+          quantity: defaultFirstInv.unit?.toLowerCase().includes('kg') ? 150 : 1,
+          unit: defaultFirstInv.unit?.toLowerCase().includes('kg') ? 'g' : (defaultFirstInv.unit || 'Unidad'),
+          notes: ''
+        }
+      ] : [],
+      preparationInstructions: '1. Preparar mise en place de ingredientes.\n2. Cocinar y montar en plato o empaque.\n3. Servir a temperatura ideal.',
+      chefNotes: 'Ficha técnica asignada desde el catálogo de platillos.',
+    });
+    setIsEditModalOpen(true);
+  }, [inventory]);
+
+  // If navigated with ?configureProduct=<id>, auto-open editor for that product
+  useEffect(() => {
+    if (configureProductId && products.length > 0) {
+      const targetProd = products.find(p => String(p.id) === String(configureProductId));
+      if (targetProd) {
+        handleConfigurePendingProduct(targetProd);
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('configureProduct');
+        setSearchParams(newParams, { replace: true });
+      }
+    }
+  }, [configureProductId, products, searchParams, setSearchParams, handleConfigurePendingProduct]);
 
   const loadData = async (isInitial = false) => {
     try {
@@ -1166,6 +1220,87 @@ export default function RecipesScreen() {
         </Grid>
       </Grid>
 
+      {/* ALERTA DE PLATILLOS PENDIENTES DE CONFIGURAR */}
+      {pendingProducts.length > 0 && (
+        <Paper
+          elevation={0}
+          sx={{
+            mb: 3,
+            p: 2,
+            px: 2.5,
+            borderRadius: 3,
+            bgcolor: '#fffbeb',
+            border: '1px solid #fde68a',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 2,
+            boxShadow: '0 2px 8px rgba(217, 119, 6, 0.08)'
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                bgcolor: '#fef3c7',
+                color: '#d97706',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}
+            >
+              <WarningIcon sx={{ fontSize: 22 }} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#92400e' }}>
+                ¡Tienes {pendingProducts.length} {pendingProducts.length === 1 ? 'platillo nuevo' : 'platillos nuevos'} del catálogo sin receta ni escandallo!
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#b45309', fontWeight: 600 }}>
+                Configura sus materias primas para calcular su costo real, margen de ganancia y descontar stock automáticamente.
+              </Typography>
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            {pendingProducts.slice(0, 3).map(p => (
+              <Chip
+                key={p.id}
+                label={`+ ${p.name}`}
+                onClick={() => handleConfigurePendingProduct(p)}
+                clickable
+                size="small"
+                sx={{
+                  bgcolor: '#ffffff',
+                  fontWeight: 800,
+                  color: '#92400e',
+                  border: '1px solid #fcd34d',
+                  '&:hover': { bgcolor: '#fef3c7' }
+                }}
+              />
+            ))}
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => setMainTab(1)}
+              sx={{
+                bgcolor: '#d97706',
+                color: '#ffffff',
+                fontWeight: 900,
+                textTransform: 'none',
+                borderRadius: 2,
+                px: 2,
+                '&:hover': { bgcolor: '#b45309' }
+              }}
+            >
+              Ver Todos ({pendingProducts.length})
+            </Button>
+          </Box>
+        </Paper>
+      )}
+
       {/* 3. PESTAÑAS PRINCIPALES DEL MÓDULO */}
       <Box sx={{ borderBottom: 1, borderColor: '#e2e8f0', mb: 3 }}>
         <Tabs
@@ -1183,7 +1318,26 @@ export default function RecipesScreen() {
             '& .MuiTabs-indicator': { bgcolor: '#84cc16', height: 3, borderRadius: '3px 3px 0 0' }
           }}
         >
-          <Tab label={`📋 Fichas Técnicas & Escandallos (${recipes.length})`} />
+          <Tab label={`📋 Fichas Activas (${recipes.length})`} />
+          <Tab
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <span>⚠️ Platillos Sin Receta</span>
+                <Chip
+                  label={pendingProducts.length}
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontWeight: 900,
+                    fontSize: '0.7rem',
+                    bgcolor: pendingProducts.length > 0 ? '#fef3c7' : '#f1f5f9',
+                    color: pendingProducts.length > 0 ? '#b45309' : '#64748b',
+                    border: pendingProducts.length > 0 ? '1px solid #fcd34d' : 'none'
+                  }}
+                />
+              </Box>
+            }
+          />
           {canManageRecipes && <Tab label="📊 Auditoría y Control de Food Cost %" />}
         </Tabs>
       </Box>
@@ -1844,8 +1998,145 @@ export default function RecipesScreen() {
         </>
       )}
 
-      {/* TAB 1: AUDITORÍA DE FOOD COST */}
+      {/* TAB 1: PLATILLOS PENDIENTES DE RECETA */}
       {mainTab === 1 && (
+        <Box>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b' }}>
+              Platillos del Menú Sin Receta ({pendingProducts.length})
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Platos dados de alta en el catálogo pero que aún no tienen escandallo, insumos asociados ni costeo Food Cost %.
+            </Typography>
+          </Box>
+
+          {pendingProducts.length === 0 ? (
+            <Paper
+              elevation={0}
+              sx={{
+                p: 5,
+                textAlign: 'center',
+                borderRadius: '20px',
+                border: '1px solid #bbf7d0',
+                bgcolor: '#f0fdf4'
+              }}
+            >
+              <Box
+                sx={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: '50%',
+                  bgcolor: '#dcfce7',
+                  color: '#16a34a',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mx: 'auto',
+                  mb: 2
+                }}
+              >
+                <KitchenIcon sx={{ fontSize: 32 }} />
+              </Box>
+              <Typography variant="h6" sx={{ fontWeight: 900, color: '#166534', mb: 1 }}>
+                ¡Todos los platillos del catálogo tienen su receta configurada!
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#15803d', maxWidth: 480, mx: 'auto' }}>
+                Cada ítem del menú tiene sus ingredientes, cantidades y costo unitario calculados para descontar inventario al vender.
+              </Typography>
+            </Paper>
+          ) : (
+            <Grid container spacing={2}>
+              {pendingProducts.map(prod => (
+                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={prod.id}>
+                  <Card
+                    elevation={0}
+                    sx={{
+                      p: 2.5,
+                      borderRadius: '18px',
+                      border: '1px solid #fde68a',
+                      bgcolor: '#fffdfa',
+                      boxShadow: '0 2px 10px rgba(217, 119, 6, 0.06)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      height: '100%',
+                      transition: 'all 0.2s ease',
+                      '&:hover': { borderColor: '#d97706', transform: 'translateY(-2px)' }
+                    }}
+                  >
+                    <Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5, gap: 1 }}>
+                        <Box>
+                          <Typography variant="h6" sx={{ fontWeight: 900, color: '#1e290b', lineHeight: 1.2 }}>
+                            {prod.name}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+                            SKU: {prod.sku || 'N/A'} • {prod.categoryId ? `Cat: ${prod.categoryId}` : 'Menú General'}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          label="⚠️ Sin Ficha"
+                          size="small"
+                          sx={{
+                            fontWeight: 900,
+                            fontSize: '0.7rem',
+                            bgcolor: '#fef3c7',
+                            color: '#b45309',
+                            border: '1px solid #fcd34d',
+                            height: 24
+                          }}
+                        />
+                      </Box>
+
+                      <Box sx={{ p: 1.5, mb: 2, bgcolor: '#fef2f2', borderRadius: '12px', border: '1px dashed #fca5a5' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 800, color: '#991b1b', fontSize: '0.78rem', mb: 0.5 }}>
+                          Faltan materias primas y modo de cocción
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#7f1d1d', display: 'block' }}>
+                          Al vender este platillo no se descontarán insumos del inventario y no se calculará el margen de ganancia.
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700 }}>
+                          Precio de Venta:
+                        </Typography>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#0284c7' }}>
+                          ${(prod.price || 0).toLocaleString()} COP
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    {canManageRecipes && (
+                      <Button
+                        variant="contained"
+                        fullWidth
+                        startIcon={<AddIcon />}
+                        onClick={() => handleConfigurePendingProduct(prod)}
+                        sx={{
+                          borderRadius: '12px',
+                          fontWeight: 900,
+                          textTransform: 'none',
+                          bgcolor: '#65a30d',
+                          color: '#ffffff',
+                          py: 1,
+                          boxShadow: '0 4px 12px rgba(101, 163, 13, 0.3)',
+                          '&:hover': { bgcolor: '#4d7c0f' }
+                        }}
+                      >
+                        Configurar Escandallo Ahora
+                      </Button>
+                    )}
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Box>
+      )}
+
+      {/* TAB 2: AUDITORÍA DE FOOD COST */}
+      {mainTab === 2 && (
         <Box>
           <Box sx={{ mb: 3 }}>
             <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b' }}>

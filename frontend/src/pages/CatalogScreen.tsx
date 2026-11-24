@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -32,7 +33,8 @@ import {
   InputAdornment,
   Stack,
   Divider,
-  LinearProgress
+  LinearProgress,
+  Alert
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -55,10 +57,11 @@ import {
   Casino as RandomIcon,
   FolderSpecial as CategoryIcon,
   Refresh as RefreshIcon,
-  LocalFireDepartment as FireIcon
+  LocalFireDepartment as FireIcon,
+  MenuBook as MenuBookIcon
 } from '@mui/icons-material';
 import { mockApi } from '../services/mockApi';
-import { Product, Category, ModifierGroup } from '../types';
+import { Product, Category, ModifierGroup, Recipe } from '../types';
 import { subscribeRealtimeEvents } from '../services/eventBus';
 import { useAuthStore } from '../store/authStore';
 
@@ -77,6 +80,7 @@ const QUICK_TAG_SUGGESTIONS = [
 ];
 
 export default function CatalogScreen() {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const isAdminOrManager = ['ADMINISTRADOR', 'GERENTE'].includes(user?.role || '');
   const canManageCatalog = isAdminOrManager;
@@ -86,6 +90,8 @@ export default function CatalogScreen() {
   const [viewMode, setViewMode] = useState<'GRID' | 'TABLE'>('GRID');
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [pendingConfigProduct, setPendingConfigProduct] = useState<{ id: string; name: string } | null>(null);
 
   // Filtros y Búsqueda
   const [searchQuery, setSearchQuery] = useState('');
@@ -139,12 +145,14 @@ export default function CatalogScreen() {
 
   const loadData = async () => {
     try {
-      const [prods, cats] = await Promise.all([
+      const [prods, cats, recs] = await Promise.all([
         mockApi.products.getAll(),
-        mockApi.categories.getAll()
+        mockApi.categories.getAll(),
+        mockApi.recipes.getAll()
       ]);
       setProducts(prods || []);
       setCategories(cats || []);
+      setRecipes(recs || []);
     } catch (e) {
       console.error(e);
     }
@@ -256,13 +264,20 @@ export default function CatalogScreen() {
     };
 
     try {
+      let createdId: string | null = null;
       if (editingProduct) {
         await mockApi.products.update(editingProduct.id, payload);
       } else {
-        await mockApi.products.create(payload);
+        const created = await mockApi.products.create(payload);
+        if (created && created.id) {
+          createdId = String(created.id);
+        }
       }
       setIsProductDialogOpen(false);
-      loadData();
+      await loadData();
+      if (createdId) {
+        setPendingConfigProduct({ id: createdId, name: payload.name });
+      }
     } catch (e: any) {
       console.error(e);
       alert(e.message || 'Error al guardar el producto');
@@ -1214,6 +1229,31 @@ export default function CatalogScreen() {
 
                         {/* Tags & Extras */}
                         <Box sx={{ display: 'flex', gap: 0.6, flexWrap: 'wrap', mb: 1.5 }}>
+                          {/* Recipe Status Chip */}
+                          {(() => {
+                            const hasRecipe = recipes.some(r => String(r.productId) === String(product.id));
+                            return hasRecipe ? (
+                              <Tooltip title="Ficha técnica de receta configurada. Clic para ver en Recetas">
+                                <Chip
+                                  size="small"
+                                  label="✅ Receta OK"
+                                  onClick={() => navigate('/recipes')}
+                                  clickable
+                                  sx={{ fontSize: '0.65rem', height: 22, fontWeight: 800, bgcolor: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}
+                                />
+                              </Tooltip>
+                            ) : (
+                              <Tooltip title="Platillo nuevo sin escandallo culinario. Clic para configurarlo">
+                                <Chip
+                                  size="small"
+                                  label="⚠️ Falta Receta"
+                                  onClick={() => navigate(`/recipes?configureProduct=${product.id}`)}
+                                  clickable
+                                  sx={{ fontSize: '0.65rem', height: 22, fontWeight: 800, bgcolor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}
+                                />
+                              </Tooltip>
+                            );
+                          })()}
                           {product.calories && (
                             <Chip
                               size="small"
@@ -1304,6 +1344,7 @@ export default function CatalogScreen() {
                     <TableCell align="right" sx={{ fontWeight: 800, color: '#475569' }}>Precio Venta</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800, color: '#475569' }}>Margen Bruto</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 800, color: '#475569' }}>Disponibilidad</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 800, color: '#475569' }}>Escandallo / Receta</TableCell>
                     {canManageCatalog && <TableCell align="right" sx={{ fontWeight: 800, color: '#475569' }}>Acciones</TableCell>}
                   </TableRow>
                 </TableHead>
@@ -1361,6 +1402,32 @@ export default function CatalogScreen() {
                             size="small"
                             sx={{ fontWeight: 800, borderRadius: '8px' }}
                           />
+                        </TableCell>
+                        <TableCell align="center">
+                          {(() => {
+                            const hasRecipe = recipes.some(r => String(r.productId) === String(product.id));
+                            return hasRecipe ? (
+                              <Tooltip title="Ficha técnica de receta configurada. Clic para ver en Recetas">
+                                <Chip
+                                  size="small"
+                                  label="✅ Receta OK"
+                                  onClick={() => navigate('/recipes')}
+                                  clickable
+                                  sx={{ height: 22, fontSize: '0.68rem', fontWeight: 800, bgcolor: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}
+                                />
+                              </Tooltip>
+                            ) : (
+                              <Tooltip title="Platillo nuevo sin escandallo culinario. Clic para ir a Recetas">
+                                <Chip
+                                  size="small"
+                                  label="⚠️ Falta Receta"
+                                  onClick={() => navigate(`/recipes?configureProduct=${product.id}`)}
+                                  clickable
+                                  sx={{ height: 22, fontSize: '0.68rem', fontWeight: 800, bgcolor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}
+                                />
+                              </Tooltip>
+                            );
+                          })()}
                         </TableCell>
                         {canManageCatalog && (
                           <TableCell align="right">
@@ -2115,6 +2182,76 @@ export default function CatalogScreen() {
             sx={{ borderRadius: '12px', fontWeight: 800, bgcolor: '#1e290b', '&:hover': { bgcolor: '#2d3e11' } }}
           >
             Abrir Vista Previa Cliente
+          </Button>
+        </DialogActions>
+      </Dialog>
+      {/* 6. Diálogo Alerta: Platillo Creado -> Enviado a Recetas */}
+      <Dialog
+        open={Boolean(pendingConfigProduct)}
+        onClose={() => setPendingConfigProduct(null)}
+        slotProps={{ paper: { sx: { borderRadius: '24px', p: 1.5, maxWidth: 480 } } }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5, fontWeight: 900, pb: 1 }}>
+          <Box
+            sx={{
+              width: 44,
+              height: 44,
+              borderRadius: '14px',
+              bgcolor: 'rgba(101, 163, 13, 0.15)',
+              color: '#4d7c0f',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}
+          >
+            <MenuBookIcon sx={{ fontSize: 24 }} />
+          </Box>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 900, color: '#1e290b', lineHeight: 1.2 }}>
+              ¡Platillo agregado a tu Menú!
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#65a30d', fontWeight: 800 }}>
+              Enviado al módulo de Recetas & Escandallos
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 2.5 }}>
+          <Typography variant="body2" sx={{ color: '#334155', mb: 2, lineHeight: 1.6 }}>
+            El platillo <strong>"{pendingConfigProduct?.name}"</strong> ya está disponible en la carta.
+            <br />
+            Para que este producto <strong>descuente automáticamente las materias primas del inventario al venderse en el POS</strong> y puedas controlar su Food Cost % real, es necesario configurar su escandallo culinario.
+          </Typography>
+          <Alert severity="warning" sx={{ borderRadius: '12px', fontSize: '0.8rem', fontWeight: 700 }}>
+            Estado actual en cocina: <strong>⚠️ Pendiente de configurar receta</strong>
+          </Alert>
+        </DialogContent>
+        <DialogActions sx={{ p: 2.5, pt: 0, display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+          <Button
+            onClick={() => setPendingConfigProduct(null)}
+            sx={{ fontWeight: 700, color: '#64748b', textTransform: 'none' }}
+          >
+            Configurar Después
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              const pid = pendingConfigProduct?.id;
+              setPendingConfigProduct(null);
+              navigate(`/recipes?configureProduct=${pid}`);
+            }}
+            sx={{
+              borderRadius: '12px',
+              fontWeight: 900,
+              bgcolor: '#65a30d',
+              px: 2.5,
+              py: 0.9,
+              textTransform: 'none',
+              boxShadow: '0 4px 14px rgba(101, 163, 13, 0.35)',
+              '&:hover': { bgcolor: '#4d7c0f' }
+            }}
+          >
+            Configurar Receta Ahora
           </Button>
         </DialogActions>
       </Dialog>
