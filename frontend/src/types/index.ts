@@ -398,6 +398,7 @@ export interface RecipeIngredient {
   notes?: string;
   name?: string;
   customIngredientName?: string;
+  unitCostManual?: number;
 }
 
 export interface Recipe {
@@ -405,6 +406,7 @@ export interface Recipe {
   productId: string;
   productName?: string;
   category?: string;
+  recipeType?: 'PLATO_MENU' | 'SUB_RECETA';
   ingredients: RecipeIngredient[];
   preparationTimeMinutes?: number;
   portions?: number;
@@ -415,6 +417,7 @@ export interface Recipe {
   chefNotes?: string;
   difficulty?: 'FÁCIL' | 'MEDIA' | 'ALTA';
   station?: 'PARRILLA' | 'HORNO' | 'COCINA' | 'BAR' | 'ENSALADAS';
+  salePriceManual?: number;
   updatedAt?: number;
 }
 

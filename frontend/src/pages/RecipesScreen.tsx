@@ -24,14 +24,16 @@ import {
   IconButton,
   Tooltip,
   Alert,
-  LinearProgress,
   Snackbar,
   Stack,
   Collapse,
   Tabs,
   Tab,
   Avatar,
-  Divider,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  CircularProgress
 } from '@mui/material';
 import {
   Kitchen as KitchenIcon,
@@ -43,7 +45,6 @@ import {
   Search as SearchIcon,
   Warning as WarningIcon,
   TrendingUp as TrendingUpIcon,
-  Timer as TimerIcon,
   AttachMoney as MoneyIcon,
   Close as CloseIcon,
   ExpandMore as ExpandMoreIcon,
@@ -52,7 +53,10 @@ import {
   Inventory as InventoryIcon,
   GridView as GridViewIcon,
   ViewList as TableViewIcon,
-  Speed as SpeedIcon
+  Speed as SpeedIcon,
+  ContentCopy as ContentCopyIcon,
+  AutoFixHigh as AutoFixHighIcon,
+  Scale as ScaleIcon
 } from '@mui/icons-material';
 import {
   BarChart,
@@ -68,61 +72,20 @@ import { mockApi } from '../services/mockApi';
 import { Recipe, RecipeIngredient, Product, InventoryItem } from '../types';
 import { useAuthStore } from '../store/authStore';
 
-// Helper to calculate exact ingredient cost based on inventory unit and recipe quantity
-function calculateIngredientCost(item: InventoryItem | undefined, quantity: number, unit?: string): number {
-  if (!item || quantity <= 0) return 0;
-  const invUnit = (item.unit || '').toLowerCase();
-  const reqUnit = (unit || item.unit || '').toLowerCase();
+// Common Culinary Measurement Units
+const CULINARY_UNITS: { value: string; label: string; group: string }[] = [
+  { value: 'g', label: 'g (Gramos)', group: 'Peso' },
+  { value: 'Kg', label: 'Kg (Kilogramos)', group: 'Peso' },
+  { value: 'oz', label: 'oz (Onzas)', group: 'Peso' },
+  { value: 'ml', label: 'ml (Mililitros)', group: 'Volumen' },
+  { value: 'Lt', label: 'Lt (Litros)', group: 'Volumen' },
+  { value: 'Unidad', label: 'Unidad (Und)', group: 'Conteo' },
+  { value: 'Porción', label: 'Porción', group: 'Conteo' },
+  { value: 'Cucharada', label: 'Cucharada (15 ml)', group: 'Volumen' }
+];
 
-  // If inventory item is stored in Kg
-  if (invUnit.includes('kg') || invUnit.includes('kilo')) {
-    if (reqUnit.includes('g') && !reqUnit.includes('kg')) {
-      return (quantity / 1000) * item.unitCost;
-    }
-    return quantity * item.unitCost;
-  }
-
-  // If inventory item is stored in Litro / Lt
-  if (invUnit.includes('litro') || invUnit.includes('lt')) {
-    if (reqUnit.includes('ml')) {
-      return (quantity / 1000) * item.unitCost;
-    }
-    return quantity * item.unitCost;
-  }
-
-  return quantity * item.unitCost;
-}
-
-// Helper to calculate maximum portions possible with current warehouse stock
-function calculateAvailablePortions(recipe: Recipe, inventoryList: InventoryItem[]): number {
-  if (!recipe.ingredients || recipe.ingredients.length === 0) return 0;
-  let minPortions = Infinity;
-
-  for (const ing of recipe.ingredients) {
-    const item = inventoryList.find(i => i.id === ing.inventoryItemId);
-    if (!item) continue;
-    const invUnit = (item.unit || '').toLowerCase();
-    const reqUnit = (ing.unit || item.unit || '').toLowerCase();
-    let usageInInvUnits = ing.quantity;
-
-    if ((invUnit.includes('kg') || invUnit.includes('kilo')) && reqUnit.includes('g') && !reqUnit.includes('kg')) {
-      usageInInvUnits = ing.quantity / 1000;
-    } else if ((invUnit.includes('litro') || invUnit.includes('lt')) && reqUnit.includes('ml')) {
-      usageInInvUnits = ing.quantity / 1000;
-    }
-
-    if (usageInInvUnits > 0) {
-      const possible = Math.floor(item.currentStock / usageInInvUnits);
-      if (possible < minPortions) {
-        minPortions = possible;
-      }
-    }
-  }
-
-  return minPortions === Infinity ? 0 : Math.max(0, minPortions);
-}
-
-// Available allergen badges
+// Available Stations & Allergens
+const STATIONS = ['PARRILLA', 'HORNO', 'COCINA', 'BAR', 'ENSALADAS', 'REPOSTERÍA'];
 const AVAILABLE_ALLERGENS = [
   'Gluten',
   'Lácteos',
@@ -134,6 +97,88 @@ const AVAILABLE_ALLERGENS = [
   'Mostaza'
 ];
 
+// Helper to calculate ingredient cost with unit conversions
+function calculateIngredientCost(item: InventoryItem | undefined, quantity: number, unit?: string, manualUnitCost?: number): number {
+  const baseCost = typeof manualUnitCost === 'number' && manualUnitCost > 0 ? manualUnitCost : (item?.unitCost || 0);
+  if (baseCost <= 0 || quantity <= 0) return 0;
+
+  const invUnit = (item?.unit || '').toLowerCase();
+  const reqUnit = (unit || item?.unit || '').toLowerCase();
+
+  // Weight conversions
+  if (invUnit.includes('kg') || invUnit.includes('kilo')) {
+    if (reqUnit === 'g' || reqUnit.includes('gram')) return (quantity / 1000) * baseCost;
+    if (reqUnit === 'oz' || reqUnit.includes('onza')) return ((quantity * 28.3495) / 1000) * baseCost;
+    return quantity * baseCost;
+  }
+
+  // Volume conversions
+  if (invUnit.includes('litro') || invUnit.includes('lt')) {
+    if (reqUnit === 'ml' || reqUnit.includes('mililitro')) return (quantity / 1000) * baseCost;
+    if (reqUnit.includes('cucharada')) return ((quantity * 15) / 1000) * baseCost;
+    return quantity * baseCost;
+  }
+
+  // Unit / portion fallback
+  return quantity * baseCost;
+}
+
+// Portion & Bottleneck Analysis
+interface PortionAnalysis {
+  portions: number;
+  bottleneckItemName?: string;
+  bottleneckStock?: number;
+  bottleneckUnit?: string;
+  totalIngredientsCount: number;
+}
+
+function calculatePortionAnalysis(recipe: Recipe, inventoryList: InventoryItem[]): PortionAnalysis {
+  if (!recipe.ingredients || recipe.ingredients.length === 0) {
+    return { portions: 0, totalIngredientsCount: 0 };
+  }
+
+  let minPortions = Infinity;
+  let bottleneck: { name: string; stock: number; unit: string } | undefined;
+
+  for (const ing of recipe.ingredients) {
+    const item = inventoryList.find(i => i.id === ing.inventoryItemId);
+    const itemName = item?.name || ing.customIngredientName || ing.name || 'Insumo no registrado';
+    const itemUnit = item?.unit || ing.unit || 'und';
+
+    if (!item) {
+      minPortions = 0;
+      bottleneck = { name: itemName, stock: 0, unit: itemUnit };
+      break;
+    }
+
+    const invUnit = (item.unit || '').toLowerCase();
+    const reqUnit = (ing.unit || item.unit || '').toLowerCase();
+    let usageInInvUnits = ing.quantity;
+
+    if ((invUnit.includes('kg') || invUnit.includes('kilo')) && (reqUnit === 'g' || reqUnit.includes('gram'))) {
+      usageInInvUnits = ing.quantity / 1000;
+    } else if ((invUnit.includes('litro') || invUnit.includes('lt')) && (reqUnit === 'ml' || reqUnit.includes('mili'))) {
+      usageInInvUnits = ing.quantity / 1000;
+    }
+
+    if (usageInInvUnits > 0) {
+      const possible = Math.floor((item.currentStock || 0) / usageInInvUnits);
+      if (possible < minPortions) {
+        minPortions = possible;
+        bottleneck = { name: itemName, stock: item.currentStock || 0, unit: itemUnit };
+      }
+    }
+  }
+
+  return {
+    portions: minPortions === Infinity ? 0 : Math.max(0, minPortions),
+    bottleneckItemName: bottleneck?.name,
+    bottleneckStock: bottleneck?.stock,
+    bottleneckUnit: bottleneck?.unit,
+    totalIngredientsCount: recipe.ingredients.length
+  };
+}
+
 export default function RecipesScreen() {
   const { user } = useAuthStore();
   const isKitchen = user?.role === 'COCINA';
@@ -143,21 +188,29 @@ export default function RecipesScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [seedingSamples, setSeedingSamples] = useState<boolean>(false);
 
-  // Main Tabs (0: Fichas & Escandallos, 1: Auditoría Food Cost)
+  // Tabs (0: Fichas & Escandallos, 1: Auditoría Food Cost)
   const [mainTab, setMainTab] = useState<number>(0);
 
-  // Filters & Views
+  // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('TODAS');
   const [selectedStation, setSelectedStation] = useState('TODAS');
+  const [selectedType, setSelectedType] = useState('TODAS');
   const [marginFilter, setMarginFilter] = useState('TODOS');
   const [viewMode, setViewMode] = useState<'CARDS' | 'TABLE'>('CARDS');
   const [expandedRecipeId, setExpandedRecipeId] = useState<string | null>(null);
 
   // Modals
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isNewProductMode, setIsNewProductMode] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<Partial<Recipe> | null>(null);
+
+  // Form custom product fields
+  const [customProductName, setCustomProductName] = useState('');
+  const [customProductPrice, setCustomProductPrice] = useState<number | ''>(22000);
+  const [customProductCategory, setCustomProductCategory] = useState('Platos Fuertes');
 
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printingRecipe, setPrintingRecipe] = useState<Recipe | null>(null);
@@ -196,23 +249,34 @@ export default function RecipesScreen() {
     window.addEventListener('sesamo_recipes_updated', handleUpdate);
     window.addEventListener('sesamo_inventory_updated', handleUpdate);
     window.addEventListener('sesamo_order_created', handleUpdate);
+    window.addEventListener('sesamo_catalog_updated', handleUpdate);
     return () => {
       window.removeEventListener('sesamo_recipes_updated', handleUpdate);
       window.removeEventListener('sesamo_inventory_updated', handleUpdate);
       window.removeEventListener('sesamo_order_created', handleUpdate);
+      window.removeEventListener('sesamo_catalog_updated', handleUpdate);
     };
   }, []);
 
   // Compute metrics for a single recipe
   const getRecipeFinancials = useCallback((recipe: Recipe) => {
-    const product = products.find(p => p.id === recipe.productId);
-    const salePrice = product?.price || 0;
+    const product = products.find(p => String(p.id) === String(recipe.productId));
+    const salePrice = (recipe.salePriceManual && recipe.salePriceManual > 0)
+      ? recipe.salePriceManual
+      : (product?.price || 0);
 
     let rawIngredientsCost = 0;
+    let hasZeroCostInsumos = false;
+
     const ingredientsDetailed = (recipe.ingredients || []).map(ing => {
-      const invItem = inventory.find(i => i.id === ing.inventoryItemId);
-      const cost = calculateIngredientCost(invItem, ing.quantity, ing.unit);
+      const invItem = inventory.find(i => String(i.id) === String(ing.inventoryItemId));
+      const cost = calculateIngredientCost(invItem, ing.quantity, ing.unit, ing.unitCostManual);
       rawIngredientsCost += cost;
+
+      if ((!invItem || invItem.unitCost <= 0) && (!ing.unitCostManual || ing.unitCostManual <= 0)) {
+        hasZeroCostInsumos = true;
+      }
+
       return {
         ...ing,
         invItem,
@@ -229,7 +293,7 @@ export default function RecipesScreen() {
     const grossMargin = salePrice - totalCost;
     const grossMarginPercent = salePrice > 0 ? (grossMargin / salePrice) * 100 : 0;
     const foodCostPercent = salePrice > 0 ? (totalCost / salePrice) * 100 : 0;
-    const availablePortions = calculateAvailablePortions(recipe, inventory);
+    const portionAnalysis = calculatePortionAnalysis(recipe, inventory);
 
     return {
       product,
@@ -243,29 +307,32 @@ export default function RecipesScreen() {
       grossMarginPercent,
       foodCostPercent,
       ingredientsDetailed,
-      availablePortions,
+      portionAnalysis,
+      hasZeroCostInsumos,
     };
   }, [products, inventory]);
 
-  // Popularidad histórica cruzada con órdenes
   // Aggregated KPI summary
   const summaryKPIs = useMemo(() => {
     if (recipes.length === 0) {
-      return { totalRecipes: 0, avgCost: 0, avgMargin: 0, avgFoodCost: 0, criticalCount: 0 };
+      return { totalRecipes: 0, avgCost: 0, avgMargin: 0, avgFoodCost: 0, criticalCount: 0, healthyCount: 0 };
     }
 
     let totalCostAccum = 0;
     let totalMarginPctAccum = 0;
     let totalFoodCostPctAccum = 0;
     let criticalCount = 0;
+    let healthyCount = 0;
 
     recipes.forEach(r => {
       const fin = getRecipeFinancials(r);
       totalCostAccum += fin.totalCost;
       totalMarginPctAccum += fin.grossMarginPercent;
       totalFoodCostPctAccum += fin.foodCostPercent;
-      if (fin.foodCostPercent > 38 || fin.grossMarginPercent < 50) {
+      if (fin.foodCostPercent > 35) {
         criticalCount++;
+      } else if (fin.foodCostPercent <= 32) {
+        healthyCount++;
       }
     });
 
@@ -275,23 +342,18 @@ export default function RecipesScreen() {
       avgMargin: +(totalMarginPctAccum / recipes.length).toFixed(1),
       avgFoodCost: +(totalFoodCostPctAccum / recipes.length).toFixed(1),
       criticalCount,
+      healthyCount
     };
   }, [recipes, getRecipeFinancials]);
 
-  // Categories and stations list for filters
+  // Categories list
   const categories = useMemo(() => {
     const set = new Set<string>();
     recipes.forEach(r => {
       if (r.category) set.add(r.category);
-      else {
-        const p = products.find(prod => prod.id === r.productId);
-        if (p) set.add(p.categoryId === '1' ? 'Hamburguesas' : p.categoryId === '2' ? 'Pizzas' : 'Otros');
-      }
     });
     return Array.from(set);
-  }, [recipes, products]);
-
-  const stations = ['PARRILLA', 'HORNO', 'COCINA', 'BAR', 'ENSALADAS'];
+  }, [recipes]);
 
   // Filtered recipes
   const filteredRecipes = useMemo(() => {
@@ -301,15 +363,16 @@ export default function RecipesScreen() {
       const matchesSearch = prodName.includes(searchQuery.toLowerCase()) ||
         (r.preparationInstructions?.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (r.ingredients?.some(i => {
-          const inv = inventory.find(invI => invI.id === i.inventoryItemId);
-          return inv?.name.toLowerCase().includes(searchQuery.toLowerCase());
+          const inv = inventory.find(invI => String(invI.id) === String(i.inventoryItemId));
+          const name = inv?.name || i.customIngredientName || i.name || '';
+          return name.toLowerCase().includes(searchQuery.toLowerCase());
         }));
 
       if (!matchesSearch) return false;
 
       // Category filter
       if (selectedCategory !== 'TODAS') {
-        const cat = r.category || (fin.product?.categoryId === '1' ? 'Hamburguesas' : 'Pizzas');
+        const cat = r.category;
         if (cat !== selectedCategory) return false;
       }
 
@@ -318,83 +381,190 @@ export default function RecipesScreen() {
         return false;
       }
 
+      // Type filter (Plato menú vs Sub-receta)
+      if (selectedType !== 'TODAS') {
+        const type = r.recipeType || 'PLATO_MENU';
+        if (type !== selectedType) return false;
+      }
+
       // Margin filter
-      if (marginFilter === 'ALTO' && fin.grossMarginPercent < 65) return false;
-      if (marginFilter === 'MEDIO' && (fin.grossMarginPercent < 50 || fin.grossMarginPercent >= 65)) return false;
-      if (marginFilter === 'BAJO' && fin.grossMarginPercent >= 50) return false;
+      if (marginFilter === 'OPTIMO' && fin.foodCostPercent > 30) return false;
+      if (marginFilter === 'SALUDABLE' && (fin.foodCostPercent <= 30 || fin.foodCostPercent > 35)) return false;
+      if (marginFilter === 'CRITICO' && fin.foodCostPercent <= 35) return false;
 
       return true;
     });
-  }, [recipes, inventory, searchQuery, selectedCategory, selectedStation, marginFilter, getRecipeFinancials]);
+  }, [recipes, inventory, searchQuery, selectedCategory, selectedStation, selectedType, marginFilter, getRecipeFinancials]);
 
-  // Handle Open Create Modal
+  // Open Create Modal
   const handleOpenCreateModal = () => {
-    const existingProductIds = new Set(recipes.map(r => r.productId));
-    const availableProduct = products.find(p => !existingProductIds.has(p.id)) || products[0];
+    const existingProductIds = new Set(recipes.map(r => String(r.productId)));
+    const availableProduct = products.find(p => !existingProductIds.has(String(p.id)));
 
-    setEditingRecipe({
-      productId: availableProduct?.id || '1',
-      productName: availableProduct?.name || '',
-      category: availableProduct?.categoryId === '1' ? 'Hamburguesas' : availableProduct?.categoryId === '2' ? 'Pizzas' : 'General',
-      preparationTimeMinutes: 10,
-      portions: 1,
-      wasteMarginPercentage: 5,
-      packagingCost: 500,
-      station: 'COCINA',
-      difficulty: 'MEDIA',
-      allergens: [],
-      ingredients: [
-        { inventoryItemId: inventory[0]?.id || '1', quantity: 1, unit: inventory[0]?.unit || 'Unidad', notes: '' }
-      ],
-      preparationInstructions: '1. Preparar ingredientes según porción.\n2. Cocinar y montar plato.\n3. Servir en temperatura ideal.',
-      chefNotes: 'Consejo del chef: Mantener mise en place fresca antes del servicio.',
-    });
+    const defaultFirstInv = inventory[0];
+
+    if (availableProduct) {
+      setIsNewProductMode(false);
+      setEditingRecipe({
+        productId: String(availableProduct.id),
+        productName: availableProduct.name,
+        category: 'Platos Fuertes',
+        recipeType: 'PLATO_MENU',
+        preparationTimeMinutes: 15,
+        portions: 1,
+        wasteMarginPercentage: 5,
+        packagingCost: 500,
+        station: 'COCINA',
+        difficulty: 'MEDIA',
+        allergens: [],
+        ingredients: [
+          {
+            inventoryItemId: defaultFirstInv ? String(defaultFirstInv.id) : '__NEW__',
+            customIngredientName: defaultFirstInv ? defaultFirstInv.name : 'Insumo Principal',
+            quantity: defaultFirstInv?.unit?.toLowerCase().includes('kg') ? 150 : 1,
+            unit: defaultFirstInv?.unit?.toLowerCase().includes('kg') ? 'g' : (defaultFirstInv?.unit || 'Unidad'),
+            notes: ''
+          }
+        ],
+        preparationInstructions: '1. Preparar mise en place de ingredientes.\n2. Cocinar y montar en plato o empaque.\n3. Servir a temperatura ideal.',
+        chefNotes: 'Mantener insumos frescos y verificar punto de cocción antes de servicio.',
+      });
+    } else {
+      // Direct new dish mode (works even if database has 0 products)
+      setIsNewProductMode(true);
+      setCustomProductName('Hamburguesa Especial Sésamo');
+      setCustomProductPrice(24000);
+      setCustomProductCategory('Hamburguesas');
+
+      setEditingRecipe({
+        productId: `prod-temp-${Date.now()}`,
+        productName: 'Hamburguesa Especial Sésamo',
+        category: 'Hamburguesas',
+        recipeType: 'PLATO_MENU',
+        preparationTimeMinutes: 15,
+        portions: 1,
+        wasteMarginPercentage: 5,
+        packagingCost: 600,
+        station: 'PARRILLA',
+        difficulty: 'MEDIA',
+        allergens: ['Gluten', 'Lácteos'],
+        ingredients: [
+          {
+            inventoryItemId: defaultFirstInv ? String(defaultFirstInv.id) : '__NEW__',
+            customIngredientName: defaultFirstInv ? defaultFirstInv.name : 'Carne de Res Molida 80/20',
+            quantity: 180,
+            unit: 'g',
+            unitCostManual: 3600,
+            notes: 'Porción por hamburguesa'
+          }
+        ],
+        preparationInstructions: '1. Sellar la carne en plancha a 200°C por 3 minutos por lado.\n2. Tostar pan brioche con mantequilla.\n3. Montar vegetales frescos y servir.',
+        chefNotes: 'Servir inmediatamente para mantener textura crujiente del pan.',
+      });
+    }
+
     setIsEditModalOpen(true);
   };
 
-  // Handle Open Edit Modal
+  // Open Edit Modal
   const handleOpenEditModal = (recipe: Recipe) => {
+    setIsNewProductMode(false);
+    const prod = products.find(p => String(p.id) === String(recipe.productId));
+    setCustomProductName(recipe.productName || prod?.name || '');
+    setCustomProductPrice(recipe.salePriceManual || prod?.price || 0);
+    setCustomProductCategory(recipe.category || 'General');
+
     setEditingRecipe(JSON.parse(JSON.stringify(recipe)));
     setIsEditModalOpen(true);
   };
 
+  // Duplicate / Clone Recipe
+  const handleDuplicateRecipe = (recipe: Recipe) => {
+    const prod = products.find(p => String(p.id) === String(recipe.productId));
+    const clonedName = `${recipe.productName || prod?.name || 'Receta'} (Copia)`;
+    const newProdId = `prod-copy-${Date.now()}`;
+
+    setIsNewProductMode(true);
+    setCustomProductName(clonedName);
+    setCustomProductPrice(recipe.salePriceManual || prod?.price || 0);
+    setCustomProductCategory(recipe.category || 'General');
+
+    setEditingRecipe({
+      ...JSON.parse(JSON.stringify(recipe)),
+      id: undefined,
+      productId: newProdId,
+      productName: clonedName,
+      recipeType: recipe.recipeType || 'PLATO_MENU',
+      salePriceManual: recipe.salePriceManual || prod?.price || 0,
+      updatedAt: Date.now()
+    });
+
+    setIsEditModalOpen(true);
+    setSnackbar({
+      open: true,
+      message: `Receta clonada como "${clonedName}". Ajusta los ingredientes o precio y guarda.`,
+      severity: 'info'
+    });
+  };
+
   // Handle Save Recipe
   const handleSaveRecipe = async () => {
-    if (!editingRecipe || !editingRecipe.productId) {
-      setSnackbar({ open: true, message: 'Selecciona un producto válido para la receta.', severity: 'error' });
-      return;
-    }
+    if (!editingRecipe) return;
 
-    if (!editingRecipe.ingredients || editingRecipe.ingredients.length === 0) {
-      setSnackbar({ open: true, message: 'La receta debe tener al menos un ingrediente.', severity: 'error' });
-      return;
-    }
+    let targetProductId = editingRecipe.productId;
+    let targetProductName = editingRecipe.productName;
+    let targetPrice = Number(customProductPrice) || 0;
 
-    // Validar si hay ingredientes nuevos que requieran nombre
-    for (const ing of editingRecipe.ingredients) {
-      if (ing.inventoryItemId === '__NEW__' && !ing.customIngredientName?.trim()) {
-        setSnackbar({ open: true, message: 'Ingresa el nombre para los nuevos insumos no registrados en almacén.', severity: 'error' });
+    // If creating a new dish directly, ensure it exists in catalog
+    if (isNewProductMode) {
+      if (!customProductName.trim()) {
+        setSnackbar({ open: true, message: 'Ingresa el nombre del platillo o preparación.', severity: 'error' });
         return;
+      }
+      targetProductName = customProductName.trim();
+
+      // Look if product already exists with this name, otherwise create it
+      const existing = products.find(p => p.name.toLowerCase().trim() === targetProductName!.toLowerCase());
+      if (existing) {
+        targetProductId = String(existing.id);
+      } else {
+        try {
+          const newProduct = await mockApi.products.create({
+            sku: `PLT-${Date.now().toString().slice(-4)}`,
+            name: targetProductName,
+            price: targetPrice,
+            cost: Math.round(targetPrice * 0.3),
+            description: `Receta gastronómica con ${editingRecipe.ingredients?.length || 0} insumos`,
+            isAvailable: true,
+            isActive: true,
+            categoryId: '1'
+          });
+          targetProductId = String(newProduct.id);
+          products.unshift(newProduct);
+        } catch (e) {
+          targetProductId = `prod-${Date.now()}`;
+        }
       }
     }
 
-    const hasNewIngredients = editingRecipe.ingredients.some(
-      ing => ing.inventoryItemId === '__NEW__' || !inventory.some(i => i.id === ing.inventoryItemId)
-    );
-
-    const newIngredientNames = editingRecipe.ingredients
-      .filter(ing => ing.inventoryItemId === '__NEW__' || !inventory.some(i => i.id === ing.inventoryItemId))
-      .map(ing => ing.customIngredientName || ing.name || 'Nuevo Insumo');
+    if (!editingRecipe.ingredients || editingRecipe.ingredients.length === 0) {
+      setSnackbar({ open: true, message: 'La receta debe incluir al menos un insumo.', severity: 'error' });
+      return;
+    }
 
     try {
-      const prod = products.find(p => p.id === editingRecipe.productId);
       const recipeToSave: Recipe = {
         id: editingRecipe.id || `rec-${Date.now()}`,
-        productId: editingRecipe.productId,
-        productName: prod?.name || editingRecipe.productName || 'Plato',
-        category: editingRecipe.category || 'General',
-        ingredients: editingRecipe.ingredients,
-        preparationTimeMinutes: Number(editingRecipe.preparationTimeMinutes) || 10,
+        productId: String(targetProductId),
+        productName: targetProductName,
+        category: customProductCategory || editingRecipe.category || 'General',
+        recipeType: editingRecipe.recipeType || 'PLATO_MENU',
+        ingredients: editingRecipe.ingredients.map(ing => ({
+          ...ing,
+          quantity: Number(ing.quantity) || 1,
+          unitCostManual: ing.unitCostManual ? Number(ing.unitCostManual) : undefined
+        })),
+        preparationTimeMinutes: Number(editingRecipe.preparationTimeMinutes) || 15,
         portions: Number(editingRecipe.portions) || 1,
         wasteMarginPercentage: Number(editingRecipe.wasteMarginPercentage) || 0,
         packagingCost: Number(editingRecipe.packagingCost) || 0,
@@ -403,6 +573,7 @@ export default function RecipesScreen() {
         chefNotes: editingRecipe.chefNotes || '',
         difficulty: editingRecipe.difficulty || 'MEDIA',
         station: editingRecipe.station || 'COCINA',
+        salePriceManual: targetPrice,
         updatedAt: Date.now(),
       };
 
@@ -410,49 +581,163 @@ export default function RecipesScreen() {
       setIsEditModalOpen(false);
       setEditingRecipe(null);
 
-      if (hasNewIngredients) {
-        setSnackbar({
-          open: true,
-          message: `Escandallo de "${recipeToSave.productName}" guardado. ¡Insumo(s) [${newIngredientNames.join(', ')}] guardado(s) en inventario! Se envió notificación para actualizar su stock y costo en Almacén.`,
-          severity: 'success'
-        });
-      } else {
-        setSnackbar({ open: true, message: `Escandallo de "${recipeToSave.productName}" guardado correctamente.`, severity: 'success' });
-      }
+      setSnackbar({
+        open: true,
+        message: `Escandallo de "${recipeToSave.productName}" guardado exitosamente.`,
+        severity: 'success'
+      });
 
-      loadData();
+      loadData(false);
     } catch (err) {
       console.error(err);
       setSnackbar({ open: true, message: 'Error al guardar la receta.', severity: 'error' });
     }
   };
 
-  // Handle Delete Recipe
+  // Seed sample recipes
+  const handleSeedSamples = async () => {
+    try {
+      setSeedingSamples(true);
+
+      const samples: Omit<Recipe, 'id'>[] = [
+        {
+          productId: `sample-burger-${Date.now()}`,
+          productName: 'Hamburguesa Doble Queso Sésamo',
+          category: 'Hamburguesas',
+          recipeType: 'PLATO_MENU',
+          preparationTimeMinutes: 12,
+          portions: 1,
+          wasteMarginPercentage: 4,
+          packagingCost: 700,
+          salePriceManual: 26000,
+          difficulty: 'MEDIA',
+          station: 'PARRILLA',
+          allergens: ['Gluten', 'Lácteos', 'Sésamo'],
+          ingredients: [
+            { inventoryItemId: '__NEW__', customIngredientName: 'Pan Brioche Artesanal', quantity: 1, unit: 'Unidad', unitCostManual: 1200 },
+            { inventoryItemId: '__NEW__', customIngredientName: 'Carne de Res Molida 80/20', quantity: 180, unit: 'g', unitCostManual: 3600 },
+            { inventoryItemId: '__NEW__', customIngredientName: 'Queso Cheddar Americano', quantity: 40, unit: 'g', unitCostManual: 1000 },
+            { inventoryItemId: '__NEW__', customIngredientName: 'Tocineta Ahumada', quantity: 40, unit: 'g', unitCostManual: 1200 },
+            { inventoryItemId: '__NEW__', customIngredientName: 'Salsa Especial de la Casa', quantity: 30, unit: 'ml', unitCostManual: 400 },
+            { inventoryItemId: '__NEW__', customIngredientName: 'Cebolla Caramelizada', quantity: 30, unit: 'g', unitCostManual: 300 },
+          ],
+          preparationInstructions: '1. Sellar la carne en plancha a fuego vivo formando costra.\n2. Fundir cheddar doble sobre la carne caliente.\n3. Tostar pan brioche y coronar con tocineta crujiente y salsa.',
+          chefNotes: 'Mantener la carne a temperatura ambiente 10 min antes del grill para cocción homogénea.'
+        },
+        {
+          productId: `sample-pizza-${Date.now()}`,
+          productName: 'Pizza Margherita Clásica',
+          category: 'Pizzas',
+          recipeType: 'PLATO_MENU',
+          preparationTimeMinutes: 10,
+          portions: 1,
+          wasteMarginPercentage: 3,
+          packagingCost: 900,
+          salePriceManual: 28000,
+          difficulty: 'MEDIA',
+          station: 'HORNO',
+          allergens: ['Gluten', 'Lácteos'],
+          ingredients: [
+            { inventoryItemId: '__NEW__', customIngredientName: 'Masa Madre Fermentada 48h', quantity: 250, unit: 'g', unitCostManual: 1400 },
+            { inventoryItemId: '__NEW__', customIngredientName: 'Salsa de Tomate San Marzano', quantity: 80, unit: 'g', unitCostManual: 800 },
+            { inventoryItemId: '__NEW__', customIngredientName: 'Queso Mozzarella Flor di Latte', quantity: 120, unit: 'g', unitCostManual: 3200 },
+            { inventoryItemId: '__NEW__', customIngredientName: 'Albahaca Fresca', quantity: 10, unit: 'g', unitCostManual: 250 },
+            { inventoryItemId: '__NEW__', customIngredientName: 'Aceite de Oliva Extra Virgen', quantity: 15, unit: 'ml', unitCostManual: 500 },
+          ],
+          preparationInstructions: '1. Estirar la masa a mano dejando borde pronunciado (cornicione).\n2. Esparcir salsa y mozzarella.\n3. Hornear a 400°C por 90 segundos. Finalizar con albahaca y oliva.',
+          chefNotes: 'No usar rodillo para preservar el alveolado de la masa en el borde.'
+        },
+        {
+          productId: `sample-fries-${Date.now()}`,
+          productName: 'Papas Rústicas a las Finas Hierbas',
+          category: 'Entradas',
+          recipeType: 'PLATO_MENU',
+          preparationTimeMinutes: 8,
+          portions: 1,
+          wasteMarginPercentage: 5,
+          packagingCost: 400,
+          salePriceManual: 14000,
+          difficulty: 'FÁCIL',
+          station: 'COCINA',
+          allergens: [],
+          ingredients: [
+            { inventoryItemId: '__NEW__', customIngredientName: 'Papa Sabanera en Cascos', quantity: 300, unit: 'g', unitCostManual: 1200 },
+            { inventoryItemId: '__NEW__', customIngredientName: 'Aceite Vegetal de Fritura', quantity: 40, unit: 'ml', unitCostManual: 450 },
+            { inventoryItemId: '__NEW__', customIngredientName: 'Romero y Finas Hierbas', quantity: 5, unit: 'g', unitCostManual: 200 },
+            { inventoryItemId: '__NEW__', customIngredientName: 'Sal Marina y Pimienta Negra', quantity: 5, unit: 'g', unitCostManual: 100 },
+          ],
+          preparationInstructions: '1. Freír en doble cocción: primero a 140°C por 5 min, luego a 180°C por 3 min para lograr crocancia.\n2. Escurrir y espolvorear sal marina y romero.',
+          chefNotes: 'Servir en cono térmico de papel antigrasa inmediatamente.'
+        }
+      ];
+
+      for (const sample of samples) {
+        // Create product first
+        const p = await mockApi.products.create({
+          sku: `PLT-${Date.now().toString().slice(-4)}`,
+          name: sample.productName!,
+          price: sample.salePriceManual || 20000,
+          cost: Math.round((sample.salePriceManual || 20000) * 0.3),
+          categoryId: '1',
+          description: `Ficha técnica culinaria estándar`,
+          isAvailable: true,
+          isActive: true
+        });
+
+        await mockApi.recipes.save({
+          ...sample,
+          id: `rec-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          productId: String(p.id),
+          updatedAt: Date.now()
+        });
+      }
+
+      setSnackbar({
+        open: true,
+        message: '¡3 fichas técnicas maestras cargadas con insumos y Food Cost calculados!',
+        severity: 'success'
+      });
+      await loadData(false);
+    } catch (err) {
+      console.error(err);
+      setSnackbar({ open: true, message: 'Error cargando ejemplos.', severity: 'error' });
+    } finally {
+      setSeedingSamples(false);
+    }
+  };
+
+  // Delete Recipe
   const handleDeleteRecipe = async (recipe: Recipe) => {
     try {
       await mockApi.recipes.delete(recipe.productId);
       setDeleteConfirmRecipe(null);
-      setSnackbar({ open: true, message: 'Receta eliminada correctamente.', severity: 'info' });
-      loadData();
+      setSnackbar({ open: true, message: 'Ficha técnica eliminada.', severity: 'info' });
+      loadData(false);
     } catch (err) {
       console.error(err);
       setSnackbar({ open: true, message: 'Error al eliminar la receta.', severity: 'error' });
     }
   };
 
-  // Handle Open Print Technical Sheet Modal
+  // Print Technical Sheet Modal
   const handleOpenPrintModal = (recipe: Recipe) => {
     setPrintingRecipe(recipe);
     setIsPrintModalOpen(true);
   };
 
-  // Recipe Ingredient Manipulation in Modal
+  // Ingredient list handlers in Modal
   const handleAddIngredientRow = () => {
     if (!editingRecipe) return;
     const firstInv = inventory[0];
     const newIngredients = [
       ...(editingRecipe.ingredients || []),
-      { inventoryItemId: firstInv ? firstInv.id : '1', quantity: 1, unit: firstInv ? firstInv.unit : 'Unidad', notes: '' }
+      {
+        inventoryItemId: firstInv ? String(firstInv.id) : '__NEW__',
+        customIngredientName: firstInv ? firstInv.name : 'Insumo Adicional',
+        quantity: 1,
+        unit: firstInv ? firstInv.unit : 'g',
+        notes: ''
+      }
     ];
     setEditingRecipe({ ...editingRecipe, ingredients: newIngredients });
   };
@@ -461,7 +746,14 @@ export default function RecipesScreen() {
     if (!editingRecipe) return;
     const newIngredients = [
       ...(editingRecipe.ingredients || []),
-      { inventoryItemId: '__NEW__', customIngredientName: '', quantity: 1, unit: 'Kg', notes: 'Nuevo ingrediente para inventario' }
+      {
+        inventoryItemId: '__NEW__',
+        customIngredientName: '',
+        quantity: 100,
+        unit: 'g',
+        unitCostManual: 1500,
+        notes: 'Nuevo insumo para inventario'
+      }
     ];
     setEditingRecipe({ ...editingRecipe, ingredients: newIngredients });
   };
@@ -480,10 +772,11 @@ export default function RecipesScreen() {
       [field]: value
     };
 
-    if (field === 'inventoryItemId') {
-      const inv = inventory.find(i => i.id === value);
+    if (field === 'inventoryItemId' && value !== '__NEW__') {
+      const inv = inventory.find(i => String(i.id) === String(value));
       if (inv) {
         newIngredients[index].unit = inv.unit;
+        newIngredients[index].name = inv.name;
       }
     }
 
@@ -502,9 +795,14 @@ export default function RecipesScreen() {
 
   if (loading) {
     return (
-      <Box sx={{ p: 4 }}>
-        <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold' }}>Cargando Ingeniería de Recetas y Escandallos...</Typography>
-        <LinearProgress color="primary" />
+      <Box sx={{ p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 350 }}>
+        <CircularProgress size={44} sx={{ color: '#65a30d', mb: 2 }} />
+        <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e290b' }}>
+          Cargando Ingeniería de Recetas & Escandallos...
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Sincronizando inventario y Food Cost % en tiempo real
+        </Typography>
       </Box>
     );
   }
@@ -546,7 +844,7 @@ export default function RecipesScreen() {
                   Ingeniería de Recetas & Escandallos
                 </Typography>
                 <Chip
-                  label="Escandallos & Food Cost %"
+                  label="Control de Food Cost %"
                   size="small"
                   sx={{
                     fontWeight: 800,
@@ -560,14 +858,14 @@ export default function RecipesScreen() {
                 />
                 {isKitchen && (
                   <Chip
-                    label="👨‍🍳 Vista Culinaria"
+                    label="👨‍🍳 Vista de Cocina"
                     size="small"
                     sx={{ fontWeight: 800, fontSize: '0.72rem', bgcolor: '#ffedd5', color: '#c2410c', borderRadius: 2, height: 24 }}
                   />
                 )}
               </Box>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.4 }}>
-                Fichas técnicas culinarias, costeo de materias primas por gramo/mililitro, Food Cost % y control de mermas.
+                Fichas técnicas culinarias, costeo de materias primas por gramo/mililitro, margen de rentabilidad y descargue de stock.
               </Typography>
             </Box>
           </Box>
@@ -626,7 +924,7 @@ export default function RecipesScreen() {
           <Paper
             elevation={0}
             sx={{
-              p: 2.5,
+              p: 2.2,
               height: '100%',
               display: 'flex',
               flexDirection: 'column',
@@ -636,21 +934,21 @@ export default function RecipesScreen() {
               bgcolor: '#ffffff',
               boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
               transition: 'all 0.2s ease',
-              '&:hover': { borderColor: '#cbd5e1', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(0,0,0,0.06)' },
+              '&:hover': { borderColor: '#cbd5e1', transform: 'translateY(-2px)' },
             }}
           >
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Box sx={{ width: 30, height: 30, borderRadius: '50%', bgcolor: '#f1f5f9', color: '#1e290b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <KitchenIcon sx={{ fontSize: 17 }} />
+                  <Box sx={{ width: 28, height: 28, borderRadius: '50%', bgcolor: '#f1f5f9', color: '#1e290b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <KitchenIcon sx={{ fontSize: 16 }} />
                   </Box>
-                  <Typography variant="caption" sx={{ color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
-                    Recetas Costeadas
+                  <Typography variant="caption" sx={{ color: '#475569', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem' }}>
+                    Fichas Técnicas
                   </Typography>
                 </Box>
                 <Chip
-                  label={`${Math.round((summaryKPIs.totalRecipes / (products.length || 1)) * 100)}%`}
+                  label={products.length > 0 ? `${Math.round((summaryKPIs.totalRecipes / products.length) * 100)}% Menú` : '0%'}
                   size="small"
                   sx={{ height: 20, fontSize: '0.65rem', fontWeight: 900, bgcolor: '#f1f5f9', color: '#475569' }}
                 />
@@ -660,7 +958,7 @@ export default function RecipesScreen() {
               </Typography>
             </Box>
             <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-              Fichas técnicas culinarias activas
+              Platos con costeo gramo a gramo
             </Typography>
           </Paper>
         </Grid>
@@ -670,7 +968,7 @@ export default function RecipesScreen() {
           <Paper
             elevation={0}
             sx={{
-              p: 2.5,
+              p: 2.2,
               height: '100%',
               display: 'flex',
               flexDirection: 'column',
@@ -680,27 +978,27 @@ export default function RecipesScreen() {
               bgcolor: '#ffffff',
               boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
               transition: 'all 0.2s ease',
-              '&:hover': { borderColor: '#7dd3fc', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(2, 132, 199, 0.08)' },
+              '&:hover': { borderColor: '#7dd3fc', transform: 'translateY(-2px)' },
             }}
           >
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Box sx={{ width: 30, height: 30, borderRadius: '50%', bgcolor: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <MoneyIcon sx={{ fontSize: 17 }} />
+                  <Box sx={{ width: 28, height: 28, borderRadius: '50%', bgcolor: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <MoneyIcon sx={{ fontSize: 16 }} />
                   </Box>
-                  <Typography variant="caption" sx={{ color: '#0369a1', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
-                    Costo Promedio
+                  <Typography variant="caption" sx={{ color: '#0369a1', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem' }}>
+                    Costo Materia Prima
                   </Typography>
                 </Box>
                 <Chip label="POR PLATO" size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 800, bgcolor: '#e0f2fe', color: '#0284c7' }} />
               </Box>
               <Typography variant="h4" sx={{ fontWeight: 900, color: '#0284c7', mb: 0.5, letterSpacing: -0.5 }}>
-                ${Math.round(summaryKPIs.avgCost).toLocaleString()}
+                ${summaryKPIs.avgCost.toLocaleString()}
               </Typography>
             </Box>
             <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-              Insumos + empaque + merma
+              Insumos + empaque + merma técnica
             </Typography>
           </Paper>
         </Grid>
@@ -710,7 +1008,7 @@ export default function RecipesScreen() {
           <Paper
             elevation={0}
             sx={{
-              p: 2.5,
+              p: 2.2,
               height: '100%',
               display: 'flex',
               flexDirection: 'column',
@@ -720,17 +1018,17 @@ export default function RecipesScreen() {
               bgcolor: '#ffffff',
               boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
               transition: 'all 0.2s ease',
-              '&:hover': { borderColor: '#86efac', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(22, 163, 74, 0.08)' },
+              '&:hover': { borderColor: '#86efac', transform: 'translateY(-2px)' },
             }}
           >
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Box sx={{ width: 30, height: 30, borderRadius: '50%', bgcolor: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <TrendingUpIcon sx={{ fontSize: 17 }} />
+                  <Box sx={{ width: 28, height: 28, borderRadius: '50%', bgcolor: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <TrendingUpIcon sx={{ fontSize: 16 }} />
                   </Box>
-                  <Typography variant="caption" sx={{ color: '#166534', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.72rem' }}>
-                    Margen Promedio
+                  <Typography variant="caption" sx={{ color: '#166534', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem' }}>
+                    Margen Bruto
                   </Typography>
                 </Box>
                 <Chip label="RENTABILIDAD" size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 800, bgcolor: '#dcfce7', color: '#15803d' }} />
@@ -745,12 +1043,12 @@ export default function RecipesScreen() {
           </Paper>
         </Grid>
 
-        {/* KPI 4: Food Cost % */}
+        {/* KPI 4: Food Cost % Promedio */}
         <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
           <Paper
             elevation={0}
             sx={{
-              p: 2.5,
+              p: 2.2,
               height: '100%',
               display: 'flex',
               flexDirection: 'column',
@@ -760,89 +1058,57 @@ export default function RecipesScreen() {
               bgcolor: '#ffffff',
               boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
               transition: 'all 0.2s ease',
-              '&:hover': { borderColor: '#bef264', transform: 'translateY(-2px)', boxShadow: '0 6px 18px rgba(101, 163, 13, 0.08)' },
+              '&:hover': { borderColor: '#fde047', transform: 'translateY(-2px)' },
             }}
           >
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Box
-                    sx={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: '50%',
-                      bgcolor: summaryKPIs.avgFoodCost <= 35 ? '#ecfccb' : '#fef3c7',
-                      color: summaryKPIs.avgFoodCost <= 35 ? '#4d7c0f' : '#d97706',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <SpeedIcon sx={{ fontSize: 17 }} />
+                  <Box sx={{ width: 28, height: 28, borderRadius: '50%', bgcolor: '#fef9c3', color: '#ca8a04', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <SpeedIcon sx={{ fontSize: 16 }} />
                   </Box>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: summaryKPIs.avgFoodCost <= 35 ? '#4d7c0f' : '#d97706',
-                      fontWeight: 800,
-                      textTransform: 'uppercase',
-                      letterSpacing: 0.5,
-                      fontSize: '0.72rem',
-                    }}
-                  >
+                  <Typography variant="caption" sx={{ color: '#a16207', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem' }}>
                     Food Cost %
                   </Typography>
                 </Box>
                 <Chip
-                  label={summaryKPIs.avgFoodCost <= 35 ? 'ÓPTIMO' : 'ALTO'}
+                  label={summaryKPIs.avgFoodCost <= 35 ? 'SALUDABLE' : 'ALTO'}
                   size="small"
                   sx={{
                     height: 20,
                     fontSize: '0.62rem',
-                    fontWeight: 900,
-                    bgcolor: summaryKPIs.avgFoodCost <= 35 ? '#ecfccb' : '#fef3c7',
-                    color: summaryKPIs.avgFoodCost <= 35 ? '#3f6212' : '#92400e',
+                    fontWeight: 800,
+                    bgcolor: summaryKPIs.avgFoodCost <= 35 ? '#dcfce7' : '#fee2e2',
+                    color: summaryKPIs.avgFoodCost <= 35 ? '#15803d' : '#b91c1c'
                   }}
                 />
               </Box>
-              <Typography
-                variant="h4"
-                sx={{
-                  fontWeight: 900,
-                  color: summaryKPIs.avgFoodCost <= 35 ? '#3f6212' : '#d97706',
-                  mb: 0.5,
-                  letterSpacing: -0.5,
-                }}
-              >
+              <Typography variant="h4" sx={{ fontWeight: 900, color: summaryKPIs.avgFoodCost <= 35 ? '#15803d' : '#b91c1c', mb: 0.5, letterSpacing: -0.5 }}>
                 {summaryKPIs.avgFoodCost}%
               </Typography>
             </Box>
             <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-              Target óptimo: 28% – 35%
+              Meta del restaurante: 28% al 35%
             </Typography>
           </Paper>
         </Grid>
 
-        {/* KPI 5: Food Cost Crítico */}
+        {/* KPI 5: Alertas Food Cost */}
         <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
           <Paper
             elevation={0}
             sx={{
-              p: 2.5,
+              p: 2.2,
               height: '100%',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              border: summaryKPIs.criticalCount > 0 ? '1px solid #fca5a5' : '1px solid #e2e8f0',
+              border: '1px solid',
+              borderColor: summaryKPIs.criticalCount > 0 ? '#fca5a5' : '#e2e8f0',
               borderRadius: 3,
               bgcolor: summaryKPIs.criticalCount > 0 ? '#fff5f5' : '#ffffff',
               boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
               transition: 'all 0.2s ease',
-              '&:hover': {
-                borderColor: summaryKPIs.criticalCount > 0 ? '#ef4444' : '#cbd5e1',
-                transform: 'translateY(-2px)',
-                boxShadow: summaryKPIs.criticalCount > 0 ? '0 6px 18px rgba(239, 68, 68, 0.12)' : '0 6px 18px rgba(0,0,0,0.06)',
-              },
             }}
           >
             <Box>
@@ -850,33 +1116,24 @@ export default function RecipesScreen() {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Box
                     sx={{
-                      width: 30,
-                      height: 30,
+                      width: 28,
+                      height: 28,
                       borderRadius: '50%',
-                      bgcolor: summaryKPIs.criticalCount > 0 ? '#fee2e2' : '#f1f5f9',
-                      color: summaryKPIs.criticalCount > 0 ? '#dc2626' : '#64748b',
+                      bgcolor: summaryKPIs.criticalCount > 0 ? '#fee2e2' : '#f0fdf4',
+                      color: summaryKPIs.criticalCount > 0 ? '#dc2626' : '#16a34a',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                   >
-                    <WarningIcon sx={{ fontSize: 17 }} />
+                    <WarningIcon sx={{ fontSize: 16 }} />
                   </Box>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: summaryKPIs.criticalCount > 0 ? '#dc2626' : '#64748b',
-                      fontWeight: 800,
-                      textTransform: 'uppercase',
-                      letterSpacing: 0.5,
-                      fontSize: '0.72rem',
-                    }}
-                  >
-                    Food Cost Crítico
+                  <Typography variant="caption" sx={{ color: summaryKPIs.criticalCount > 0 ? '#991b1b' : '#166534', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem' }}>
+                    Alertas Margen
                   </Typography>
                 </Box>
                 <Chip
-                  label={summaryKPIs.criticalCount > 0 ? `⚠️ ${summaryKPIs.criticalCount} ALERTA` : '🟢 TODO OK'}
+                  label={summaryKPIs.criticalCount > 0 ? 'REVISAR' : 'OK'}
                   size="small"
                   sx={{
                     height: 20,
@@ -903,7 +1160,7 @@ export default function RecipesScreen() {
               variant="caption"
               sx={{ color: summaryKPIs.criticalCount > 0 ? '#dc2626' : 'text.secondary', fontWeight: 600 }}
             >
-              {summaryKPIs.criticalCount > 0 ? 'Costo > 38% del precio de venta' : 'Todos en margen saludable'}
+              {summaryKPIs.criticalCount > 0 ? 'Costo > 35% del precio de venta' : 'Márgenes en rango saludable'}
             </Typography>
           </Paper>
         </Grid>
@@ -927,7 +1184,7 @@ export default function RecipesScreen() {
           }}
         >
           <Tab label={`📋 Fichas Técnicas & Escandallos (${recipes.length})`} />
-          {canManageRecipes && <Tab label="📊 Auditoría de Food Cost" />}
+          {canManageRecipes && <Tab label="📊 Auditoría y Control de Food Cost %" />}
         </Tabs>
       </Box>
 
@@ -937,11 +1194,11 @@ export default function RecipesScreen() {
           {/* BARRA DE HERRAMIENTAS Y FILTROS */}
           <Paper elevation={0} sx={{ p: 2, mb: 3, border: '1px solid #e2e8f0', borderRadius: '18px', bgcolor: '#ffffff' }}>
             <Grid container spacing={1.5} sx={{ alignItems: 'center' }}>
-              <Grid size={{ xs: 12, md: 4 }}>
+              <Grid size={{ xs: 12, md: 3.5 }}>
                 <TextField
                   fullWidth
                   size="small"
-                  placeholder="Buscar por plato, ingrediente o técnica..."
+                  placeholder="Buscar por plato, ingrediente o estación..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   slotProps={{
@@ -962,10 +1219,10 @@ export default function RecipesScreen() {
                   select
                   fullWidth
                   size="small"
-                  label="Sección / Categoría"
+                  label="Categoría"
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  slotProps={{ input: { sx: { borderRadius: '12px' } } }}
+                  slotProps={{ input: { sx: { borderRadius: '12px', bgcolor: '#f8fafc', fontWeight: 700 } } }}
                 >
                   <MenuItem value="TODAS">Todas las Categorías</MenuItem>
                   {categories.map(c => (
@@ -982,10 +1239,10 @@ export default function RecipesScreen() {
                   label="Estación de Cocina"
                   value={selectedStation}
                   onChange={(e) => setSelectedStation(e.target.value)}
-                  slotProps={{ input: { sx: { borderRadius: '12px' } } }}
+                  slotProps={{ input: { sx: { borderRadius: '12px', bgcolor: '#f8fafc', fontWeight: 700 } } }}
                 >
                   <MenuItem value="TODAS">Todas las Estaciones</MenuItem>
-                  {stations.map(s => (
+                  {STATIONS.map(s => (
                     <MenuItem key={s} value={s}>{s}</MenuItem>
                   ))}
                 </TextField>
@@ -996,21 +1253,30 @@ export default function RecipesScreen() {
                   select
                   fullWidth
                   size="small"
-                  label="Rentabilidad"
+                  label="Rango Food Cost"
                   value={marginFilter}
                   onChange={(e) => setMarginFilter(e.target.value)}
-                  slotProps={{ input: { sx: { borderRadius: '12px' } } }}
+                  slotProps={{ input: { sx: { borderRadius: '12px', bgcolor: '#f8fafc', fontWeight: 700 } } }}
                 >
                   <MenuItem value="TODOS">Todos los Márgenes</MenuItem>
-                  <MenuItem value="ALTO">Alto Margen (&gt; 65%)</MenuItem>
-                  <MenuItem value="MEDIO">Margen Medio (50% - 65%)</MenuItem>
-                  <MenuItem value="BAJO">Margen Crítico (&lt; 50%)</MenuItem>
+                  <MenuItem value="OPTIMO">🟢 Óptimo (&lt; 30%)</MenuItem>
+                  <MenuItem value="SALUDABLE">🟡 Saludable (30% - 35%)</MenuItem>
+                  <MenuItem value="CRITICO">🔴 Alerta Crítico (&gt; 35%)</MenuItem>
                 </TextField>
               </Grid>
 
-              <Grid size={{ xs: 6, sm: 3, md: 2 }} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                <Paper elevation={0} sx={{ display: 'flex', border: '1px solid #cbd5e1', borderRadius: '12px', p: 0.3, bgcolor: '#f8fafc' }}>
-                  <Tooltip title="Vista Fichas Gastronómicas">
+              <Grid size={{ xs: 6, sm: 3, md: 2.5 }} sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    display: 'flex',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    p: 0.4,
+                    bgcolor: '#f8fafc'
+                  }}
+                >
+                  <Tooltip title="Vista Fichas / Tarjetas">
                     <Button
                       size="small"
                       onClick={() => setViewMode('CARDS')}
@@ -1043,20 +1309,170 @@ export default function RecipesScreen() {
             </Grid>
           </Paper>
 
-          {/* VISTA FICHAS (CARDS VIEW) */}
-          {viewMode === 'CARDS' ? (
+          {/* EMPTY STATE CUANDO NO HAY RECETAS */}
+          {recipes.length === 0 ? (
+            <Paper
+              elevation={0}
+              sx={{
+                p: { xs: 3, md: 6 },
+                textAlign: 'center',
+                borderRadius: '24px',
+                border: '1.5px dashed #cbd5e1',
+                bgcolor: '#fafafa',
+                mt: 1
+              }}
+            >
+              <Box
+                sx={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: '24px',
+                  bgcolor: 'rgba(101, 163, 13, 0.12)',
+                  color: '#65a30d',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mb: 2.5,
+                  boxShadow: '0 8px 20px rgba(101, 163, 13, 0.15)'
+                }}
+              >
+                <KitchenIcon sx={{ fontSize: 44 }} />
+              </Box>
+
+              <Typography variant="h5" sx={{ fontWeight: 900, color: '#1e290b', mb: 1.2 }}>
+                Aún no tienes fichas técnicas ni escandallos registrados
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 680, mx: 'auto', mb: 4, lineHeight: 1.6 }}>
+                Las recetas te permiten costear cada plato milimétricamente por gramo o mililitro, controlar el Food Cost % para proteger la rentabilidad de tu restaurante, y activar el <strong>descargue automático de insumos en el almacén</strong> con cada orden vendida.
+              </Typography>
+
+              {/* Pillars of Recipe Engineering */}
+              <Grid container spacing={2} sx={{ maxWidth: 860, mx: 'auto', mb: 4, textAlign: 'left' }}>
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <Paper elevation={0} sx={{ p: 2.2, borderRadius: '16px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', height: '100%' }}>
+                    <Box sx={{ width: 36, height: 36, borderRadius: '10px', bgcolor: '#ecfccb', color: '#4d7c0f', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.2 }}>
+                      <ScaleIcon sx={{ fontSize: 20 }} />
+                    </Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#1e290b', mb: 0.5 }}>
+                      Costeo Milimétrico
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Conversión automática de gramos, mililitros, merma técnica y costo de empaque para llevar.
+                    </Typography>
+                  </Paper>
+                </Grid>
+
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <Paper elevation={0} sx={{ p: 2.2, borderRadius: '16px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', height: '100%' }}>
+                    <Box sx={{ width: 36, height: 36, borderRadius: '10px', bgcolor: '#e0f2fe', color: '#0369a1', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.2 }}>
+                      <SpeedIcon sx={{ fontSize: 20 }} />
+                    </Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#1e290b', mb: 0.5 }}>
+                      Control de Food Cost %
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Semáforo visual de rentabilidad: asegura que el costo de alimentos no supere el 35% del precio de venta.
+                    </Typography>
+                  </Paper>
+                </Grid>
+
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <Paper elevation={0} sx={{ p: 2.2, borderRadius: '16px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', height: '100%' }}>
+                    <Box sx={{ width: 36, height: 36, borderRadius: '10px', bgcolor: '#fef3c7', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.2 }}>
+                      <InventoryIcon sx={{ fontSize: 20 }} />
+                    </Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#1e290b', mb: 0.5 }}>
+                      Descargue en Bodega
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Detecta cuál insumo es el cuello de botella que limita las porciones disponibles en cocina.
+                    </Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              {/* Call to Actions */}
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'center', alignItems: 'center' }}>
+                <Button
+                  variant="contained"
+                  size="large"
+                  startIcon={<AddIcon />}
+                  onClick={handleOpenCreateModal}
+                  sx={{
+                    borderRadius: '14px',
+                    fontWeight: 900,
+                    textTransform: 'none',
+                    bgcolor: '#65a30d',
+                    px: 3.5,
+                    py: 1.3,
+                    boxShadow: '0 6px 20px rgba(101, 163, 13, 0.35)',
+                    '&:hover': { bgcolor: '#4d7c0f' }
+                  }}
+                >
+                  Crear Mi Primer Escandallo
+                </Button>
+
+                <Button
+                  variant="outlined"
+                  size="large"
+                  disabled={seedingSamples}
+                  startIcon={seedingSamples ? <CircularProgress size={18} /> : <AutoFixHighIcon />}
+                  onClick={handleSeedSamples}
+                  sx={{
+                    borderRadius: '14px',
+                    fontWeight: 800,
+                    textTransform: 'none',
+                    color: '#334155',
+                    borderColor: '#cbd5e1',
+                    bgcolor: '#ffffff',
+                    px: 3,
+                    py: 1.3,
+                    '&:hover': { bgcolor: '#f1f5f9' }
+                  }}
+                >
+                  {seedingSamples ? 'Cargando plantillas...' : 'Cargar 3 Recetas de Ejemplo (Demo)'}
+                </Button>
+              </Stack>
+            </Paper>
+          ) : filteredRecipes.length === 0 ? (
+            /* EMPTY STATE PARA FILTROS */
+            <Paper elevation={0} sx={{ p: 5, textAlign: 'center', borderRadius: '18px', border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e290b', mb: 1 }}>
+                No se encontraron recetas con los filtros aplicados
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Prueba buscando otro término o restablece los filtros de búsqueda.
+              </Typography>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('TODAS');
+                  setSelectedStation('TODAS');
+                  setMarginFilter('TODOS');
+                  setSelectedType('TODAS');
+                }}
+                sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 800 }}
+              >
+                Limpiar Filtros
+              </Button>
+            </Paper>
+          ) : viewMode === 'CARDS' ? (
+            /* VISTA FICHAS (CARDS VIEW) */
             <Grid container spacing={2.5}>
               {filteredRecipes.map(recipe => {
                 const fin = getRecipeFinancials(recipe);
                 const isExpanded = expandedRecipeId === recipe.productId;
+                const portionInfo = fin.portionAnalysis;
 
                 return (
-                  <Grid size={{ xs: 12, lg: 6 }} key={recipe.productId}>
+                  <Grid size={{ xs: 12, lg: 6 }} key={recipe.productId || recipe.id}>
                     <Card
                       elevation={0}
                       sx={{
                         border: '1px solid',
-                        borderColor: fin.foodCostPercent > 38 ? '#fca5a5' : '#e2e8f0',
+                        borderColor: fin.foodCostPercent > 35 ? '#fca5a5' : '#e2e8f0',
                         borderRadius: '20px',
                         bgcolor: '#ffffff',
                         transition: 'all 0.2s ease',
@@ -1070,7 +1486,7 @@ export default function RecipesScreen() {
                       <CardContent sx={{ p: 2.5 }}>
                         {/* Cabecera del Plato */}
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
-                          <Box sx={{ display: 'flex', gap: 1.5 }}>
+                          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
                             <Avatar
                               variant="rounded"
                               src={fin.product?.imageUrl}
@@ -1079,128 +1495,174 @@ export default function RecipesScreen() {
                               {(fin.product?.name || recipe.productName || 'R')[0]}
                             </Avatar>
                             <Box>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, flexWrap: 'wrap' }}>
                                 <Typography variant="h6" sx={{ fontWeight: 900, color: '#1e290b', lineHeight: 1.2 }}>
                                   {fin.product?.name || recipe.productName || 'Plato'}
                                 </Typography>
+                                {recipe.recipeType === 'SUB_RECETA' && (
+                                  <Chip label="PREPARACIÓN BASE" size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 900, bgcolor: '#f3e8ff', color: '#7e22ce' }} />
+                                )}
+                              </Box>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.4 }}>
                                 <Chip
                                   label={recipe.station || 'COCINA'}
                                   size="small"
-                                  sx={{ fontWeight: 800, fontSize: '0.68rem', bgcolor: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0' }}
+                                  sx={{ height: 20, fontSize: '0.65rem', fontWeight: 800, bgcolor: '#f1f5f9', color: '#475569' }}
                                 />
+                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700 }}>
+                                  • {recipe.category || 'General'} • {recipe.preparationTimeMinutes || 15} min
+                                </Typography>
                               </Box>
-                              <Typography variant="caption" sx={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5, fontWeight: 600 }}>
-                                <TimerIcon sx={{ fontSize: 14 }} /> {recipe.preparationTimeMinutes || 10} min preparación • {recipe.portions || 1} porción • Dificultad: {recipe.difficulty || 'MEDIA'}
-                              </Typography>
                             </Box>
                           </Box>
 
-                          <Stack direction="column" spacing={0.5} sx={{ alignItems: 'flex-end' }}>
+                          {/* Food Cost Badge Indicator */}
+                          <Box sx={{ textAlign: 'right' }}>
                             <Chip
-                              label={`Margen: ${fin.grossMarginPercent.toFixed(1)}%`}
-                              color={fin.grossMarginPercent >= 65 ? 'success' : fin.grossMarginPercent >= 50 ? 'warning' : 'error'}
-                              size="small"
-                              sx={{ fontWeight: 900 }}
-                            />
-                            <Chip
-                              label={`Food Cost: ${fin.foodCostPercent.toFixed(1)}%`}
+                              label={`${fin.foodCostPercent.toFixed(1)}% Food Cost`}
                               size="small"
                               sx={{
-                                fontWeight: 800,
-                                fontSize: '0.7rem',
-                                bgcolor: fin.foodCostPercent <= 35 ? 'rgba(22, 163, 74, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-                                color: fin.foodCostPercent <= 35 ? '#16a34a' : '#ef4444'
+                                fontWeight: 900,
+                                fontSize: '0.75rem',
+                                bgcolor: fin.foodCostPercent <= 30 ? '#dcfce7' : fin.foodCostPercent <= 35 ? '#fef9c3' : '#fee2e2',
+                                color: fin.foodCostPercent <= 30 ? '#15803d' : fin.foodCostPercent <= 35 ? '#854d0e' : '#b91c1c',
+                                border: '1px solid',
+                                borderColor: fin.foodCostPercent <= 30 ? '#86efac' : fin.foodCostPercent <= 35 ? '#fde047' : '#fca5a5',
                               }}
                             />
-                          </Stack>
-                        </Box>
-
-                        {/* Finanzas del Escandallo */}
-                        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, p: 1.5, mb: 2, bgcolor: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
-                          <Box>
-                            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, display: 'block' }}>Insumos Netos</Typography>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#334155' }}>
-                              ${Math.round(fin.rawIngredientsCost).toLocaleString()}
-                            </Typography>
-                          </Box>
-                          <Box>
-                            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, display: 'block' }}>Empaque + Merma</Typography>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#64748b' }}>
-                              ${Math.round(fin.packagingCost + fin.wasteCost).toLocaleString()}
-                            </Typography>
-                          </Box>
-                          <Box>
-                            <Typography variant="caption" sx={{ color: '#dc2626', fontWeight: 700, display: 'block' }}>Costo Total</Typography>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#dc2626' }}>
-                              ${fin.totalCost.toLocaleString()}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ textAlign: 'right' }}>
-                            <Typography variant="caption" sx={{ color: '#16a34a', fontWeight: 700, display: 'block' }}>Precio Venta</Typography>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#16a34a' }}>
-                              ${fin.salePrice.toLocaleString()}
+                            <Typography variant="caption" sx={{ display: 'block', mt: 0.3, color: '#64748b', fontWeight: 600 }}>
+                              {fin.foodCostPercent <= 30 ? 'Margen Óptimo' : fin.foodCostPercent <= 35 ? 'Rango Saludable' : 'Alerta Costo Alto'}
                             </Typography>
                           </Box>
                         </Box>
 
-                        {/* Indicador de Porciones Disponibles según Almacén */}
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, px: 0.5 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                            <InventoryIcon sx={{ fontSize: 16, color: fin.availablePortions > 5 ? '#16a34a' : '#dc2626' }} />
-                            <Typography variant="caption" sx={{ fontWeight: 800, color: fin.availablePortions > 5 ? '#16a34a' : '#dc2626' }}>
-                              {fin.availablePortions > 0
-                                ? `${fin.availablePortions} porciones posibles con stock actual en bodega`
-                                : '⚠️ Sin stock disponible en inventario para preparar'}
+                        {/* Banner Cuello de Botella / Stock en Almacén */}
+                        <Box
+                          sx={{
+                            mb: 2,
+                            p: 1.2,
+                            px: 1.6,
+                            borderRadius: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: 1,
+                            bgcolor: portionInfo.portions > 5 ? '#f0fdf4' : portionInfo.portions > 0 ? '#fffbeb' : '#fef2f2',
+                            border: '1px solid',
+                            borderColor: portionInfo.portions > 5 ? '#bbf7d0' : portionInfo.portions > 0 ? '#fde68a' : '#fecaca',
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <InventoryIcon sx={{ fontSize: 18, color: portionInfo.portions > 5 ? '#16a34a' : portionInfo.portions > 0 ? '#d97706' : '#dc2626' }} />
+                            <Typography variant="body2" sx={{ fontWeight: 800, color: portionInfo.portions > 5 ? '#166534' : portionInfo.portions > 0 ? '#92400e' : '#991b1b', fontSize: '0.8rem' }}>
+                              {portionInfo.portions > 0
+                                ? `${portionInfo.portions} porciones listas con stock actual`
+                                : '0 porciones en cocina (Insumos insuficientes)'}
                             </Typography>
                           </Box>
 
-                          {recipe.allergens && recipe.allergens.length > 0 && (
-                            <Box sx={{ display: 'flex', gap: 0.5 }}>
-                              {recipe.allergens.slice(0, 2).map(a => (
-                                <Chip key={a} label={a} size="small" sx={{ fontSize: '0.62rem', height: 20, bgcolor: '#fef2f2', color: '#991b1b', fontWeight: 700 }} />
-                              ))}
-                            </Box>
+                          {portionInfo.bottleneckItemName && (
+                            <Typography variant="caption" sx={{ fontWeight: 700, color: portionInfo.portions > 0 ? '#b45309' : '#dc2626' }}>
+                              {portionInfo.portions > 0
+                                ? `Limitado por: ${portionInfo.bottleneckItemName} (${portionInfo.bottleneckStock} ${portionInfo.bottleneckUnit})`
+                                : `Faltante: ${portionInfo.bottleneckItemName}`}
+                            </Typography>
                           )}
                         </Box>
 
-                        {/* Botón de Expansión de Ingredientes Detallados */}
+                        {/* Alerta si hay insumos con costo $0 */}
+                        {fin.hasZeroCostInsumos && (
+                          <Alert severity="warning" sx={{ mb: 1.5, py: 0.3, borderRadius: '10px', fontSize: '0.72rem' }}>
+                            Hay insumos con costo $0 en inventario. Edita el escandallo para asignarles costo y no falsear tu Food Cost.
+                          </Alert>
+                        )}
+
+                        {/* Tarjetas de Métricas de Rentabilidad (3 Bloques) */}
+                        <Grid container spacing={1.2} sx={{ mb: 2 }}>
+                          <Grid size={{ xs: 4 }}>
+                            <Box sx={{ p: 1.2, bgcolor: '#f8fafc', borderRadius: '12px', border: '1px solid #f1f5f9', textAlign: 'center' }}>
+                              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.65rem' }}>
+                                Costo Total
+                              </Typography>
+                              <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#1e290b' }}>
+                                ${fin.totalCost.toLocaleString()}
+                              </Typography>
+                            </Box>
+                          </Grid>
+
+                          <Grid size={{ xs: 4 }}>
+                            <Box sx={{ p: 1.2, bgcolor: '#f8fafc', borderRadius: '12px', border: '1px solid #f1f5f9', textAlign: 'center' }}>
+                              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.65rem' }}>
+                                Precio Venta
+                              </Typography>
+                              <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#0284c7' }}>
+                                ${fin.salePrice.toLocaleString()}
+                              </Typography>
+                            </Box>
+                          </Grid>
+
+                          <Grid size={{ xs: 4 }}>
+                            <Box sx={{ p: 1.2, bgcolor: '#f0fdf4', borderRadius: '12px', border: '1px solid #dcfce7', textAlign: 'center' }}>
+                              <Typography variant="caption" sx={{ color: '#15803d', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.65rem' }}>
+                                Margen Bruto
+                              </Typography>
+                              <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#16a34a' }}>
+                                +${fin.grossMargin.toLocaleString()}
+                              </Typography>
+                            </Box>
+                          </Grid>
+                        </Grid>
+
+                        {/* Botón Desplegar Ingredientes */}
                         <Button
                           fullWidth
                           size="small"
                           onClick={() => setExpandedRecipeId(isExpanded ? null : recipe.productId)}
                           endIcon={isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                          sx={{ textTransform: 'none', fontWeight: 800, color: '#475569', bgcolor: '#f1f5f9', borderRadius: '10px', py: 0.6 }}
+                          sx={{
+                            borderRadius: '10px',
+                            fontWeight: 800,
+                            fontSize: '0.75rem',
+                            color: '#475569',
+                            bgcolor: isExpanded ? '#f1f5f9' : '#f8fafc',
+                            textTransform: 'none',
+                            py: 0.8
+                          }}
                         >
-                          {isExpanded ? 'Ocultar ingredientes y técnicas' : `Ver ${recipe.ingredients?.length || 0} ingredientes y técnica de cocina`}
+                          {isExpanded
+                            ? 'Ocultar ingredientes y preparación'
+                            : `Ver ${recipe.ingredients?.length || 0} insumos y técnica de cocción`}
                         </Button>
 
-                        {/* Detalle Desplegable */}
+                        {/* Contenido Expandible de la Ficha Técnica */}
                         <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                           <Box sx={{ mt: 2, pt: 1.5, borderTop: '1px dashed #e2e8f0' }}>
-                            <Typography variant="caption" sx={{ fontWeight: 800, color: '#1e290b', textTransform: 'uppercase', display: 'block', mb: 1 }}>
-                              Ingredientes y Costeo por Ración:
+                            {/* Tabla de Insumos */}
+                            <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', mb: 1, display: 'block' }}>
+                              Desglose de Materias Primas por Porción:
                             </Typography>
-                            <TableContainer sx={{ mb: 1.5 }}>
+                            <TableContainer sx={{ mb: 1.5, borderRadius: '10px', border: '1px solid #f1f5f9' }}>
                               <Table size="small">
                                 <TableHead sx={{ bgcolor: '#f8fafc' }}>
                                   <TableRow>
-                                    <TableCell sx={{ fontWeight: 800, fontSize: '0.72rem' }}>Ingrediente</TableCell>
-                                    <TableCell sx={{ fontWeight: 800, fontSize: '0.72rem' }}>Cantidad</TableCell>
-                                    <TableCell align="right" sx={{ fontWeight: 800, fontSize: '0.72rem' }}>Costo Unitario</TableCell>
-                                    <TableCell align="right" sx={{ fontWeight: 800, fontSize: '0.72rem' }}>Costo Total</TableCell>
+                                    <TableCell sx={{ fontSize: '0.72rem', fontWeight: 800 }}>Insumo</TableCell>
+                                    <TableCell align="center" sx={{ fontSize: '0.72rem', fontWeight: 800 }}>Cantidad</TableCell>
+                                    <TableCell align="right" sx={{ fontSize: '0.72rem', fontWeight: 800 }}>Costo Base</TableCell>
+                                    <TableCell align="right" sx={{ fontSize: '0.72rem', fontWeight: 800 }}>Subtotal</TableCell>
                                   </TableRow>
                                 </TableHead>
                                 <TableBody>
                                   {fin.ingredientsDetailed.map((ing, idx) => (
                                     <TableRow key={idx}>
                                       <TableCell sx={{ fontSize: '0.75rem', fontWeight: 700 }}>
-                                        {ing.invItem?.name || 'Ingrediente'}
+                                        {ing.invItem?.name || ing.customIngredientName || ing.name || 'Insumo'}
                                       </TableCell>
-                                      <TableCell sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                      <TableCell align="center" sx={{ fontSize: '0.75rem' }}>
                                         {ing.quantity} {ing.unit || ing.invItem?.unit}
                                       </TableCell>
                                       <TableCell align="right" sx={{ fontSize: '0.75rem', color: '#64748b' }}>
-                                        ${ing.invItem?.unitCost.toLocaleString()} / {ing.invItem?.unit}
+                                        ${(ing.unitCostManual || ing.invItem?.unitCost || 0).toLocaleString()} / {ing.unit || ing.invItem?.unit}
                                       </TableCell>
                                       <TableCell align="right" sx={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e290b' }}>
                                         ${Math.round(ing.calculatedCost).toLocaleString()}
@@ -1251,6 +1713,11 @@ export default function RecipesScreen() {
 
                           {canManageRecipes && (
                             <Box sx={{ display: 'flex', gap: 0.5 }}>
+                              <Tooltip title="Duplicar / Clonar Receta">
+                                <IconButton size="small" color="secondary" onClick={() => handleDuplicateRecipe(recipe)}>
+                                  <ContentCopyIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
                               <Tooltip title="Editar Escandallo">
                                 <IconButton size="small" color="primary" onClick={() => handleOpenEditModal(recipe)}>
                                   <EditIcon fontSize="small" />
@@ -1278,7 +1745,7 @@ export default function RecipesScreen() {
                   <TableRow>
                     <TableCell sx={{ fontWeight: 800, color: '#475569' }}>Plato / Receta</TableCell>
                     <TableCell sx={{ fontWeight: 800, color: '#475569' }}>Estación</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 800, color: '#475569' }}>Porciones en Bodega</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 800, color: '#475569' }}>Porciones Bodega</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800, color: '#475569' }}>Costo Total</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800, color: '#475569' }}>Precio Venta</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800, color: '#475569' }}>Margen Bruto</TableCell>
@@ -1289,48 +1756,54 @@ export default function RecipesScreen() {
                 <TableBody>
                   {filteredRecipes.map(recipe => {
                     const fin = getRecipeFinancials(recipe);
+                    const portionInfo = fin.portionAnalysis;
 
                     return (
-                      <TableRow key={recipe.productId} hover sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
+                      <TableRow key={recipe.productId || recipe.id} hover sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
                         <TableCell>
                           <Typography variant="body2" sx={{ fontWeight: 900, color: '#1e290b' }}>
                             {fin.product?.name || recipe.productName || 'Plato'}
                           </Typography>
                           <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                            {recipe.ingredients?.length || 0} insumos • {recipe.preparationTimeMinutes || 10} min
+                            {recipe.ingredients?.length || 0} insumos • {recipe.preparationTimeMinutes || 15} min
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          <Chip label={recipe.station || 'COCINA'} size="small" sx={{ fontWeight: 800, borderRadius: '8px' }} />
+                          <Chip label={recipe.station || 'COCINA'} size="small" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 800, bgcolor: '#f1f5f9' }} />
                         </TableCell>
                         <TableCell align="center">
                           <Chip
-                            label={`${fin.availablePortions} porciones`}
+                            label={`${portionInfo.portions} und`}
                             size="small"
-                            color={fin.availablePortions > 5 ? 'success' : 'error'}
-                            sx={{ fontWeight: 800, borderRadius: '8px' }}
+                            sx={{
+                              height: 22,
+                              fontSize: '0.7rem',
+                              fontWeight: 900,
+                              bgcolor: portionInfo.portions > 5 ? '#dcfce7' : portionInfo.portions > 0 ? '#fef9c3' : '#fee2e2',
+                              color: portionInfo.portions > 5 ? '#15803d' : portionInfo.portions > 0 ? '#854d0e' : '#b91c1c'
+                            }}
                           />
                         </TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 800, color: '#dc2626' }}>
+                        <TableCell align="right" sx={{ fontWeight: 800, color: '#1e290b' }}>
                           ${fin.totalCost.toLocaleString()}
                         </TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 900, color: '#1e290b' }}>
+                        <TableCell align="right" sx={{ fontWeight: 800, color: '#0284c7' }}>
                           ${fin.salePrice.toLocaleString()}
                         </TableCell>
-                        <TableCell align="right">
-                          <Typography variant="body2" sx={{ fontWeight: 900, color: '#16a34a' }}>
-                            +{fin.grossMarginPercent.toFixed(1)}%
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                            ${fin.grossMargin.toLocaleString()}
-                          </Typography>
+                        <TableCell align="right" sx={{ fontWeight: 900, color: '#16a34a' }}>
+                          +${fin.grossMargin.toLocaleString()} ({fin.grossMarginPercent.toFixed(0)}%)
                         </TableCell>
                         <TableCell align="center">
                           <Chip
                             label={`${fin.foodCostPercent.toFixed(1)}%`}
                             size="small"
-                            color={fin.foodCostPercent <= 35 ? 'success' : 'warning'}
-                            sx={{ fontWeight: 800, borderRadius: '8px' }}
+                            sx={{
+                              height: 22,
+                              fontSize: '0.72rem',
+                              fontWeight: 900,
+                              bgcolor: fin.foodCostPercent <= 30 ? '#dcfce7' : fin.foodCostPercent <= 35 ? '#fef9c3' : '#fee2e2',
+                              color: fin.foodCostPercent <= 30 ? '#15803d' : fin.foodCostPercent <= 35 ? '#854d0e' : '#b91c1c'
+                            }}
                           />
                         </TableCell>
                         <TableCell align="right">
@@ -1342,7 +1815,12 @@ export default function RecipesScreen() {
                             </Tooltip>
                             {canManageRecipes && (
                               <>
-                                <Tooltip title="Editar Escandallo">
+                                <Tooltip title="Duplicar">
+                                  <IconButton size="small" color="secondary" onClick={() => handleDuplicateRecipe(recipe)}>
+                                    <ContentCopyIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Editar">
                                   <IconButton size="small" color="primary" onClick={() => handleOpenEditModal(recipe)}>
                                     <EditIcon fontSize="small" />
                                   </IconButton>
@@ -1378,73 +1856,87 @@ export default function RecipesScreen() {
             </Typography>
           </Box>
 
-          <Grid container spacing={3}>
-            {/* Gráfico de Barras de Food Cost por Plato */}
-            <Grid size={{ xs: 12, md: 8 }}>
-              <Paper elevation={0} sx={{ p: 2.5, borderRadius: '18px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', height: '100%' }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#1e290b', mb: 2 }}>
-                  Food Cost % por Platillo (Target &lt; 35%):
-                </Typography>
-                <Box sx={{ width: '100%', height: 320 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={recipes.map(r => {
-                        const fin = getRecipeFinancials(r);
-                        return {
-                          name: (fin.product?.name || r.productName || '').slice(0, 16),
-                          foodCost: +fin.foodCostPercent.toFixed(1)
-                        };
-                      })}
-                      margin={{ top: 10, right: 10, left: -20, bottom: 40 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="name" angle={-30} textAnchor="end" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} unit="%" domain={[0, 50]} />
-                      <RechartsTooltip formatter={(val: any) => [`${val}%`, 'Food Cost']} />
-                      <Bar dataKey="foodCost" radius={[6, 6, 0, 0]}>
-                        {recipes.map((r, idx) => {
+          {recipes.length === 0 ? (
+            <Paper elevation={0} sx={{ p: 4, textAlign: 'center', borderRadius: '18px', border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
+                Aún no hay recetas registradas para auditar
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Crea tus primeros escandallos para visualizar el análisis gráfico de rentabilidad.
+              </Typography>
+              <Button variant="contained" onClick={handleOpenCreateModal} sx={{ borderRadius: '10px', bgcolor: '#65a30d', fontWeight: 800 }}>
+                Crear Escandallo
+              </Button>
+            </Paper>
+          ) : (
+            <Grid container spacing={3}>
+              {/* Gráfico de Barras de Food Cost por Plato */}
+              <Grid size={{ xs: 12, md: 8 }}>
+                <Paper elevation={0} sx={{ p: 2.5, borderRadius: '18px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', height: '100%' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#1e290b', mb: 2 }}>
+                    Food Cost % por Platillo (Target &lt; 35%):
+                  </Typography>
+                  <Box sx={{ width: '100%', height: 320 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={recipes.map(r => {
                           const fin = getRecipeFinancials(r);
-                          return (
-                            <Cell key={`cell-${idx}`} fill={fin.foodCostPercent <= 32 ? '#16a34a' : fin.foodCostPercent <= 38 ? '#f59e0b' : '#ef4444'} />
-                          );
+                          return {
+                            name: (fin.product?.name || r.productName || '').slice(0, 16),
+                            foodCost: +fin.foodCostPercent.toFixed(1)
+                          };
                         })}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </Box>
-              </Paper>
-            </Grid>
+                        margin={{ top: 10, right: 10, left: -20, bottom: 40 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="name" angle={-30} textAnchor="end" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} unit="%" domain={[0, 60]} />
+                        <RechartsTooltip formatter={(val: any) => [`${val}%`, 'Food Cost']} />
+                        <Bar dataKey="foodCost" radius={[6, 6, 0, 0]}>
+                          {recipes.map((r, idx) => {
+                            const fin = getRecipeFinancials(r);
+                            return (
+                              <Cell key={`cell-${idx}`} fill={fin.foodCostPercent <= 30 ? '#16a34a' : fin.foodCostPercent <= 35 ? '#f59e0b' : '#ef4444'} />
+                            );
+                          })}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </Paper>
+              </Grid>
 
-            {/* Ranking de Platos Más y Menos Rentables */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <Paper elevation={0} sx={{ p: 2.5, borderRadius: '18px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', height: '100%' }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#1e290b', mb: 1.5 }}>
-                  Platos con Mayor Margen ($):
-                </Typography>
-                <Stack spacing={1.2}>
-                  {[...recipes]
-                    .map(r => ({ recipe: r, fin: getRecipeFinancials(r) }))
-                    .sort((a, b) => b.fin.grossMargin - a.fin.grossMargin)
-                    .slice(0, 5)
-                    .map(({ recipe, fin }) => (
-                      <Box key={recipe.productId} sx={{ p: 1.2, bgcolor: '#f8fafc', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 800, color: '#1e290b' }}>
-                            {fin.product?.name || recipe.productName}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#64748b' }}>
-                            P. Venta: ${fin.salePrice.toLocaleString()}
+              {/* Ranking de Platos Más y Menos Rentables */}
+              <Grid size={{ xs: 12, md: 4 }}>
+                <Paper elevation={0} sx={{ p: 2.5, borderRadius: '18px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', height: '100%' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#1e290b', mb: 1.5 }}>
+                    Platos con Mayor Margen ($):
+                  </Typography>
+                  <Stack spacing={1.2}>
+                    {[...recipes]
+                      .map(r => ({ recipe: r, fin: getRecipeFinancials(r) }))
+                      .sort((a, b) => b.fin.grossMargin - a.fin.grossMargin)
+                      .slice(0, 5)
+                      .map(({ recipe, fin }) => (
+                        <Box key={recipe.productId || recipe.id} sx={{ p: 1.2, bgcolor: '#f8fafc', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 800, color: '#1e290b' }}>
+                              {fin.product?.name || recipe.productName}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#64748b' }}>
+                              P. Venta: ${fin.salePrice.toLocaleString()} COP
+                            </Typography>
+                          </Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#16a34a' }}>
+                            +${fin.grossMargin.toLocaleString()}
                           </Typography>
                         </Box>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#16a34a' }}>
-                          +${fin.grossMargin.toLocaleString()}
-                        </Typography>
-                      </Box>
-                    ))}
-                </Stack>
-              </Paper>
+                      ))}
+                  </Stack>
+                </Paper>
+              </Grid>
             </Grid>
-          </Grid>
+          )}
         </Box>
       )}
 
@@ -1478,32 +1970,115 @@ export default function RecipesScreen() {
         <DialogContent dividers sx={{ p: 3 }}>
           {editingRecipe && (
             <Grid container spacing={2}>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <TextField
-                  select
-                  fullWidth
-                  size="small"
-                  label="Platillo del Menú"
-                  value={editingRecipe.productId || ''}
-                  onChange={(e) => {
-                    const prod = products.find(p => p.id === e.target.value);
-                    setEditingRecipe({
-                      ...editingRecipe,
-                      productId: e.target.value,
-                      productName: prod?.name || ''
-                    });
-                  }}
-                  slotProps={{ input: { sx: { fontWeight: 800 } } }}
-                >
-                  {products.map(p => (
-                    <MenuItem key={p.id} value={p.id}>
-                      {p.name} (${p.price.toLocaleString()} COP)
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
+              {/* Selector de Modo: Plato del Menú vs Crear Nuevo */}
+              {!editingRecipe.id && (
+                <Grid size={{ xs: 12 }}>
+                  <Paper elevation={0} sx={{ p: 1.5, bgcolor: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0', mb: 1 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', display: 'block', mb: 0.8 }}>
+                      Tipo de Ficha Culinaria:
+                    </Typography>
+                    <RadioGroup
+                      row
+                      value={isNewProductMode ? 'NEW' : 'CATALOG'}
+                      onChange={(e) => setIsNewProductMode(e.target.value === 'NEW')}
+                    >
+                      <FormControlLabel
+                        value="CATALOG"
+                        disabled={products.length === 0}
+                        control={<Radio size="small" />}
+                        label={
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            Asociar a Plato existente en Menú {products.length === 0 && '(No hay platos aún)'}
+                          </Typography>
+                        }
+                      />
+                      <FormControlLabel
+                        value="NEW"
+                        control={<Radio size="small" />}
+                        label={
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: '#16a34a' }}>
+                            ✨ Crear Nuevo Platillo o Preparación Base
+                          </Typography>
+                        }
+                      />
+                    </RadioGroup>
+                  </Paper>
+                </Grid>
+              )}
 
-              <Grid size={{ xs: 12, sm: 3 }}>
+              {/* Nombre y Precio del Plato */}
+              {isNewProductMode ? (
+                <>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Nombre del Platillo o Preparación"
+                      placeholder="Ej. Hamburguesa Doble Queso, Salsa BBQ Casera..."
+                      value={customProductName}
+                      onChange={(e) => {
+                        setCustomProductName(e.target.value);
+                        setEditingRecipe({ ...editingRecipe, productName: e.target.value });
+                      }}
+                      slotProps={{ input: { sx: { fontWeight: 800 } } }}
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      label="Precio Venta COP"
+                      value={customProductPrice}
+                      onChange={(e) => setCustomProductPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                      slotProps={{
+                        input: {
+                          startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                          sx: { fontWeight: 800, color: '#0284c7' }
+                        }
+                      }}
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Categoría"
+                      value={customProductCategory}
+                      onChange={(e) => setCustomProductCategory(e.target.value)}
+                    />
+                  </Grid>
+                </>
+              ) : (
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    label="Platillo del Menú"
+                    value={editingRecipe.productId || ''}
+                    onChange={(e) => {
+                      const prod = products.find(p => String(p.id) === String(e.target.value));
+                      setEditingRecipe({
+                        ...editingRecipe,
+                        productId: e.target.value,
+                        productName: prod?.name || ''
+                      });
+                    }}
+                    slotProps={{ input: { sx: { fontWeight: 800 } } }}
+                  >
+                    {products.map(p => (
+                      <MenuItem key={p.id} value={String(p.id)}>
+                        {p.name} (${p.price.toLocaleString()} COP)
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+              )}
+
+              <Grid size={{ xs: 6, sm: 3 }}>
                 <TextField
                   select
                   fullWidth
@@ -1512,13 +2087,13 @@ export default function RecipesScreen() {
                   value={editingRecipe.station || 'COCINA'}
                   onChange={(e) => setEditingRecipe({ ...editingRecipe, station: e.target.value as any })}
                 >
-                  {stations.map(s => (
+                  {STATIONS.map(s => (
                     <MenuItem key={s} value={s}>{s}</MenuItem>
                   ))}
                 </TextField>
               </Grid>
 
-              <Grid size={{ xs: 12, sm: 3 }}>
+              <Grid size={{ xs: 6, sm: 3 }}>
                 <TextField
                   select
                   fullWidth
@@ -1539,7 +2114,7 @@ export default function RecipesScreen() {
                   size="small"
                   type="number"
                   label="Tiempo Prep (min)"
-                  value={editingRecipe.preparationTimeMinutes || 10}
+                  value={editingRecipe.preparationTimeMinutes || 15}
                   onChange={(e) => setEditingRecipe({ ...editingRecipe, preparationTimeMinutes: Number(e.target.value) })}
                 />
               </Grid>
@@ -1609,7 +2184,7 @@ export default function RecipesScreen() {
                         color: '#ffffff'
                       }}
                     >
-                      ✨ Insumo Nuevo (No está en inventario)
+                      ✨ Insumo Nuevo
                     </Button>
                   </Stack>
                 </Box>
@@ -1617,8 +2192,9 @@ export default function RecipesScreen() {
                 <Stack spacing={1.2}>
                   {(editingRecipe.ingredients || []).map((ing, idx) => {
                     const isNew = ing.inventoryItemId === '__NEW__';
-                    const inv = inventory.find(i => i.id === ing.inventoryItemId);
-                    const cost = calculateIngredientCost(inv, ing.quantity, ing.unit);
+                    const inv = inventory.find(i => String(i.id) === String(ing.inventoryItemId));
+                    const cost = calculateIngredientCost(inv, ing.quantity, ing.unit, ing.unitCostManual);
+                    const isZeroCost = cost === 0;
 
                     return (
                       <Paper
@@ -1627,105 +2203,94 @@ export default function RecipesScreen() {
                         sx={{
                           p: 1.5,
                           border: '1px solid',
-                          borderColor: isNew ? '#bef264' : '#e2e8f0',
-                          bgcolor: isNew ? '#fbfdf5' : '#ffffff',
+                          borderColor: isZeroCost ? '#fde047' : isNew ? '#bef264' : '#e2e8f0',
+                          bgcolor: isZeroCost ? '#fffdf5' : isNew ? '#fbfdf5' : '#ffffff',
                           borderRadius: '12px',
                           display: 'flex',
-                          flexDirection: { xs: 'column', sm: 'row' },
-                          gap: 1.5,
-                          alignItems: { sm: 'center' }
+                          flexDirection: { xs: 'column', md: 'row' },
+                          gap: 1.2,
+                          alignItems: { md: 'center' }
                         }}
                       >
                         {isNew ? (
-                          <Box sx={{ flex: 1.5, display: 'flex', gap: 1, alignItems: 'center' }}>
+                          <Box sx={{ flex: 2, display: 'flex', gap: 1 }}>
                             <TextField
                               size="small"
                               fullWidth
                               label="Nombre del Nuevo Insumo"
-                              placeholder="Ej. Trufa Negra, Panko, Aceite Trufado..."
+                              placeholder="Ej. Carne de Res, Trufa, Panko..."
                               value={ing.customIngredientName || ''}
                               onChange={(e) => handleUpdateIngredientRow(idx, 'customIngredientName', e.target.value)}
-                              slotProps={{
-                                input: {
-                                  startAdornment: (
-                                    <InputAdornment position="start">
-                                      <Chip
-                                        label="AUTO-INVENTARIO"
-                                        size="small"
-                                        sx={{ height: 20, fontSize: '0.62rem', fontWeight: 900, bgcolor: '#ecfccb', color: '#3f6212' }}
-                                      />
-                                    </InputAdornment>
-                                  ),
-                                }
-                              }}
                             />
-                            <Tooltip title="Cambiar a insumo existente del catálogo">
-                              <Button
-                                size="small"
-                                onClick={() => handleUpdateIngredientRow(idx, 'inventoryItemId', inventory[0]?.id || '1')}
-                                sx={{ minWidth: 65, fontSize: '0.7rem', fontWeight: 700 }}
-                              >
-                                Existente
-                              </Button>
-                            </Tooltip>
+                            <TextField
+                              size="small"
+                              type="number"
+                              label="Costo Est. ($)"
+                              placeholder="2500"
+                              value={ing.unitCostManual || ''}
+                              onChange={(e) => handleUpdateIngredientRow(idx, 'unitCostManual', Number(e.target.value))}
+                              sx={{ width: 140 }}
+                            />
                           </Box>
                         ) : (
                           <TextField
                             select
                             size="small"
-                            label="Insumo de Almacén"
-                            value={ing.inventoryItemId}
-                            onChange={(e) => {
-                              if (e.target.value === '__NEW__') {
-                                handleUpdateIngredientRow(idx, 'inventoryItemId', '__NEW__');
-                                handleUpdateIngredientRow(idx, 'customIngredientName', '');
-                              } else {
-                                handleUpdateIngredientRow(idx, 'inventoryItemId', e.target.value);
-                              }
-                            }}
-                            sx={{ flex: 1.5 }}
+                            label="Insumo en Almacén"
+                            value={String(ing.inventoryItemId)}
+                            onChange={(e) => handleUpdateIngredientRow(idx, 'inventoryItemId', e.target.value)}
+                            sx={{ flex: 2 }}
                           >
-                            <MenuItem value="__NEW__" sx={{ fontWeight: 800, color: '#16a34a', bgcolor: '#f0fdf4' }}>
-                              ✨ + Crear / Registrar nuevo insumo no existente...
-                            </MenuItem>
-                            <Divider sx={{ my: 0.5 }} />
-                            {inventory.map(invItem => (
-                              <MenuItem key={invItem.id} value={invItem.id}>
-                                {invItem.name} (${invItem.unitCost.toLocaleString()} / {invItem.unit})
+                            {inventory.map(item => (
+                              <MenuItem key={item.id} value={String(item.id)}>
+                                {item.name} (${item.unitCost.toLocaleString()} / {item.unit}) - Stock: {item.currentStock} {item.unit}
                               </MenuItem>
                             ))}
+                            <MenuItem value="__NEW__">✨ + Crear Nuevo Insumo...</MenuItem>
                           </TextField>
                         )}
 
-                        <TextField
-                          size="small"
-                          type="number"
-                          label="Cantidad"
-                          value={ing.quantity}
-                          onChange={(e) => handleUpdateIngredientRow(idx, 'quantity', Number(e.target.value))}
-                          sx={{ width: { xs: '100%', sm: 110 } }}
-                        />
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                          <TextField
+                            size="small"
+                            type="number"
+                            label="Cantidad"
+                            value={ing.quantity}
+                            onChange={(e) => handleUpdateIngredientRow(idx, 'quantity', Number(e.target.value))}
+                            sx={{ width: 90 }}
+                          />
 
-                        <TextField
-                          size="small"
-                          label="Unidad"
-                          value={ing.unit || inv?.unit || 'Kg'}
-                          onChange={(e) => handleUpdateIngredientRow(idx, 'unit', e.target.value)}
-                          sx={{ width: { xs: '100%', sm: 110 } }}
-                        />
-
-                        <Box sx={{ minWidth: 90, textAlign: { xs: 'left', sm: 'right' } }}>
-                          <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontWeight: 700 }}>
-                            {isNew ? 'Costo Estimado:' : 'Costo Insumo:'}
-                          </Typography>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#1e290b' }}>
-                            ${Math.round(cost).toLocaleString()}
-                          </Typography>
+                          <TextField
+                            select
+                            size="small"
+                            label="Unidad"
+                            value={ing.unit || 'g'}
+                            onChange={(e) => handleUpdateIngredientRow(idx, 'unit', e.target.value)}
+                            sx={{ width: 130 }}
+                          >
+                            {CULINARY_UNITS.map(u => (
+                              <MenuItem key={u.value} value={u.value}>
+                                {u.label}
+                              </MenuItem>
+                            ))}
+                          </TextField>
                         </Box>
 
-                        <IconButton size="small" color="error" onClick={() => handleRemoveIngredientRow(idx)}>
-                          <CloseIcon fontSize="small" />
-                        </IconButton>
+                        {/* Cost Display and Delete Row */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, minWidth: 140 }}>
+                          <Box sx={{ textAlign: 'right', flex: 1 }}>
+                            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '0.65rem' }}>
+                              Costo Calculado
+                            </Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 900, color: isZeroCost ? '#b45309' : '#1e290b' }}>
+                              ${Math.round(cost).toLocaleString()}
+                            </Typography>
+                          </Box>
+
+                          <IconButton size="small" color="error" onClick={() => handleRemoveIngredientRow(idx)}>
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
                       </Paper>
                     );
                   })}
@@ -1734,19 +2299,19 @@ export default function RecipesScreen() {
 
               {/* ALÉRGENOS */}
               <Grid size={{ xs: 12 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1e290b', mt: 1, mb: 0.8 }}>
-                  Alérgenos Alimentarios:
+                <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', display: 'block', mb: 0.8 }}>
+                  Alérgenos Presentes en el Plato:
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
-                  {AVAILABLE_ALLERGENS.map(allergen => {
-                    const isChecked = (editingRecipe.allergens || []).includes(allergen);
+                  {AVAILABLE_ALLERGENS.map(al => {
+                    const isChecked = (editingRecipe.allergens || []).includes(al);
                     return (
                       <Chip
-                        key={allergen}
-                        label={allergen}
-                        clickable
-                        onClick={() => toggleAllergen(allergen)}
-                        color={isChecked ? 'error' : 'default'}
+                        key={al}
+                        label={al}
+                        size="small"
+                        onClick={() => toggleAllergen(al)}
+                        color={isChecked ? 'primary' : 'default'}
                         variant={isChecked ? 'filled' : 'outlined'}
                         sx={{ fontWeight: 800, borderRadius: '8px' }}
                       />
@@ -1814,7 +2379,7 @@ export default function RecipesScreen() {
               onClick={() => window.print()}
               sx={{ borderRadius: '10px', fontWeight: 800, bgcolor: '#1e290b' }}
             >
-              Imprimir
+              Imprimir Ficha
             </Button>
             <IconButton size="small" onClick={() => setIsPrintModalOpen(false)}>
               <CloseIcon />
@@ -1841,7 +2406,7 @@ export default function RecipesScreen() {
                       P. Venta: ${fin.salePrice.toLocaleString()} COP
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#16a34a', fontWeight: 800 }}>
-                      Food Cost: {fin.foodCostPercent.toFixed(1)}%
+                      Food Cost: {fin.foodCostPercent.toFixed(1)}% (Costo: ${fin.totalCost.toLocaleString()})
                     </Typography>
                   </Box>
                 </Box>
@@ -1849,71 +2414,96 @@ export default function RecipesScreen() {
                 <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1, textTransform: 'uppercase' }}>
                   Gramaje de Insumos por Porción:
                 </Typography>
-                <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: '12px', mb: 2.5 }}>
+                <TableContainer sx={{ mb: 2.5, border: '1px solid #e2e8f0', borderRadius: '12px' }}>
                   <Table size="small">
                     <TableHead sx={{ bgcolor: '#f8fafc' }}>
                       <TableRow>
-                        <TableCell sx={{ fontWeight: 800 }}>Ingrediente</TableCell>
-                        <TableCell sx={{ fontWeight: 800 }}>Porción</TableCell>
-                        <TableCell sx={{ fontWeight: 800 }}>Notas de Mise en Place</TableCell>
+                        <TableCell sx={{ fontWeight: 800 }}>Insumo</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 800 }}>Gramaje / Unidad</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 800 }}>Costo Base</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 800 }}>Costo por Porción</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {printingRecipe.ingredients?.map((ing, idx) => {
-                        const inv = inventory.find(i => i.id === ing.inventoryItemId);
-                        return (
-                          <TableRow key={idx}>
-                            <TableCell sx={{ fontWeight: 800 }}>{inv?.name || 'Insumo'}</TableCell>
-                            <TableCell sx={{ fontWeight: 700 }}>{ing.quantity} {ing.unit || inv?.unit}</TableCell>
-                            <TableCell sx={{ color: '#64748b' }}>{ing.notes || 'Preparado fresco'}</TableCell>
-                          </TableRow>
-                        );
-                      })}
+                      {fin.ingredientsDetailed.map((ing, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell sx={{ fontWeight: 700 }}>
+                            {ing.invItem?.name || ing.customIngredientName || ing.name || 'Insumo'}
+                          </TableCell>
+                          <TableCell align="center">
+                            {ing.quantity} {ing.unit || ing.invItem?.unit}
+                          </TableCell>
+                          <TableCell align="right" sx={{ color: '#64748b' }}>
+                            ${(ing.unitCostManual || ing.invItem?.unitCost || 0).toLocaleString()} / {ing.unit || ing.invItem?.unit}
+                          </TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 800 }}>
+                            ${Math.round(ing.calculatedCost).toLocaleString()} COP
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow sx={{ bgcolor: '#f8fafc' }}>
+                        <TableCell colSpan={3} sx={{ fontWeight: 900, textAlign: 'right' }}>
+                          Costo Total con Merma ({printingRecipe.wasteMarginPercentage || 0}%):
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 900, color: '#1e290b' }}>
+                          ${fin.totalCost.toLocaleString()} COP
+                        </TableCell>
+                      </TableRow>
                     </TableBody>
                   </Table>
                 </TableContainer>
 
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 0.5, textTransform: 'uppercase' }}>
-                    Paso a Paso de Cocción y Emplatado:
-                  </Typography>
-                  <Paper elevation={0} sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>
-                      {printingRecipe.preparationInstructions || 'Sin instrucciones detalladas.'}
+                {printingRecipe.preparationInstructions && (
+                  <Box sx={{ mb: 2.5, p: 2, bgcolor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1 }}>
+                      Técnica Estándar de Preparación:
                     </Typography>
-                  </Paper>
-                </Box>
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-line', color: '#334155', lineHeight: 1.6 }}>
+                      {printingRecipe.preparationInstructions}
+                    </Typography>
+                  </Box>
+                )}
 
                 {printingRecipe.chefNotes && (
-                  <Box sx={{ p: 1.5, bgcolor: '#fffbeb', borderRadius: '12px', border: '1px solid #fef3c7' }}>
-                    <Typography variant="caption" sx={{ fontWeight: 900, color: '#92400e', display: 'block' }}>
-                      Recomendaciones del Chef:
+                  <Box sx={{ mb: 2.5, p: 2, bgcolor: '#fffbeb', borderRadius: '12px', border: '1px solid #fef3c7' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#92400e', mb: 0.5 }}>
+                      Consejos del Chef Ejecutivo:
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#78350f' }}>
+                    <Typography variant="body2" sx={{ color: '#78350f' }}>
                       {printingRecipe.chefNotes}
                     </Typography>
                   </Box>
                 )}
+
+                {/* Sign-off box for culinary kitchen binder */}
+                <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}>
+                  <Box sx={{ width: '40%', borderTop: '1px dashed #94a3b8', pt: 1, textAlign: 'center' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569' }}>
+                      Firma Chef Ejecutivo / Cocina
+                    </Typography>
+                  </Box>
+                  <Box sx={{ width: '40%', borderTop: '1px dashed #94a3b8', pt: 1, textAlign: 'center' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569' }}>
+                      Aprobación Gerencia / Operaciones
+                    </Typography>
+                  </Box>
+                </Box>
               </Box>
             );
           })()}
         </DialogContent>
       </Dialog>
 
-      {/* DIÁLOGO CONFIRMAR ELIMINACIÓN */}
+      {/* CONFIRMAR ELIMINAR DIÁLOGO */}
       <Dialog
         open={Boolean(deleteConfirmRecipe)}
         onClose={() => setDeleteConfirmRecipe(null)}
-        maxWidth="xs"
-        fullWidth
-        slotProps={{ paper: { sx: { borderRadius: '20px', p: 1 } } }}
+        slotProps={{ paper: { sx: { borderRadius: '18px', p: 1 } } }}
       >
-        <DialogTitle sx={{ fontWeight: 900, color: '#dc2626' }}>
-          ¿Eliminar Escandallo de Receta?
-        </DialogTitle>
+        <DialogTitle sx={{ fontWeight: 900 }}>¿Eliminar ficha técnica?</DialogTitle>
         <DialogContent>
-          <Typography variant="body2">
-            ¿Confirmas que deseas eliminar el escandallo y costeo de &quot;{deleteConfirmRecipe?.productName}&quot;? Los insumos del almacén no se eliminarán.
+          <Typography variant="body2" color="text.secondary">
+            ¿Estás seguro de que deseas eliminar el escandallo de "{deleteConfirmRecipe?.productName}"? Esto no eliminará el platillo de tu carta ni los insumos del almacén.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
@@ -1931,13 +2521,18 @@ export default function RecipesScreen() {
         </DialogActions>
       </Dialog>
 
-      {/* SNACKBAR FEEDBACK */}
+      {/* SNACKBAR DE FEEDBACK */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert severity={snackbar.severity} sx={{ borderRadius: '12px', fontWeight: 700 }}>
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ fontWeight: 700, borderRadius: '12px' }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>
